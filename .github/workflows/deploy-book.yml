@@ -23,9 +23,13 @@ jobs:
       - name: Install mdBook
         run: |
           mkdir -p bin
-          curl -sSL https://github.com/rust-lang/mdBook/releases/latest/download/mdbook-v0.4.44-x86_64-unknown-linux-gnu.tar.gz | tar -xz -C bin
-          curl -sSL https://github.com/badboy/mdbook-mermaid/releases/latest/download/mdbook-mermaid-v0.14.0-x86_64-unknown-linux-gnu.tar.gz | tar -xz -C bin
+          MDBOOK_URL=$(gh release view --repo rust-lang/mdBook --json assets --jq '.assets[] | select(.name | test("x86_64-unknown-linux-gnu.tar.gz$")) | .url')
+          curl -sSL "$MDBOOK_URL" | tar -xz -C bin
+          MERMAID_URL=$(gh release view --repo badboy/mdbook-mermaid --json assets --jq '.assets[] | select(.name | test("x86_64-unknown-linux-gnu.tar.gz$")) | .url')
+          curl -sSL "$MERMAID_URL" | tar -xz -C bin
           echo "$PWD/bin" >> $GITHUB_PATH
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Build book
         run: mdbook build mini-code-book

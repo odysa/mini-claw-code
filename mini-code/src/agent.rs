@@ -4,6 +4,8 @@ use tokio::sync::mpsc;
 /// Events emitted by the agent during execution.
 #[derive(Debug)]
 pub enum AgentEvent {
+    /// A chunk of text streamed from the LLM (streaming mode only).
+    TextDelta(String),
     /// A tool is being called.
     ToolCall { name: String, summary: String },
     /// The agent finished with a final response.
@@ -13,7 +15,7 @@ pub enum AgentEvent {
 }
 
 /// Format a one-line summary of a tool call for terminal output.
-fn tool_summary(call: &ToolCall) -> String {
+pub(crate) fn tool_summary(call: &ToolCall) -> String {
     // Pick the most useful argument to display:
     // "command" for bash, "path" for read/write/edit.
     let detail = call

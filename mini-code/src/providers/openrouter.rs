@@ -14,6 +14,8 @@ pub(crate) struct ChatRequest<'a> {
     pub(crate) messages: Vec<ApiMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) tools: Vec<ApiTool>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) stream: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -167,6 +169,60 @@ impl OpenRouterProvider {
     }
 }
 
+impl crate::streaming::StreamProvider for OpenRouterProvider {
+    async fn stream_chat(
+        &self,
+        messages: &[Message],
+        tools: &[&ToolDefinition],
+        tx: tokio::sync::mpsc::UnboundedSender<crate::streaming::StreamEvent>,
+    ) -> anyhow::Result<AssistantTurn> {
+        use crate::streaming::{StreamAccumulator, parse_sse_line};
+
+        let body = ChatRequest {
+            model: &self.model,
+            messages: Self::convert_messages(messages),
+            tools: Self::convert_tools(tools),
+            stream: true,
+        };
+
+        let mut resp = self
+            .client
+            .post(format!("{}/chat/completions", self.base_url))
+            .bearer_auth(&self.api_key)
+            .json(&body)
+            .send()
+            .await
+            .context("request failed")?
+            .error_for_status()
+            .context("API returned error status")?;
+
+        let mut acc = StreamAccumulator::new();
+        let mut buffer = String::new();
+
+        while let Some(chunk) = resp.chunk().await.context("failed to read chunk")? {
+            buffer.push_str(&String::from_utf8_lossy(&chunk));
+
+            while let Some(newline_pos) = buffer.find('\n') {
+                let line = buffer[..newline_pos].trim_end_matches('\r').to_string();
+                buffer = buffer[newline_pos + 1..].to_string();
+
+                if line.is_empty() {
+                    continue;
+                }
+
+                if let Some(events) = parse_sse_line(&line) {
+                    for event in events {
+                        acc.feed(&event);
+                        let _ = tx.send(event);
+                    }
+                }
+            }
+        }
+
+        Ok(acc.finish())
+    }
+}
+
 impl Provider for OpenRouterProvider {
     async fn chat(
         &self,
@@ -177,6 +233,7 @@ impl Provider for OpenRouterProvider {
             model: &self.model,
             messages: Self::convert_messages(messages),
             tools: Self::convert_tools(tools),
+            stream: false,
         };
 
         let resp: ChatResponse = self

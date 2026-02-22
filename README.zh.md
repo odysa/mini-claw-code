@@ -1,4 +1,4 @@
-<h1 align="center">mini-claw-code</h1>
+<h1 align="center">Mini Claw Code</h1>
 
 <p align="center">
   <strong>用 Rust 从零构建你自己的编程智能体。</strong><br>

@@ -1,4 +1,4 @@
-<h1 align="center">mini-claw-code</h1>
+<h1 align="center">Mini Claw Code</h1>
 
 <p align="center">
   <strong>Build your own coding agent from scratch in Rust.</strong><br>

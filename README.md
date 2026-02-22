@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/demo.gif" alt="Mini Claw Code demo" width="700">
+  <img src="docs/banner.png" alt="Mini Claw Code banner" width="500">
 </p>
 
 <h1 align="center">Mini Claw Code</h1>
@@ -21,6 +21,10 @@
 ---
 
 You use coding agents every day. Ever wonder how they actually work?
+
+<p align="center">
+  <img src="docs/demo.gif" alt="mini-claw-code running in a terminal" width="700">
+</p>
 
 It's simpler than you think. Strip away the UI, the streaming, the model routing — and every coding agent is just this loop:
 

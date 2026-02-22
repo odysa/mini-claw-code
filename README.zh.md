@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/demo.gif" alt="Mini Claw Code demo" width="700">
+  <img src="docs/banner.png" alt="Mini Claw Code banner" width="500">
 </p>
 
 <h1 align="center">Mini Claw Code</h1>
@@ -22,6 +22,10 @@
 ---
 
 你每天都在使用编程智能体，但你有没有想过它们到底是怎么工作的？
+
+<p align="center">
+  <img src="docs/demo.gif" alt="mini-claw-code 在终端中运行" width="700">
+</p>
 
 比你想象的要简单。去掉 UI、流式传输、模型路由——每个编程智能体的核心就是这个循环：
 

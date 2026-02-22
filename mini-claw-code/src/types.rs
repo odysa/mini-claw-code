@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::future::Future;
+use std::sync::Arc;
 
 use serde_json::Value;
 
@@ -145,4 +146,18 @@ pub trait Provider: Send + Sync {
         messages: &'a [Message],
         tools: &'a [&'a ToolDefinition],
     ) -> impl Future<Output = anyhow::Result<AssistantTurn>> + Send + 'a;
+}
+
+/// Blanket impl: `Arc<P>` is a `Provider` whenever `P` is.
+///
+/// This lets parent and child agents share the same provider via `Arc`
+/// without cloning. Needed for subagents (Chapter 13).
+impl<P: Provider> Provider for Arc<P> {
+    fn chat<'a>(
+        &'a self,
+        messages: &'a [Message],
+        tools: &'a [&'a ToolDefinition],
+    ) -> impl Future<Output = anyhow::Result<AssistantTurn>> + Send + 'a {
+        (**self).chat(messages, tools)
+    }
 }

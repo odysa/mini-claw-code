@@ -204,7 +204,15 @@ if allowed.is_some() && call.name == "exit_plan" {
 }
 ```
 
-After processing all tool calls in the turn, if `exit_plan` was among them:
+After the tool-call loop, `plan_text` captures the LLM's text from this turn
+(the plan itself), and the turn is pushed onto the message history:
+
+```rust
+let plan_text = turn.text.clone().unwrap_or_default();
+messages.push(Message::Assistant(turn));
+```
+
+If `exit_plan` was among the tool calls, we're done:
 
 ```rust
 if exit_plan {
@@ -323,7 +331,7 @@ let agent = PlanAgent::new(provider)
 let mut messages = vec![Message::User("Refactor auth.rs".into())];
 
 // Phase 1: Plan (read-only tools + exit_plan)
-let (tx, rx) = mpsc::unbounded_channel();
+let (tx, _rx) = mpsc::unbounded_channel(); // consume _rx to handle streaming events
 let plan = agent.plan(&mut messages, tx).await?;
 println!("Plan: {plan}");
 
@@ -331,13 +339,13 @@ println!("Plan: {plan}");
 if user_approves() {
     // Phase 2: Execute (all tools)
     messages.push(Message::User("Approved. Execute the plan.".into()));
-    let (tx2, rx2) = mpsc::unbounded_channel();
+    let (tx2, _rx2) = mpsc::unbounded_channel();
     let result = agent.execute(&mut messages, tx2).await?;
     println!("Result: {result}");
 } else {
     // Re-plan with feedback
     messages.push(Message::User("No, try a different approach.".into()));
-    let (tx3, rx3) = mpsc::unbounded_channel();
+    let (tx3, _rx3) = mpsc::unbounded_channel();
     let revised_plan = agent.plan(&mut messages, tx3).await?;
     println!("Revised plan: {revised_plan}");
 }
@@ -355,7 +363,7 @@ sequenceDiagram
     participant L as LLM
 
     C->>P: plan(&mut messages)
-    P->>L: [read, bash, exit_plan tools only]
+    P->>L: [read, bash, ask_user, exit_plan tools only]
     L-->>P: reads files, calls exit_plan
     P-->>C: "Plan: ..."
 
@@ -368,7 +376,7 @@ sequenceDiagram
         P-->>C: "Done."
     else Rejected
         C->>P: plan(&mut messages) [with feedback]
-        P->>L: [read, bash, exit_plan tools only]
+        P->>L: [read, bash, ask_user, exit_plan tools only]
         L-->>P: revised plan
         P-->>C: "Revised plan: ..."
     end

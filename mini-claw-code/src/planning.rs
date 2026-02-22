@@ -6,25 +6,40 @@ use crate::agent::{AgentEvent, tool_summary};
 use crate::streaming::{StreamEvent, StreamProvider};
 use crate::types::*;
 
+const DEFAULT_PLAN_PROMPT: &str = "\
+You are in PLANNING MODE. Explore the codebase using the available tools and \
+create a plan. You can read files, run shell commands, and ask the user \
+questions — but you CANNOT write, edit, or create files.\n\n\
+When your plan is ready, call the `exit_plan` tool to submit it for review.";
+
 /// A two-phase agent that separates planning (read-only) from execution (all tools).
 ///
-/// During the **plan** phase, only read-only tools are available — the LLM cannot
-/// see or call write/edit/bash-mutating tools. During the **execute** phase, all
-/// registered tools are available. The caller drives the approval flow between
-/// the two phases.
+/// During the **plan** phase a system prompt is injected telling the LLM it is
+/// in planning mode, and only read-only tools (plus `exit_plan`) are visible.
+/// The LLM calls `exit_plan` when its plan is ready, or stops naturally.
+/// During the **execute** phase all registered tools are available.
+/// The caller drives the approval flow between the two phases.
 pub struct PlanAgent<P: StreamProvider> {
     provider: P,
     tools: ToolSet,
     read_only: HashSet<&'static str>,
+    plan_system_prompt: String,
+    exit_plan_def: ToolDefinition,
 }
 
 impl<P: StreamProvider> PlanAgent<P> {
-    /// Create a new `PlanAgent` with default read-only tools: `bash` and `read`.
+    /// Create a new `PlanAgent` with default read-only tools: `bash`, `read`, and `ask_user`.
     pub fn new(provider: P) -> Self {
         Self {
             provider,
             tools: ToolSet::new(),
             read_only: HashSet::from(["bash", "read", "ask_user"]),
+            plan_system_prompt: DEFAULT_PLAN_PROMPT.to_string(),
+            exit_plan_def: ToolDefinition::new(
+                "exit_plan",
+                "Signal that your plan is complete and ready for user review. \
+                 Call this when you have finished exploring and are ready to present your plan.",
+            ),
         }
     }
 
@@ -40,16 +55,28 @@ impl<P: StreamProvider> PlanAgent<P> {
         self
     }
 
-    /// Run the **planning** phase: only read-only tools are available.
+    /// Override the system prompt injected at the start of the planning phase.
+    pub fn plan_prompt(mut self, prompt: impl Into<String>) -> Self {
+        self.plan_system_prompt = prompt.into();
+        self
+    }
+
+    /// Run the **planning** phase: only read-only tools (plus `exit_plan`) are visible.
     ///
-    /// The LLM sees only read-only tool definitions. If it somehow calls a
-    /// blocked tool, the agent returns an error `ToolResult` instead of
-    /// executing it.
+    /// Injects a system prompt if one is not already present, telling the LLM
+    /// it is in planning mode. Returns when the LLM either calls `exit_plan`
+    /// or stops naturally.
     pub async fn plan(
         &self,
         messages: &mut Vec<Message>,
         events: mpsc::UnboundedSender<AgentEvent>,
     ) -> anyhow::Result<String> {
+        if !messages
+            .first()
+            .is_some_and(|m| matches!(m, Message::System(_)))
+        {
+            messages.insert(0, Message::System(self.plan_system_prompt.clone()));
+        }
         self.run_loop(messages, Some(&self.read_only), events).await
     }
 
@@ -62,8 +89,8 @@ impl<P: StreamProvider> PlanAgent<P> {
         self.run_loop(messages, None, events).await
     }
 
-    /// Shared agent loop. When `allowed` is `Some`, only those tool names are
-    /// sent to the LLM and permitted for execution (double defense).
+    /// Shared agent loop. When `allowed` is `Some`, only those tool names
+    /// (plus `exit_plan`) are sent to the LLM and permitted for execution.
     async fn run_loop(
         &self,
         messages: &mut Vec<Message>,
@@ -72,10 +99,14 @@ impl<P: StreamProvider> PlanAgent<P> {
     ) -> anyhow::Result<String> {
         let all_defs = self.tools.definitions();
         let defs: Vec<&ToolDefinition> = match allowed {
-            Some(names) => all_defs
-                .into_iter()
-                .filter(|d| names.contains(d.name))
-                .collect(),
+            Some(names) => {
+                let mut filtered: Vec<&ToolDefinition> = all_defs
+                    .into_iter()
+                    .filter(|d| names.contains(d.name))
+                    .collect();
+                filtered.push(&self.exit_plan_def);
+                filtered
+            }
             None => all_defs,
         };
 
@@ -109,7 +140,16 @@ impl<P: StreamProvider> PlanAgent<P> {
                 }
                 StopReason::ToolUse => {
                     let mut results = Vec::with_capacity(turn.tool_calls.len());
+                    let mut exit_plan = false;
+
                     for call in &turn.tool_calls {
+                        // Handle exit_plan: signal plan completion
+                        if allowed.is_some() && call.name == "exit_plan" {
+                            results.push((call.id.clone(), "Plan submitted for review.".into()));
+                            exit_plan = true;
+                            continue;
+                        }
+
                         // Execution guard: block tools not in the allowed set
                         if let Some(names) = allowed
                             && !names.contains(call.name.as_str())
@@ -138,9 +178,16 @@ impl<P: StreamProvider> PlanAgent<P> {
                         results.push((call.id.clone(), content));
                     }
 
+                    let plan_text = turn.text.clone().unwrap_or_default();
                     messages.push(Message::Assistant(turn));
                     for (id, content) in results {
                         messages.push(Message::ToolResult { id, content });
+                    }
+
+                    // If exit_plan was called, return the plan text to the caller
+                    if exit_plan {
+                        let _ = events.send(AgentEvent::Done(plan_text.clone()));
+                        return Ok(plan_text);
                     }
                 }
             }

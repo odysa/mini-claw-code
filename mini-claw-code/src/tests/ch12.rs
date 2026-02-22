@@ -30,7 +30,9 @@ async fn test_ch12_plan_text_response() {
     let result = agent.plan(&mut messages, tx).await.unwrap();
 
     assert_eq!(result, "Here is my plan.");
-    assert_eq!(messages.len(), 2);
+    // System prompt injected + User + Assistant
+    assert_eq!(messages.len(), 3);
+    assert!(matches!(&messages[0], Message::System(_)));
 }
 
 // ---------------------------------------------------------------------------
@@ -298,17 +300,17 @@ async fn test_ch12_message_continuity() {
     let mut messages = vec![Message::User("Task".into())];
 
     let _ = agent.plan(&mut messages, tx).await.unwrap();
-    // After plan: [User, Assistant]
-    assert_eq!(messages.len(), 2);
+    // After plan: [System, User, Assistant]
+    assert_eq!(messages.len(), 3);
 
     messages.push(Message::User("Approved".into()));
-    // Before execute: [User, Assistant, User]
-    assert_eq!(messages.len(), 3);
+    // Before execute: [System, User, Assistant, User]
+    assert_eq!(messages.len(), 4);
 
     let (tx2, _rx2) = mpsc::unbounded_channel();
     let _ = agent.execute(&mut messages, tx2).await.unwrap();
-    // After execute: [User, Assistant, User, Assistant]
-    assert_eq!(messages.len(), 4);
+    // After execute: [System, User, Assistant, User, Assistant]
+    assert_eq!(messages.len(), 5);
 }
 
 // ---------------------------------------------------------------------------
@@ -414,6 +416,277 @@ fn test_ch12_builder_pattern() {
         .tool(WriteTool::new())
         .tool(EditTool::new())
         .tool(BashTool::new())
-        .read_only(&["read", "bash"]);
+        .read_only(&["read", "bash"])
+        .plan_prompt("Custom planning instructions.");
     // If this compiles and runs, the builder pattern works.
+}
+
+// ---------------------------------------------------------------------------
+// 12. System prompt injection
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_ch12_system_prompt_injected() {
+    let provider = MockStreamProvider::new(VecDeque::from([AssistantTurn {
+        text: Some("ok".into()),
+        tool_calls: vec![],
+        stop_reason: StopReason::Stop,
+    }]));
+
+    let agent = PlanAgent::new(provider).tool(ReadTool::new());
+
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let mut messages = vec![Message::User("Task".into())];
+    let _ = agent.plan(&mut messages, tx).await.unwrap();
+
+    // System prompt was injected at position 0
+    assert!(matches!(&messages[0], Message::System(s) if s.contains("PLANNING MODE")));
+}
+
+// ---------------------------------------------------------------------------
+// 13. System prompt not duplicated on re-plan
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_ch12_system_prompt_not_duplicated() {
+    let provider = MockStreamProvider::new(VecDeque::from([
+        AssistantTurn {
+            text: Some("Plan A".into()),
+            tool_calls: vec![],
+            stop_reason: StopReason::Stop,
+        },
+        AssistantTurn {
+            text: Some("Plan B".into()),
+            tool_calls: vec![],
+            stop_reason: StopReason::Stop,
+        },
+    ]));
+
+    let agent = PlanAgent::new(provider).tool(ReadTool::new());
+
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let mut messages = vec![Message::User("Task".into())];
+    let _ = agent.plan(&mut messages, tx).await.unwrap();
+
+    // Re-plan with feedback
+    messages.push(Message::User("Try again".into()));
+    let (tx2, _rx2) = mpsc::unbounded_channel();
+    let _ = agent.plan(&mut messages, tx2).await.unwrap();
+
+    // Should still have exactly one System message
+    let system_count = messages
+        .iter()
+        .filter(|m| matches!(m, Message::System(_)))
+        .count();
+    assert_eq!(system_count, 1);
+}
+
+// ---------------------------------------------------------------------------
+// 14. Caller-provided system prompt is respected
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_ch12_caller_system_prompt_respected() {
+    let provider = MockStreamProvider::new(VecDeque::from([AssistantTurn {
+        text: Some("ok".into()),
+        tool_calls: vec![],
+        stop_reason: StopReason::Stop,
+    }]));
+
+    let agent = PlanAgent::new(provider).tool(ReadTool::new());
+
+    let (tx, _rx) = mpsc::unbounded_channel();
+    // Caller already set a system prompt
+    let mut messages = vec![
+        Message::System("You are a helpful assistant.".into()),
+        Message::User("Task".into()),
+    ];
+    let _ = agent.plan(&mut messages, tx).await.unwrap();
+
+    // plan() should NOT overwrite the caller's system prompt
+    assert!(matches!(&messages[0], Message::System(s) if s.contains("helpful assistant")));
+    let system_count = messages
+        .iter()
+        .filter(|m| matches!(m, Message::System(_)))
+        .count();
+    assert_eq!(system_count, 1);
+}
+
+// ---------------------------------------------------------------------------
+// 15. exit_plan tool ends planning
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_ch12_exit_plan_tool() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("code.rs");
+    std::fs::write(&path, "fn main() {}").unwrap();
+
+    let provider = MockStreamProvider::new(VecDeque::from([
+        // Turn 1: read the file
+        AssistantTurn {
+            text: None,
+            tool_calls: vec![ToolCall {
+                id: "c1".into(),
+                name: "read".into(),
+                arguments: json!({"path": path.to_str().unwrap()}),
+            }],
+            stop_reason: StopReason::ToolUse,
+        },
+        // Turn 2: present plan and call exit_plan
+        AssistantTurn {
+            text: Some("Plan: add error handling to main".into()),
+            tool_calls: vec![ToolCall {
+                id: "c2".into(),
+                name: "exit_plan".into(),
+                arguments: json!({}),
+            }],
+            stop_reason: StopReason::ToolUse,
+        },
+    ]));
+
+    let agent = PlanAgent::new(provider).tool(ReadTool::new());
+
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let mut messages = vec![Message::User("Refactor this".into())];
+    let plan = agent.plan(&mut messages, tx).await.unwrap();
+
+    assert_eq!(plan, "Plan: add error handling to main");
+
+    // Verify exit_plan result was added to messages
+    let has_exit_result = messages.iter().any(|m| {
+        matches!(m, Message::ToolResult { content, .. } if content.contains("submitted for review"))
+    });
+    assert!(has_exit_result);
+}
+
+// ---------------------------------------------------------------------------
+// 16. exit_plan not visible during execute
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_ch12_exit_plan_not_in_execute() {
+    // During execute, exit_plan is NOT intercepted — if the LLM somehow
+    // called it, it would be treated as an unknown tool.
+    let provider = MockStreamProvider::new(VecDeque::from([
+        AssistantTurn {
+            text: None,
+            tool_calls: vec![ToolCall {
+                id: "c1".into(),
+                name: "exit_plan".into(),
+                arguments: json!({}),
+            }],
+            stop_reason: StopReason::ToolUse,
+        },
+        AssistantTurn {
+            text: Some("ok".into()),
+            tool_calls: vec![],
+            stop_reason: StopReason::Stop,
+        },
+    ]));
+
+    let agent = PlanAgent::new(provider).tool(ReadTool::new());
+
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let mut messages = vec![Message::User("Execute".into())];
+    let result = agent.execute(&mut messages, tx).await.unwrap();
+
+    assert_eq!(result, "ok");
+    // exit_plan was treated as unknown tool during execute
+    let has_unknown_error = messages.iter().any(
+        |m| matches!(m, Message::ToolResult { content, .. } if content.contains("unknown tool")),
+    );
+    assert!(has_unknown_error);
+}
+
+// ---------------------------------------------------------------------------
+// 17. Custom plan prompt
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_ch12_custom_plan_prompt() {
+    let provider = MockStreamProvider::new(VecDeque::from([AssistantTurn {
+        text: Some("ok".into()),
+        tool_calls: vec![],
+        stop_reason: StopReason::Stop,
+    }]));
+
+    let agent = PlanAgent::new(provider)
+        .tool(ReadTool::new())
+        .plan_prompt("You are a security auditor. Read code and report vulnerabilities.");
+
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let mut messages = vec![Message::User("Audit".into())];
+    let _ = agent.plan(&mut messages, tx).await.unwrap();
+
+    assert!(matches!(&messages[0], Message::System(s) if s.contains("security auditor")));
+}
+
+// ---------------------------------------------------------------------------
+// 18. Full flow with exit_plan (plan → approve → execute)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_ch12_full_flow_with_exit_plan() {
+    let dir = tempfile::tempdir().unwrap();
+    let read_path = dir.path().join("src.txt");
+    let write_path = dir.path().join("out.txt");
+    std::fs::write(&read_path, "hello world").unwrap();
+
+    let provider = MockStreamProvider::new(VecDeque::from([
+        // Plan: read file
+        AssistantTurn {
+            text: None,
+            tool_calls: vec![ToolCall {
+                id: "c1".into(),
+                name: "read".into(),
+                arguments: json!({"path": read_path.to_str().unwrap()}),
+            }],
+            stop_reason: StopReason::ToolUse,
+        },
+        // Plan: present plan and call exit_plan
+        AssistantTurn {
+            text: Some("Plan: uppercase the content and write to out.txt".into()),
+            tool_calls: vec![ToolCall {
+                id: "c2".into(),
+                name: "exit_plan".into(),
+                arguments: json!({}),
+            }],
+            stop_reason: StopReason::ToolUse,
+        },
+        // Execute: write file
+        AssistantTurn {
+            text: None,
+            tool_calls: vec![ToolCall {
+                id: "c3".into(),
+                name: "write".into(),
+                arguments: json!({"path": write_path.to_str().unwrap(), "content": "HELLO WORLD"}),
+            }],
+            stop_reason: StopReason::ToolUse,
+        },
+        // Execute: done
+        AssistantTurn {
+            text: Some("Done.".into()),
+            tool_calls: vec![],
+            stop_reason: StopReason::Stop,
+        },
+    ]));
+
+    let agent = PlanAgent::new(provider)
+        .tool(ReadTool::new())
+        .tool(WriteTool::new());
+
+    // Plan phase
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let mut messages = vec![Message::User("Uppercase src.txt into out.txt".into())];
+    let plan = agent.plan(&mut messages, tx).await.unwrap();
+    assert_eq!(plan, "Plan: uppercase the content and write to out.txt");
+    assert!(!write_path.exists());
+
+    // Approve and execute
+    messages.push(Message::User("Approved.".into()));
+    let (tx2, _rx2) = mpsc::unbounded_channel();
+    let result = agent.execute(&mut messages, tx2).await.unwrap();
+    assert_eq!(result, "Done.");
+    assert_eq!(std::fs::read_to_string(&write_path).unwrap(), "HELLO WORLD");
 }

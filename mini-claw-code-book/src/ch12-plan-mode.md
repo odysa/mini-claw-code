@@ -18,9 +18,10 @@ This is exactly how Claude Code's plan mode works. In this chapter you'll build
 You will:
 
 1. Build `PlanAgent<P: StreamProvider>` with `plan()` and `execute()` methods.
-2. Implement **double defense**: definition filtering *and* an execution guard.
-3. Let the caller drive the approval flow between phases.
-4. Reuse the streaming agent loop from Chapter 10.
+2. Inject a **system prompt** that tells the LLM it's in planning mode.
+3. Add an **`exit_plan` tool** the LLM calls when its plan is ready.
+4. Implement **double defense**: definition filtering *and* an execution guard.
+5. Let the caller drive the approval flow between phases.
 
 ## Why plan mode?
 
@@ -43,7 +44,8 @@ User: "Refactor auth.rs to use JWT instead of session cookies"
 Agent (plan phase):
   → calls read("auth.rs") to understand current code
   → calls bash("grep -r 'session' src/") to find related files
-  → returns: "Plan: Replace SessionStore with JwtProvider in 3 files..."
+  → calls exit_plan to submit its plan
+  → "Plan: Replace SessionStore with JwtProvider in 3 files..."
 
 User: "Looks good, go ahead."
 
@@ -57,20 +59,26 @@ difference is *which tools are available*.
 ## Design
 
 `PlanAgent` has the same shape as `StreamingAgent` -- a provider, a `ToolSet`,
-and an agent loop. The difference is a `HashSet<&'static str>` that records
-which tools are allowed during planning:
+and an agent loop. Three additions make it a planning agent:
+
+1. A `HashSet<&'static str>` recording which tools are allowed during planning.
+2. A **system prompt** injected at the start of the planning phase.
+3. An **`exit_plan` tool definition** the LLM calls when its plan is ready.
 
 ```rust
 pub struct PlanAgent<P: StreamProvider> {
     provider: P,
     tools: ToolSet,
     read_only: HashSet<&'static str>,
+    plan_system_prompt: String,
+    exit_plan_def: ToolDefinition,
 }
 ```
 
 Two public methods drive the two phases:
 
-- **`plan()`** -- runs the agent loop with only read-only tools visible.
+- **`plan()`** -- injects the system prompt, runs the agent loop with only
+  read-only tools and `exit_plan` visible.
 - **`execute()`** -- runs the agent loop with all tools visible.
 
 Both delegate to a private `run_loop()` that takes an optional tool filter.
@@ -87,6 +95,13 @@ impl<P: StreamProvider> PlanAgent<P> {
             provider,
             tools: ToolSet::new(),
             read_only: HashSet::from(["bash", "read", "ask_user"]),
+            plan_system_prompt: DEFAULT_PLAN_PROMPT.to_string(),
+            exit_plan_def: ToolDefinition::new(
+                "exit_plan",
+                "Signal that your plan is complete and ready for user review. \
+                 Call this when you have finished exploring and are ready to \
+                 present your plan.",
+            ),
         }
     }
 
@@ -99,6 +114,11 @@ impl<P: StreamProvider> PlanAgent<P> {
         self.read_only = names.iter().copied().collect();
         self
     }
+
+    pub fn plan_prompt(mut self, prompt: impl Into<String>) -> Self {
+        self.plan_system_prompt = prompt.into();
+        self
+    }
 }
 ```
 
@@ -107,34 +127,129 @@ By default, `bash`, `read`, and `ask_user` are read-only. (Chapter 11 added
 `.read_only()` method lets callers override this -- for example, to exclude
 `bash` from planning if you want a stricter mode.
 
+The `.plan_prompt()` method lets callers override the system prompt -- useful
+for specialized agents like security auditors or code reviewers.
+
+## System prompt
+
+The LLM needs to *know* it's in planning mode. Without this, it will try to
+accomplish the task with whatever tools it sees, rather than producing a
+deliberate plan.
+
+`plan()` injects a system prompt at the start of the conversation:
+
+```rust
+const DEFAULT_PLAN_PROMPT: &str = "\
+You are in PLANNING MODE. Explore the codebase using the available tools and \
+create a plan. You can read files, run shell commands, and ask the user \
+questions — but you CANNOT write, edit, or create files.\n\n\
+When your plan is ready, call the `exit_plan` tool to submit it for review.";
+```
+
+The injection is conditional -- if the caller already provided a `System`
+message, `plan()` respects it:
+
+```rust
+pub async fn plan(
+    &self,
+    messages: &mut Vec<Message>,
+    events: mpsc::UnboundedSender<AgentEvent>,
+) -> anyhow::Result<String> {
+    if !messages
+        .first()
+        .is_some_and(|m| matches!(m, Message::System(_)))
+    {
+        messages.insert(0, Message::System(self.plan_system_prompt.clone()));
+    }
+    self.run_loop(messages, Some(&self.read_only), events).await
+}
+```
+
+This means:
+- **First call**: no system message → inject the plan prompt.
+- **Re-plan call**: system message already there → skip.
+- **Caller provided their own**: caller's system message → respect it.
+
+This is how real agents work. Claude Code switches its system prompt when
+entering plan mode. OpenCode uses entirely separate agent configurations with
+different system prompts for `plan` vs `build` agents.
+
+## The `exit_plan` tool
+
+Without `exit_plan`, the planning phase ends when the LLM returns
+`StopReason::Stop` -- the same way any conversation ends. This is ambiguous:
+did the LLM finish planning, or did it just stop talking?
+
+Real agents solve this with an explicit signal. Claude Code has `ExitPlanMode`.
+OpenCode has `exit_plan`. The LLM calls the tool to say "my plan is ready for
+review."
+
+In `PlanAgent`, `exit_plan` is a tool definition stored on the struct -- not
+registered in the `ToolSet`. This means:
+
+- During **plan**: `exit_plan` is injected into the tool list alongside
+  read-only tools. The LLM can see and call it.
+- During **execute**: `exit_plan` is not in the tool list. The LLM doesn't
+  know it exists.
+
+When the agent loop sees an `exit_plan` call, it returns immediately with the
+plan text (the LLM's text from that turn):
+
+```rust
+// Handle exit_plan: signal plan completion
+if allowed.is_some() && call.name == "exit_plan" {
+    results.push((call.id.clone(), "Plan submitted for review.".into()));
+    exit_plan = true;
+    continue;
+}
+```
+
+After processing all tool calls in the turn, if `exit_plan` was among them:
+
+```rust
+if exit_plan {
+    let _ = events.send(AgentEvent::Done(plan_text.clone()));
+    return Ok(plan_text);
+}
+```
+
+The planning phase now has two exit paths:
+1. **`StopReason::Stop`** -- LLM stops naturally (backward compatible).
+2. **`exit_plan` tool call** -- LLM explicitly signals plan completion.
+
+Both work. The `exit_plan` path is better because it's unambiguous.
+
 ## Double defense
 
-Tool filtering uses two layers of protection:
+Tool filtering still uses two layers of protection:
 
 ### Layer 1: Definition filtering
 
-During `plan()`, only read-only tool definitions are sent to the LLM. The
-model literally cannot see `write` or `edit` in its tool list:
+During `plan()`, only read-only tool definitions plus `exit_plan` are sent to
+the LLM. The model literally cannot see `write` or `edit` in its tool list:
 
 ```rust
 let all_defs = self.tools.definitions();
 let defs: Vec<&ToolDefinition> = match allowed {
-    Some(names) => all_defs
-        .into_iter()
-        .filter(|d| names.contains(d.name))
-        .collect(),
+    Some(names) => {
+        let mut filtered: Vec<&ToolDefinition> = all_defs
+            .into_iter()
+            .filter(|d| names.contains(d.name))
+            .collect();
+        filtered.push(&self.exit_plan_def);
+        filtered
+    }
     None => all_defs,
 };
 ```
 
-This is the primary defense. If the LLM doesn't know a tool exists, it
-(usually) won't try to call it.
+During `execute()`, `allowed` is `None`, so all registered tools are sent --
+and `exit_plan` is *not* included.
 
 ### Layer 2: Execution guard
 
-But LLMs can hallucinate tool calls. If the model somehow calls `write` during
-planning, the execution guard catches it and returns an error `ToolResult`
-instead of executing the tool:
+If the LLM somehow hallucinated a blocked tool call, the execution guard
+catches it and returns an error `ToolResult` instead of executing the tool:
 
 ```rust
 if let Some(names) = allowed
@@ -165,6 +280,7 @@ pub async fn plan(
     messages: &mut Vec<Message>,
     events: mpsc::UnboundedSender<AgentEvent>,
 ) -> anyhow::Result<String> {
+    // System prompt injection (shown earlier)
     self.run_loop(messages, Some(&self.read_only), events).await
 }
 
@@ -181,96 +297,13 @@ pub async fn execute(
 `None` to allow everything.
 
 The `run_loop` itself is identical to `StreamingAgent::chat()` from Chapter 10,
-with the addition of the tool filter:
+with these additions:
 
-```rust
-async fn run_loop(
-    &self,
-    messages: &mut Vec<Message>,
-    allowed: Option<&HashSet<&'static str>>,
-    events: mpsc::UnboundedSender<AgentEvent>,
-) -> anyhow::Result<String> {
-    // Filter definitions based on allowed set
-    let all_defs = self.tools.definitions();
-    let defs: Vec<&ToolDefinition> = match allowed {
-        Some(names) => all_defs.into_iter()
-            .filter(|d| names.contains(d.name)).collect(),
-        None => all_defs,
-    };
-
-    loop {
-        // Stream channel + forwarder (same as StreamingAgent)
-        let (stream_tx, mut stream_rx) = mpsc::unbounded_channel();
-        let events_clone = events.clone();
-        let forwarder = tokio::spawn(async move {
-            while let Some(event) = stream_rx.recv().await {
-                if let StreamEvent::TextDelta(text) = event {
-                    let _ = events_clone.send(AgentEvent::TextDelta(text));
-                }
-            }
-        });
-
-        let turn = match self.provider.stream_chat(
-            messages, &defs, stream_tx
-        ).await {
-            Ok(t) => t,
-            Err(e) => {
-                let _ = events.send(AgentEvent::Error(e.to_string()));
-                return Err(e);
-            }
-        };
-        let _ = forwarder.await;
-
-        match turn.stop_reason {
-            StopReason::Stop => {
-                let text = turn.text.clone().unwrap_or_default();
-                let _ = events.send(AgentEvent::Done(text.clone()));
-                messages.push(Message::Assistant(turn));
-                return Ok(text);
-            }
-            StopReason::ToolUse => {
-                let mut results = Vec::with_capacity(turn.tool_calls.len());
-                for call in &turn.tool_calls {
-                    // --- Execution guard ---
-                    if let Some(names) = allowed
-                        && !names.contains(call.name.as_str())
-                    {
-                        results.push((
-                            call.id.clone(),
-                            format!("error: tool '{}' is not available \
-                                     in planning mode", call.name),
-                        ));
-                        continue;
-                    }
-
-                    // Execute the tool normally
-                    let _ = events.send(AgentEvent::ToolCall {
-                        name: call.name.clone(),
-                        summary: tool_summary(call),
-                    });
-                    let content = match self.tools.get(&call.name) {
-                        Some(t) => t.call(call.arguments.clone()).await
-                            .unwrap_or_else(|e| format!("error: {e}")),
-                        None => format!("error: unknown tool `{}`", call.name),
-                    };
-                    results.push((call.id.clone(), content));
-                }
-
-                messages.push(Message::Assistant(turn));
-                for (id, content) in results {
-                    messages.push(Message::ToolResult { id, content });
-                }
-            }
-        }
-    }
-}
-```
-
-Compare this to `StreamingAgent::chat()` from Chapter 10. The structure is
-identical -- the only additions are:
-
-1. The `allowed` parameter and definition filtering at the top.
-2. The execution guard inside the `ToolUse` branch.
+1. Tool definition filtering (read-only + `exit_plan` during plan; all during
+   execute).
+2. The `exit_plan` handler that breaks the loop when the LLM signals plan
+   completion.
+3. The execution guard for blocked tools.
 
 ## Caller-driven approval flow
 
@@ -289,7 +322,7 @@ let agent = PlanAgent::new(provider)
 
 let mut messages = vec![Message::User("Refactor auth.rs".into())];
 
-// Phase 1: Plan (read-only tools)
+// Phase 1: Plan (read-only tools + exit_plan)
 let (tx, rx) = mpsc::unbounded_channel();
 let plan = agent.plan(&mut messages, tx).await?;
 println!("Plan: {plan}");
@@ -322,8 +355,8 @@ sequenceDiagram
     participant L as LLM
 
     C->>P: plan(&mut messages)
-    P->>L: [read, bash tools only]
-    L-->>P: reads files, returns plan
+    P->>L: [read, bash, exit_plan tools only]
+    L-->>P: reads files, calls exit_plan
     P-->>C: "Plan: ..."
 
     C->>C: User reviews plan
@@ -335,7 +368,7 @@ sequenceDiagram
         P-->>C: "Done."
     else Rejected
         C->>P: plan(&mut messages) [with feedback]
-        P->>L: [read, bash tools only]
+        P->>L: [read, bash, exit_plan tools only]
         L-->>P: revised plan
         P-->>C: "Revised plan: ..."
     end
@@ -371,18 +404,36 @@ The tests verify:
 - **Full plan-then-execute**: end-to-end flow -- plan reads a file, approval,
   execute writes a file.
 - **Message continuity**: messages from the plan phase carry into the execute
-  phase.
+  phase, including the injected system prompt.
 - **read_only override**: `.read_only(&["read"])` excludes `bash` from
   planning.
 - **Streaming events**: `TextDelta` and `Done` events are emitted during
   planning.
 - **Provider error**: empty mock propagates errors correctly.
-- **Builder pattern**: chained `.tool().read_only()` compiles.
+- **Builder pattern**: chained `.tool().read_only().plan_prompt()` compiles.
+- **System prompt injection**: `plan()` injects a system prompt at position 0.
+- **System prompt not duplicated**: calling `plan()` twice doesn't add a
+  second system message.
+- **Caller system prompt respected**: if the caller provides a `System`
+  message, `plan()` doesn't overwrite it.
+- **`exit_plan` tool**: the LLM calls `exit_plan` to signal plan completion;
+  `plan()` returns the plan text.
+- **`exit_plan` not in execute**: during `execute()`, `exit_plan` is not in
+  the tool list.
+- **Custom plan prompt**: `.plan_prompt(...)` overrides the default.
+- **Full flow with `exit_plan`**: plan reads file → calls `exit_plan` →
+  approve → execute writes file.
 
 ## Recap
 
 - **`PlanAgent`** separates planning (read-only) from execution (all tools)
   using a single shared agent loop.
+- **System prompt**: `plan()` injects a system message telling the LLM it's in
+  planning mode — what tools are available, what's blocked, and that it should
+  call `exit_plan` when done.
+- **`exit_plan` tool**: the LLM explicitly signals plan completion, just like
+  Claude Code's `ExitPlanMode`. This is injected during planning and invisible
+  during execution.
 - **Double defense**: definition filtering prevents the LLM from seeing blocked
   tools; an execution guard catches hallucinated calls.
 - **Caller-driven approval**: the agent doesn't manage approval -- the caller

@@ -25,7 +25,11 @@ fn check(package: &str) {
     println!("Checking {package}...\n");
 
     run("cargo", &["fmt", "--check", "-p", package], "fmt");
-    run("cargo", &["clippy", "-p", package, "--", "-D", "warnings"], "clippy");
+    run(
+        "cargo",
+        &["clippy", "-p", package, "--", "-D", "warnings"],
+        "clippy",
+    );
     run("cargo", &["test", "-p", package], "test");
 
     println!("\nAll checks passed for {package}!");
@@ -33,13 +37,10 @@ fn check(package: &str) {
 
 fn run(cmd: &str, args: &[&str], label: &str) {
     println!("--- {label} ---");
-    let status = Command::new(cmd)
-        .args(args)
-        .status()
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to run {cmd}: {e}");
-            exit(1);
-        });
+    let status = Command::new(cmd).args(args).status().unwrap_or_else(|e| {
+        eprintln!("Failed to run {cmd}: {e}");
+        exit(1);
+    });
 
     if !status.success() {
         eprintln!("\n{label} failed!");

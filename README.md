@@ -11,6 +11,10 @@
   <a href="#chapter-roadmap">Chapters</a>
 </p>
 
+<p align="center">
+  English | <a href="README.zh.md">中文</a>
+</p>
+
 ---
 
 You use coding agents every day. Ever wonder how they actually work?

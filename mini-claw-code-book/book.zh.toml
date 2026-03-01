@@ -1,11 +1,11 @@
 [book]
-title = "Build Your Own Mini Coding Agent in Rust"
+title = "用 Rust 构建你自己的迷你编程智能体"
 authors = ["mini-claw-code contributors"]
-language = "en"
-src = "src"
+language = "zh"
+src = "zh"
 
 [build]
-build-dir = "book/en"
+build-dir = "book/zh"
 
 [preprocessor.mermaid]
 command = "mdbook-mermaid"
@@ -13,6 +13,6 @@ command = "mdbook-mermaid"
 [output.html]
 additional-js = ["mermaid.min.js", "mermaid-init.js", "lang-switcher.js"]
 additional-css = ["lang-switcher.css"]
-site-url = "/mini-claw-code/en/"
+site-url = "/mini-claw-code/zh/"
 git-repository-url = "https://github.com/odysa/mini-claw-code"
 git-repository-icon = "fab-github"

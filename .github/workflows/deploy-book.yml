@@ -31,8 +31,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Build book
+      - name: Build English book
         run: mdbook build mini-claw-code-book
+
+      - name: Build Chinese book
+        run: |
+          cp mini-claw-code-book/book.zh.toml mini-claw-code-book/book.toml
+          mdbook build mini-claw-code-book
+
+      - name: Add landing page
+        run: cp mini-claw-code-book/index.html mini-claw-code-book/book/index.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -1,16 +1,16 @@
 # 概述
 
-欢迎阅读《用 Rust 构建你自己的迷你编程代理（Agent）》。在接下来的七个章节中，你将从零开始实现一个迷你编程代理（Agent）——一个类似 Claude Code 或 OpenCode 的小型程序——它接收提示词（Prompt），与大语言模型（LLM）对话，并使用*工具（Tool）*与真实世界交互。之后，一系列扩展章节将添加流式传输、终端界面（TUI）、用户输入、计划模式等功能。
+欢迎阅读《用 Rust 构建你自己的迷你 Claw Code》。在接下来的七个章节中，你将从零开始实现一个迷你 coding agent——一个类似 Claude Code 或 OpenCode 的小型程序——它接收提示词（Prompt），与大语言模型（LLM）对话，并使用*工具（Tool）*与真实世界交互。之后，一系列扩展章节将添加流式传输、终端界面（TUI）、用户输入、计划模式等功能。
 
-在本书结束时，你将拥有一个能运行 Shell 命令、读写文件、编辑代码的代理，全部由 LLM 驱动。在第 6 章之前不需要 API 密钥，到那时默认模型是
+在本书结束时，你将拥有一个能运行 Shell 命令、读写文件、编辑代码的 agent，全部由 LLM 驱动。在第 6 章之前不需要 API 密钥，到那时默认模型是
 [`openrouter/free`](https://openrouter.ai/docs/guides/routing/routers/free-models-router)
 ——OpenRouter 上的免费端点，无需任何费用。
 
-## 什么是 AI 代理？
+## 什么是 AI agent？
 
 LLM 本身只是一个函数：文本输入，文本输出。让它总结 `doc.pdf`，它要么拒绝，要么产生幻觉——因为它没有办法打开文件。
 
-**代理（Agent）** 通过给 LLM 提供**工具（Tool）** 来解决这个问题。工具就是你的代码可以运行的函数——读取文件、执行 Shell 命令、调用 API。代理在一个循环中运行：
+**Agent** 通过给 LLM 提供**工具（Tool）** 来解决这个问题。工具就是你的代码可以运行的函数——读取文件、执行 Shell 命令、调用 API。Agent 在一个循环中运行：
 
 1. 将用户的提示词发送给 LLM。
 2. LLM 判断它需要读取 `doc.pdf`，并输出一个工具调用。
@@ -68,7 +68,7 @@ sequenceDiagram
 
 LLM 的唯一职责是决定调用*哪个*工具以及传递*什么参数*。你的代码完成实际工作。
 
-## 伪代码中的最小代理
+## 伪代码中的最小 agent
 
 以下是上述示例的代码形式：
 
@@ -89,11 +89,11 @@ loop:
         messages.append(result)
 ```
 
-这就是整个代理。本书的其余部分就是用 Rust 实现每一个组件——`llm` 函数、工具，以及连接它们的类型。
+这就是整个 agent。本书的其余部分就是用 Rust 实现每一个组件——`llm` 函数、工具，以及连接它们的类型。
 
 ## 工具调用循环
 
-以下是单次代理调用的流程：
+以下是单次 agent 调用的流程：
 
 ```mermaid
 flowchart TD
@@ -113,7 +113,7 @@ flowchart TD
 
 ## 我们将构建什么
 
-我们将构建一个简单的代理框架，包含：
+我们将构建一个简单的 agent 框架，包含：
 
 **4 个工具：**
 
@@ -192,7 +192,7 @@ cargo test -p mini-claw-code-starter ch1
 | 5 | 你的第一个 Agent SDK！ | `SimpleAgent` ——将 `single_turn()` 泛化为循环 |
 | 6 | OpenRouter Provider | `OpenRouterProvider` ——与真实 LLM API 通信 |
 | 7 | 简单的 CLI | 将所有组件连接成一个带有对话记忆的交互式 CLI |
-| 8 | 奇点时刻 | 你的代理现在可以编写自身的代码了——接下来是什么 |
+| 8 | 奇点时刻 | 你的 agent 现在可以编写自身的代码了——接下来是什么 |
 
 第 1--7 章是动手实践：你在 `mini-claw-code-starter` 中编写代码并运行测试来检验你的成果。第 8 章标志着向**扩展章节**（第 9 章以后）的过渡，这些章节将引导你阅读参考实现：
 
@@ -210,7 +210,7 @@ cargo test -p mini-claw-code-starter ch1
 3. 将 `unimplemented!()` 调用替换为你的实现。
 4. 运行 `cargo test -p mini-claw-code-starter chN` 检验你的成果。
 
-准备好了？让我们开始构建一个代理。
+准备好了？让我们开始构建一个 agent。
 
 ## 下一步
 

@@ -1,29 +1,29 @@
-# 第十三章：子智能体（Subagents）
+# 第十三章：subagent
 
 复杂任务很难处理。即使是最优秀的大语言模型（LLM），当一个提示（prompt）要求它
 研究代码库、设计方案、编写代码并验证结果——同时还要保持连贯的对话时，也会力不从心。
 上下文窗口（context window）被填满，模型失去焦点，质量开始下降。
 
-**子智能体（Subagents）** 通过分解来解决这个问题：父智能体为每个子任务生成一个
-子智能体。子智能体拥有自己的消息历史和工具集，运行至完成后返回一个摘要。父智能体
-只看到最终答案——一个干净、聚焦的结果，不包含子智能体内部推理的噪声。
+**subagent** 通过分解来解决这个问题：父 agent 为每个子任务生成一个
+subagent。subagent 拥有自己的消息历史和工具集，运行至完成后返回一个摘要。父 agent
+只看到最终答案——一个干净、聚焦的结果，不包含 subagent 内部推理的噪声。
 
 这正是 Claude Code 的 **Task 工具** 的工作方式。当 Claude Code 需要探索大型
-代码库或处理独立的子任务时，它会生成一个子智能体来完成工作并汇报结果。OpenCode
+代码库或处理独立的子任务时，它会生成一个 subagent 来完成工作并汇报结果。OpenCode
 和 Anthropic Agent SDK 也使用了相同的模式。
 
-在本章中，你将构建 `SubagentTool`——一个能够生成临时子智能体的 `Tool` 实现。
+在本章中，你将构建 `SubagentTool`——一个能够生成临时 subagent 的 `Tool` 实现。
 
 你将完成以下内容：
 
-1. 为 `Arc<P>` 添加一个 blanket `impl Provider`，使父子智能体可以共享同一个
+1. 为 `Arc<P>` 添加一个 blanket `impl Provider`，使父子 agent 可以共享同一个
    Provider。
 2. 构建 `SubagentTool<P: Provider>`，使用基于闭包的工具工厂（tool factory）和
    构建器方法（builder methods）。
-3. 实现 `Tool` trait，包含内联的智能体循环和轮次限制。
+3. 实现 `Tool` trait，包含内联的 agent 循环和轮次限制。
 4. 将其作为模块接入并重新导出。
 
-## 为什么需要子智能体？
+## 为什么需要 subagent？
 
 考虑以下场景：
 
@@ -43,13 +43,13 @@ Agent (with subagents):
   → parent sees clean summaries, coordinates the overall task
 ```
 
-关键洞察：**子智能体就是一个 Tool**。它接收任务描述作为输入，在内部完成工作，
-然后返回一个字符串结果。父智能体的循环不需要任何特殊处理——它调用子智能体工具
+关键洞察：**subagent 就是一个 Tool**。它接收任务描述作为输入，在内部完成工作，
+然后返回一个字符串结果。父 agent 的循环不需要任何特殊处理——它调用 subagent 工具
 的方式与调用 `read` 或 `bash` 完全相同。
 
 ## 通过 `Arc<P>` 共享 Provider
 
-父智能体和子智能体需要使用同一个 LLM Provider。在生产环境中，这意味着共享
+父 agent 和 subagent 需要使用同一个 LLM Provider。在生产环境中，这意味着共享
 HTTP 客户端、API 密钥和配置。克隆 Provider 会导致连接重复。我们希望以低成本
 的方式共享它。
 
@@ -90,12 +90,12 @@ pub struct SubagentTool<P: Provider> {
 
 这里有三个设计决策：
 
-**使用 `Arc<P>` 作为 Provider。** 父智能体创建 `Arc::new(provider)`，保留一个
+**使用 `Arc<P>` 作为 Provider。** 父 agent 创建 `Arc::new(provider)`，保留一个
 克隆给自己，并传递一个克隆给 `SubagentTool`。两者共享同一个底层 Provider。
 成本低、安全，无需克隆 HTTP 客户端。
 
 **使用闭包工厂生产工具。** 工具是 `Box<dyn Tool>`——它们不可克隆（Clone）。
-每次子智能体生成都需要一个全新的 `ToolSet`。`Fn() -> ToolSet` 闭包可以按需
+每次 subagent 生成都需要一个全新的 `ToolSet`。`Fn() -> ToolSet` 闭包可以按需
 生产。这天然可以捕获 `Arc` 来共享状态：
 
 ```rust
@@ -109,7 +109,7 @@ SubagentTool::new(provider, || {
 })
 ```
 
-**`max_turns` 安全限制。** 没有这个限制，一个困惑的子智能体可能会无限循环。
+**`max_turns` 安全限制。** 没有这个限制，一个困惑的 subagent 可能会无限循环。
 默认值为 10——对实际任务来说足够宽裕，对防止失控循环来说足够严格。
 
 ## 构建器（Builder）
@@ -153,12 +153,12 @@ impl<P: Provider> SubagentTool<P> {
 }
 ```
 
-工具定义暴露了一个 `task` 参数——LLM 写一个清晰的描述来说明子智能体应该做什么。
+工具定义暴露了一个 `task` 参数——LLM 写一个清晰的描述来说明 subagent 应该做什么。
 简洁而有效。
 
 ## `Tool` trait 实现
 
-`SubagentTool` 的核心是它的 `Tool::call()` 方法。它内联了一个最小化的智能体
+`SubagentTool` 的核心是它的 `Tool::call()` 方法。它内联了一个最小化的 agent
 循环——与 `SimpleAgent::chat()` 相同的协议（调用 Provider、执行工具、循环），
 但增加了轮次限制、不输出到终端，并使用局部拥有的消息向量（message vec）：
 
@@ -218,20 +218,20 @@ impl<P: Provider + 'static> Tool for SubagentTool<P> {
 
 有几点值得注意：
 
-**没有使用 `tokio::spawn`。** 子智能体在父智能体的 `Tool::call()` future 内
+**没有使用 `tokio::spawn`。** subagent 在父 agent 的 `Tool::call()` future 内
 运行。这是有意为之的——生成一个后台任务会增加协调复杂性（通道、join handle、
 取消机制）。内联运行保持了简单性和确定性。
 
-**全新的消息历史。** 子智能体仅以系统提示（可选）和作为 `User` 消息的任务描述
-开始。它永远看不到父智能体的对话。当子智能体完成时，只有其最终文本作为工具结果
-返回给父智能体。子智能体的内部消息会被丢弃。
+**全新的消息历史。** subagent 仅以系统提示（可选）和作为 `User` 消息的任务描述
+开始。它永远看不到父 agent 的对话。当 subagent 完成时，只有其最终文本作为工具结果
+返回给父 agent。subagent 的内部消息会被丢弃。
 
 **轮次限制是软错误。** 当超过 `max_turns` 时，工具返回一个错误字符串而不是
 `Err(...)`。这让父 LLM 看到失败并决定如何处理（用更简单的任务重试、尝试不同
-的方法等），而不是让整个智能体循环崩溃。
+的方法等），而不是让整个 agent 循环崩溃。
 
-**Provider 错误会向上传播。** 如果 LLM API 在子智能体运行期间失败，错误通过
-`?` 冒泡到父智能体。这是有意的——API 错误是基础设施故障，而非任务失败。
+**Provider 错误会向上传播。** 如果 LLM API 在 subagent 运行期间失败，错误通过
+`?` 冒泡到父 agent。这是有意的——API 错误是基础设施故障，而非任务失败。
 
 ## 接入模块
 
@@ -245,7 +245,7 @@ pub use subagent::SubagentTool;
 
 ## 使用示例
 
-以下是如何为父智能体接入子智能体工具：
+以下是如何为父 agent 接入 subagent 工具：
 
 ```rust
 use std::sync::Arc;
@@ -272,7 +272,7 @@ let result = agent.run("Refactor the auth module").await?;
 当任务足够复杂时，LLM 可以选择通过 `subagent` 委派——或者直接使用其他工具处理。
 由 LLM 自行决定。
 
-你也可以给子智能体设置专门的系统提示：
+你也可以给 subagent 设置专门的系统提示：
 
 ```rust
 SubagentTool::new(provider, || {
@@ -292,29 +292,29 @@ cargo test -p mini-claw-code ch13
 
 测试验证了以下场景：
 
-- **文本响应**：子智能体立即返回文本（没有工具调用）。
-- **使用工具**：子智能体在回答前使用 `ReadTool`。
-- **多步骤**：子智能体跨多个轮次进行多次工具调用。
+- **文本响应**：subagent 立即返回文本（没有工具调用）。
+- **使用工具**：subagent 在回答前使用 `ReadTool`。
+- **多步骤**：subagent 跨多个轮次进行多次工具调用。
 - **超过最大轮次**：轮次限制被强制执行，返回错误字符串。
 - **缺少任务参数**：缺少 `task` 参数时报错。
-- **Provider 错误**：子智能体的 Provider 错误传播到父智能体。
-- **未知工具**：子智能体优雅地处理未知工具。
+- **Provider 错误**：subagent 的 Provider 错误传播到父 agent。
+- **未知工具**：subagent 优雅地处理未知工具。
 - **构建器模式**：链式调用 `.system_prompt().max_turns()` 能够编译通过。
-- **系统提示**：配置系统提示后子智能体正确运行。
-- **写入工具**：子智能体写入文件，父智能体之后继续工作。
-- **父智能体继续**：子智能体完成后父智能体恢复自己的工作。
-- **历史隔离**：子智能体的消息不会泄露到父智能体的消息向量中。
+- **系统提示**：配置系统提示后 subagent 正确运行。
+- **写入工具**：subagent 写入文件，父 agent 之后继续工作。
+- **父 agent 继续**：subagent 完成后父 agent 恢复自己的工作。
+- **历史隔离**：subagent 的消息不会泄露到父 agent 的消息向量中。
 
 ## 总结
 
-- **`SubagentTool`** 是一个生成临时子智能体的 `Tool`。父智能体只看到最终答案。
-- **`Arc<P>`** blanket impl 让父子智能体共享 Provider 而无需克隆。完全向后兼容。
-- **闭包工厂** 为每次子智能体生成产生一个全新的 `ToolSet`，因为 `Box<dyn Tool>`
+- **`SubagentTool`** 是一个生成临时 subagent 的 `Tool`。父 agent 只看到最终答案。
+- **`Arc<P>`** blanket impl 让父子 agent 共享 Provider 而无需克隆。完全向后兼容。
+- **闭包工厂** 为每次 subagent 生成产生一个全新的 `ToolSet`，因为 `Box<dyn Tool>`
   不可克隆。
-- **内联智能体循环** 配合 `max_turns` 守卫，使 `SimpleAgent` 保持不变。不需要
-  `tokio::spawn`——子智能体在 `Tool::call()` 内运行。
-- **消息隔离**：子智能体的内部消息局限于 `call()` future 中。只有最终文本传回
-  父智能体。
-- **单一 `task` 参数**：LLM 写一个清晰的任务描述；子智能体处理其余部分。
+- **内联 agent 循环** 配合 `max_turns` 守卫，使 `SimpleAgent` 保持不变。不需要
+  `tokio::spawn`——subagent 在 `Tool::call()` 内运行。
+- **消息隔离**：subagent 的内部消息局限于 `call()` future 中。只有最终文本传回
+  父 agent。
+- **单一 `task` 参数**：LLM 写一个清晰的任务描述；subagent 处理其余部分。
 - **纯增量修改**：唯一对现有代码的改动是 `types.rs` 中的 blanket impl。其他
   都是新代码。

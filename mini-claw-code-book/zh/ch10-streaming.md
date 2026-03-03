@@ -1,6 +1,6 @@
 # 第十章：流式输出（Streaming）
 
-在第六章中，你构建了 `OpenRouterProvider::chat()`，它会等待*整个*响应返回后才继续。这样虽然可行，但用户在所有 token 生成完毕之前只能盯着空白屏幕。真正的编码代理（coding agent）会在 token 到达时立即打印出来——这就是流式输出。
+在第六章中，你构建了 `OpenRouterProvider::chat()`，它会等待*整个*响应返回后才继续。这样虽然可行，但用户在所有 token 生成完毕之前只能盯着空白屏幕。真正的 coding agent 会在 token 到达时立即打印出来——这就是流式输出。
 
 本章将添加流式支持，并构建 `StreamingAgent`——`SimpleAgent` 的流式版本。你将：
 
@@ -10,7 +10,7 @@
 4. 定义 `StreamProvider` trait——`Provider` 的流式版本。
 5. 为 `OpenRouterProvider` 实现 `StreamProvider`。
 6. 构建用于无 HTTP 测试的 `MockStreamProvider`。
-7. 构建 `StreamingAgent<P: StreamProvider>`——一个具有实时文本流的完整代理循环。
+7. 构建 `StreamingAgent<P: StreamProvider>`——一个具有实时文本流的完整 agent 循环。
 
 这些改动完全不影响 `Provider` trait 和 `SimpleAgent`。流式输出是在现有架构*之上*叠加的功能层。
 
@@ -19,8 +19,8 @@
 没有流式输出时，较长的响应（比如 500 个 token）会让 CLI 看起来像卡住了。流式输出解决了三个问题：
 
 - **即时反馈** —— 用户在几毫秒内就能看到第一个词，而不必等待数秒才看到完整响应。
-- **提前取消** —— 如果代理走错方向，用户可以按 Ctrl-C 中断，无需等待完整响应。
-- **进度可见** —— 看到 token 逐个到达，可以确认代理正在工作，而非卡住。
+- **提前取消** —— 如果 agent 走错方向，用户可以按 Ctrl-C 中断，无需等待完整响应。
+- **进度可见** —— 看到 token 逐个到达，可以确认 agent 正在工作，而非卡住。
 
 ## SSE 的工作原理
 
@@ -278,7 +278,7 @@ impl StreamProvider for MockStreamProvider {
 
 ## StreamingAgent
 
-现在到了重头戏。`StreamingAgent` 是 `SimpleAgent` 的流式版本。它具有相同的结构——一个 provider、一组工具和一个代理循环——但它使用 `StreamProvider` 并实时发出 `AgentEvent::TextDelta` 事件：
+现在到了重头戏。`StreamingAgent` 是 `SimpleAgent` 的流式版本。它具有相同的结构——一个 provider、一组工具和一个 agent 循环——但它使用 `StreamProvider` 并实时发出 `AgentEvent::TextDelta` 事件：
 
 ```rust
 pub struct StreamingAgent<P: StreamProvider> {
@@ -304,7 +304,7 @@ impl<P: StreamProvider> StreamingAgent<P> {
 }
 ```
 
-`chat()` 方法是流式代理的核心。让我们逐步解析：
+`chat()` 方法是流式 agent 的核心。让我们逐步解析：
 
 ```rust
 pub async fn chat(
@@ -362,7 +362,7 @@ flowchart LR
     TURN --> LOOP["Agent loop"]
 ```
 
-转发器任务是一个桥梁：它从 provider 接收原始的 `StreamEvent`，并将 `TextDelta` 事件转换为 `AgentEvent::TextDelta` 发送给 UI。这使得 provider 的流式协议与代理的事件协议保持分离。
+转发器任务是一个桥梁：它从 provider 接收原始的 `StreamEvent`，并将 `TextDelta` 事件转换为 `AgentEvent::TextDelta` 发送给 UI。这使得 provider 的流式协议与 agent 的事件协议保持分离。
 
 注意 `AgentEvent` 现在多了一个 `TextDelta` 变体：
 
@@ -390,7 +390,7 @@ let agent = Arc::new(
 );
 ```
 
-代理被包装在 `Arc` 中，以便与派生的任务共享。每一轮会派生代理并使用加载动画处理事件：
+agent 被包装在 `Arc` 中，以便与派生的任务共享。每一轮会派生 agent 并使用加载动画处理事件：
 
 ```rust
 let (tx, mut rx) = mpsc::unbounded_channel();

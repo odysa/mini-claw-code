@@ -17,6 +17,6 @@
 - [第 10 章：流式输出](./ch10-streaming.md)
 - [第 11 章：用户输入](./ch11-user-input.md)
 - [第 12 章：计划模式](./ch12-plan-mode.md)
-- [第 13 章：子代理](./ch13-subagents.md)
+- [第 13 章：subagent](./ch13-subagents.md)
 - [第 14 章：MCP：模型上下文协议（即将推出）](./ch14-mcp.md)
 - [第 15 章：安全护栏（即将推出）](./ch15-safety.md)

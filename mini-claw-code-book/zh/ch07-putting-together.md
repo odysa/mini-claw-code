@@ -1,16 +1,16 @@
 # 第七章：一个简单的 CLI
 
 你已经构建了所有组件：用于测试的模拟提供者（mock provider）、四个工具、
-智能体循环（agent loop）以及 HTTP 提供者。现在是时候把它们全部组装成一个
+agent loop 以及 HTTP 提供者。现在是时候把它们全部组装成一个
 可以工作的 CLI 了。
 
 ## 目标
 
 为 `SimpleAgent` 添加一个 `chat()` 方法，并编写 `examples/chat.rs`，使得：
 
-1. 智能体能够记住对话内容——每个提示都建立在之前的对话基础上。
-2. 它打印 `> `，读取一行输入，运行智能体，然后打印结果。
-3. 在智能体工作时显示 `thinking...` 指示器。
+1. agent 能够记住对话内容——每个提示都建立在之前的对话基础上。
+2. 它打印 `> `，读取一行输入，运行 agent，然后打印结果。
+3. 在 agent 工作时显示 `thinking...` 指示器。
 4. 持续运行，直到用户按下 Ctrl+D（EOF）。
 
 ## `chat()` 方法
@@ -98,7 +98,7 @@ use std::io::{self, BufRead, Write};
 
 注意 `Message` 的导入——你需要它来构建历史向量。
 
-### 第 2 步：创建提供者和智能体
+### 第 2 步：创建提供者和 agent
 
 ```rust
 let provider = OpenRouterProvider::from_env()?;
@@ -110,7 +110,7 @@ let agent = SimpleAgent::new(provider)
 ```
 
 和之前一样——这里没有新内容。（在[第十一章](./ch11-user-input.md)中你会在这里
-添加 `AskTool`，这样智能体就可以向你提出澄清性问题。）
+添加 `AskTool`，这样 agent 就可以向你提出澄清性问题。）
 
 ### 第 3 步：系统提示词和历史向量
 
@@ -127,10 +127,10 @@ let mut history: Vec<Message> = vec![Message::System(format!(
 什么角色。有两点需要注意：
 
 1. **提示词中不包含工具名称。** 工具定义是通过 API 单独发送的。系统提示词
-   专注于*行为*——做一个编码智能体，使用任何可用的工具，简洁精确。
+   专注于*行为*——做一个 coding agent，使用任何可用的工具，简洁精确。
 
 2. **包含了工作目录。** LLM 需要知道自己在哪里，这样 `read` 和 `bash` 等
-   工具调用才能使用正确的路径。这正是真正的编码智能体所做的——Claude Code、
+   工具调用才能使用正确的路径。这正是真正的 coding agent 所做的——Claude Code、
    OpenCode 和 Kimi CLI 都会在系统提示词中注入当前目录（有时还包括平台、
    日期等信息）。
 
@@ -175,16 +175,16 @@ loop {
 
 几点需要注意：
 
-- **`history.push(Message::User(...))`** 在调用智能体之前添加用户提示。
+- **`history.push(Message::User(...))`** 在调用 agent 之前添加用户提示。
   `chat()` 会追加剩余的内容。
-- **`print!("    thinking...")`** 在智能体工作时显示状态。需要 `flush()` 是
+- **`print!("    thinking...")`** 在 agent 工作时显示状态。需要 `flush()` 是
   因为 `print!`（没有换行符）不会自动刷新缓冲区。
 - **`\x1b[2K\r`** 是一个 ANSI 转义序列："清除整行，将光标移到第 1 列。"
-  这会在打印响应之前清除 `thinking...` 文本。当智能体打印工具摘要时也会
+  这会在打印响应之前清除 `thinking...` 文本。当 agent 打印工具摘要时也会
   自动清除（因为 `tool_summary()` 使用了相同的转义序列）。
 - **`stdout.flush()?`** 在 `print!` 之后确保提示符和思考指示器立即显示。
 - `read_line` 在 EOF（Ctrl+D）时返回 `0`，从而跳出循环。
-- 智能体的错误会被打印出来而不是导致崩溃——这使得即使某个请求失败，
+- agent 的错误会被打印出来而不是导致崩溃——这使得即使某个请求失败，
   循环也能继续运行。
 
 ### main 函数
@@ -212,7 +212,7 @@ async fn main() -> anyhow::Result<()> {
 cargo test -p mini-claw-code-starter
 ```
 
-这会运行第 1 章到第 7 章的所有测试。如果全部通过，恭喜——你的智能体框架
+这会运行第 1 章到第 7 章的所有测试。如果全部通过，恭喜——你的 agent 框架
 已经完成且经过了全面测试。
 
 ### 测试验证了什么
@@ -224,7 +224,7 @@ cargo test -p mini-claw-code-starter
 - **多工具流水线**：在多个回合中使用 bash、write、edit 和 read。
 - **长对话**：五步工具调用序列。
 
-大约有 10 个集成测试，覆盖了完整的智能体流水线。
+大约有 10 个集成测试，覆盖了完整的 agent 流水线。
 
 ## 运行聊天示例
 
@@ -313,7 +313,7 @@ Append final Assistant to history, return text
 在所有文件中大约 300 行 Rust 代码，你已经拥有了：
 
 - 一个基于 trait 的工具系统，带有 JSON schema 定义。
-- 一个通用的智能体循环，可以与任何提供者配合使用。
+- 一个通用的 agent 循环，可以与任何提供者配合使用。
 - 一个用于确定性测试的模拟提供者。
 - 一个用于真实 LLM API 的 HTTP 提供者。
 - 一个带有对话记忆的 CLI，将所有这些串联在一起。
@@ -335,9 +335,9 @@ Append final Assistant to history, return text
 参见 `mini-claw-code/examples/tui.rs`，其中使用 `termimad` 实现了这三个功能。
 
 你构建的基础是扎实的。每一个扩展都只是在现有模式上添加内容，而不是重写。
-`Provider` trait、`Tool` trait 和智能体循环是你接下来想要构建的一切的基石。
+`Provider` trait、`Tool` trait 和 agent 循环是你接下来想要构建的一切的基石。
 
 ## 下一步
 
-前往[第八章：奇点](./ch08-singularity.md)——你的智能体现在可以修改它自己的
+前往[第八章：奇点](./ch08-singularity.md)——你的 agent 现在可以修改它自己的
 源代码了，我们将讨论这意味着什么，以及接下来该何去何从。

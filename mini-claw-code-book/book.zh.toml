@@ -1,5 +1,5 @@
 [book]
-title = "用 Rust 构建你自己的迷你编程智能体"
+title = "用 Rust 构建你自己的迷你 Claw Code"
 authors = ["mini-claw-code contributors"]
 language = "zh"
 src = "zh"

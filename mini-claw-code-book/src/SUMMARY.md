@@ -18,5 +18,16 @@
 - [Chapter 11: User Input](./ch11-user-input.md)
 - [Chapter 12: Plan Mode](./ch12-plan-mode.md)
 - [Chapter 13: Subagents](./ch13-subagents.md)
-- [Chapter 14: MCP: Model Context Protocol (coming soon)](./ch14-mcp.md)
-- [Chapter 15: Safety Rails (coming soon)](./ch15-safety.md)
+
+---
+
+# Production Grade
+
+- [Chapter 14: Token Tracking](./ch14-token-tracking.md)
+- [Chapter 15: Context Management](./ch15-context-management.md)
+- [Chapter 16: Configuration](./ch16-configuration.md)
+- [Chapter 17: Project Instructions](./ch17-instructions.md)
+- [Chapter 18: Safety Rails](./ch18-safety.md)
+- [Chapter 19: Permissions](./ch19-permissions.md)
+- [Chapter 20: Hooks](./ch20-hooks.md)
+- [Chapter 21: MCP](./ch21-mcp.md)

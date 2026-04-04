@@ -354,6 +354,7 @@ async fn test_ch10_mock_stream_provider_text() {
         text: Some("Hello".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     };
     let provider = MockStreamProvider::new(VecDeque::from([turn]));
 
@@ -386,6 +387,7 @@ async fn test_ch10_mock_stream_provider_tool_call() {
             arguments: serde_json::json!({"path": "f.txt"}),
         }],
         stop_reason: StopReason::ToolUse,
+        usage: None,
     };
     let provider = MockStreamProvider::new(VecDeque::from([turn]));
 
@@ -424,6 +426,7 @@ async fn test_ch10_streaming_agent_text_response() {
         text: Some("Hi there".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     };
     let provider = MockStreamProvider::new(VecDeque::from([turn]));
     let agent = crate::StreamingAgent::new(provider);
@@ -464,12 +467,14 @@ async fn test_ch10_streaming_agent_tool_loop() {
             arguments: serde_json::json!({"path": "test.txt"}),
         }],
         stop_reason: StopReason::ToolUse,
+        usage: None,
     };
     // Turn 2: LLM gives final answer
     let turn2 = AssistantTurn {
         text: Some("The file says hello".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     };
 
     let provider = MockStreamProvider::new(VecDeque::from([turn1, turn2]));
@@ -516,6 +521,7 @@ async fn test_ch10_streaming_agent_chat_history() {
         text: Some("Reply".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     };
     let provider = MockStreamProvider::new(VecDeque::from([turn]));
     let agent = crate::StreamingAgent::new(provider);

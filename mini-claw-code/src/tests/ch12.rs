@@ -19,6 +19,7 @@ async fn test_ch12_plan_text_response() {
         text: Some("Here is my plan.".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let agent = PlanAgent::new(provider)
@@ -54,11 +55,13 @@ async fn test_ch12_plan_with_read_tool() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("File contains: important data".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -92,12 +95,14 @@ async fn test_ch12_plan_blocks_write_tool() {
                 arguments: json!({"path": path.to_str().unwrap(), "content": "hacked"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // LLM acknowledges the error
         AssistantTurn {
             text: Some("Cannot write in plan mode.".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -146,11 +151,13 @@ async fn test_ch12_plan_blocks_edit_tool() {
                 }),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Edit blocked.".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -185,11 +192,13 @@ async fn test_ch12_execute_allows_write_tool() {
                 arguments: json!({"path": path.to_str().unwrap(), "content": "written!"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("File written.".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -228,12 +237,14 @@ async fn test_ch12_full_plan_then_execute() {
                 arguments: json!({"path": read_path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Plan turn 2: return plan
         AssistantTurn {
             text: Some("Plan: copy source data to dest.txt".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
         // Execute turn 1: write file
         AssistantTurn {
@@ -244,12 +255,14 @@ async fn test_ch12_full_plan_then_execute() {
                 arguments: json!({"path": write_path.to_str().unwrap(), "content": "source data"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Execute turn 2: done
         AssistantTurn {
             text: Some("Done. Copied to dest.txt".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -285,12 +298,14 @@ async fn test_ch12_message_continuity() {
             text: Some("My plan".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
         // Execute phase
         AssistantTurn {
             text: Some("Executed".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -330,11 +345,13 @@ async fn test_ch12_read_only_override() {
                 arguments: json!({"command": "rm -rf /"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Bash blocked.".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -368,6 +385,7 @@ async fn test_ch12_streaming_events_during_plan() {
         text: Some("Plan text".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let agent = PlanAgent::new(provider).tool(ReadTool::new());
@@ -431,6 +449,7 @@ async fn test_ch12_system_prompt_injected() {
         text: Some("ok".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let agent = PlanAgent::new(provider).tool(ReadTool::new());
@@ -454,11 +473,13 @@ async fn test_ch12_system_prompt_not_duplicated() {
             text: Some("Plan A".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Plan B".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -491,6 +512,7 @@ async fn test_ch12_caller_system_prompt_respected() {
         text: Some("ok".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let agent = PlanAgent::new(provider).tool(ReadTool::new());
@@ -532,6 +554,7 @@ async fn test_ch12_exit_plan_tool() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Turn 2: present plan and call exit_plan
         AssistantTurn {
@@ -542,6 +565,7 @@ async fn test_ch12_exit_plan_tool() {
                 arguments: json!({}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
     ]));
 
@@ -577,11 +601,13 @@ async fn test_ch12_exit_plan_not_in_execute() {
                 arguments: json!({}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("ok".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -609,6 +635,7 @@ async fn test_ch12_custom_plan_prompt() {
         text: Some("ok".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let agent = PlanAgent::new(provider)
@@ -643,6 +670,7 @@ async fn test_ch12_full_flow_with_exit_plan() {
                 arguments: json!({"path": read_path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Plan: present plan and call exit_plan
         AssistantTurn {
@@ -653,6 +681,7 @@ async fn test_ch12_full_flow_with_exit_plan() {
                 arguments: json!({}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Execute: write file
         AssistantTurn {
@@ -663,12 +692,14 @@ async fn test_ch12_full_flow_with_exit_plan() {
                 arguments: json!({"path": write_path.to_str().unwrap(), "content": "HELLO WORLD"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Execute: done
         AssistantTurn {
             text: Some("Done.".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 

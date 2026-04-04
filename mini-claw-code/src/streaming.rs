@@ -103,6 +103,7 @@ impl StreamAccumulator {
             text,
             tool_calls,
             stop_reason,
+            usage: None,
         }
     }
 }

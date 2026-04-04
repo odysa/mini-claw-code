@@ -18,5 +18,16 @@
 - [第 11 章：用户输入](./ch11-user-input.md)
 - [第 12 章：计划模式](./ch12-plan-mode.md)
 - [第 13 章：subagent](./ch13-subagents.md)
-- [第 14 章：MCP：模型上下文协议（即将推出）](./ch14-mcp.md)
-- [第 15 章：安全护栏（即将推出）](./ch15-safety.md)
+
+---
+
+# 生产级
+
+- [第 14 章：Token 追踪](./ch14-token-tracking.md)
+- [第 15 章：上下文管理](./ch15-context-management.md)
+- [第 16 章：配置系统](./ch16-configuration.md)
+- [第 17 章：项目指令](./ch17-instructions.md)
+- [第 18 章：安全护栏](./ch18-safety.md)
+- [第 19 章：权限系统](./ch19-permissions.md)
+- [第 20 章：Hook 系统](./ch20-hooks.md)
+- [第 21 章：MCP](./ch21-mcp.md)

@@ -1,3 +1,3 @@
 [workspace]
-members = ["mini-claw-code", "mini-claw-code-starter", "mini-claw-code-xtask"]
+members = ["mini-claw-code", "mini-claw-code-starter", "mini-claw-code-xtask", "claw-code"]
 resolver = "3"

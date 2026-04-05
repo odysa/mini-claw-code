@@ -1,0 +1,24 @@
+[package]
+name = "claw-code"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+async-trait = "0.1"
+dotenvy = "0.15"
+tokio = { version = "1", features = ["process", "fs", "sync", "io-util", "rt-multi-thread", "macros", "time"] }
+reqwest = { version = "0.12", features = ["json"] }
+toml = "0.8"
+dirs = "6"
+glob = "0.3"
+regex = "1"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[[example]]
+name = "chat"

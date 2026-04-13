@@ -19,6 +19,7 @@ async fn test_ch13_subagent_text_response() {
         text: Some("Child result".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }])));
 
     let tool = SubagentTool::new(provider, || ToolSet::new());
@@ -48,12 +49,14 @@ async fn test_ch13_subagent_with_tool() {
                 arguments: json!({"path": path_str}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Child turn 2: return answer
         AssistantTurn {
             text: Some("The file says: secret data".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ])));
 
@@ -87,6 +90,7 @@ async fn test_ch13_subagent_multi_step() {
                 arguments: json!({"path": a_str}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Turn 2: read file b
         AssistantTurn {
@@ -97,12 +101,14 @@ async fn test_ch13_subagent_multi_step() {
                 arguments: json!({"path": b_str}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Turn 3: final answer
         AssistantTurn {
             text: Some("alpha and beta".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ])));
 
@@ -128,6 +134,7 @@ async fn test_ch13_max_turns_exceeded() {
                 arguments: json!({"path": "/dev/null"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: None,
@@ -137,6 +144,7 @@ async fn test_ch13_max_turns_exceeded() {
                 arguments: json!({"path": "/dev/null"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: None,
@@ -146,6 +154,7 @@ async fn test_ch13_max_turns_exceeded() {
                 arguments: json!({"path": "/dev/null"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
     ])));
 
@@ -204,12 +213,14 @@ async fn test_ch13_subagent_unknown_tool_in_child() {
                 arguments: json!({}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Child recovers
         AssistantTurn {
             text: Some("Tool not found, but I can still answer.".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ])));
 
@@ -244,6 +255,7 @@ async fn test_ch13_system_prompt_in_child() {
         text: Some("Audited.".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }])));
 
     let tool =
@@ -273,6 +285,7 @@ async fn test_ch13_subagent_with_write_tool() {
                 arguments: json!({"task": "Write hello to the file"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // --- child turns start ---
         // Child turn 1: call write
@@ -284,12 +297,14 @@ async fn test_ch13_subagent_with_write_tool() {
                 arguments: json!({"path": path_str, "content": "hello"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Child turn 2: done
         AssistantTurn {
             text: Some("File written.".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
         // --- child turns end ---
         // Parent turn 2: done
@@ -297,6 +312,7 @@ async fn test_ch13_subagent_with_write_tool() {
             text: Some("Subagent completed the write.".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ])));
 
@@ -332,6 +348,7 @@ async fn test_ch13_parent_continues_after_subagent() {
                 arguments: json!({"task": "Summarize the file"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Child turn 1: read file
         AssistantTurn {
@@ -342,12 +359,14 @@ async fn test_ch13_parent_continues_after_subagent() {
                 arguments: json!({"path": path_str}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Child turn 2: done
         AssistantTurn {
             text: Some("File contains: important".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
         // Parent turn 2: read the same file directly
         AssistantTurn {
@@ -358,12 +377,14 @@ async fn test_ch13_parent_continues_after_subagent() {
                 arguments: json!({"path": path_str}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Parent turn 3: final answer
         AssistantTurn {
             text: Some("Confirmed: important".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ])));
 
@@ -395,6 +416,7 @@ async fn test_ch13_isolated_message_history() {
                 arguments: json!({"task": "Do child work"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Child turn 1: call a tool (this generates internal child messages)
         AssistantTurn {
@@ -405,18 +427,21 @@ async fn test_ch13_isolated_message_history() {
                 arguments: json!({"path": "/dev/null"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Child turn 2: done
         AssistantTurn {
             text: Some("Child done".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
         // Parent turn 2: done
         AssistantTurn {
             text: Some("All done".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ])));
 

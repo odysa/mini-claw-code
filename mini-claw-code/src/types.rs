@@ -73,10 +73,19 @@ pub enum StopReason {
     ToolUse,
 }
 
+/// Token usage reported by the API for a single request.
+#[derive(Debug, Clone, Default)]
+pub struct TokenUsage {
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+}
+
 pub struct AssistantTurn {
     pub text: Option<String>,
     pub tool_calls: Vec<ToolCall>,
     pub stop_reason: StopReason,
+    /// Token usage for this turn, if reported by the provider.
+    pub usage: Option<TokenUsage>,
 }
 
 pub enum Message {

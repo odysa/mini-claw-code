@@ -60,6 +60,13 @@ pub(crate) struct ApiToolDef {
 #[derive(Deserialize)]
 struct ChatResponse {
     choices: Vec<Choice>,
+    usage: Option<ApiUsage>,
+}
+
+#[derive(Deserialize)]
+struct ApiUsage {
+    prompt_tokens: Option<u64>,
+    completion_tokens: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -278,10 +285,16 @@ impl Provider for OpenRouterProvider {
             _ => StopReason::Stop,
         };
 
+        let usage = resp.usage.map(|u| TokenUsage {
+            input_tokens: u.prompt_tokens.unwrap_or(0),
+            output_tokens: u.completion_tokens.unwrap_or(0),
+        });
+
         Ok(AssistantTurn {
             text: choice.message.content,
             tool_calls,
             stop_reason,
+            usage,
         })
     }
 }

@@ -129,12 +129,14 @@ async fn test_ch11_agent_ask_then_continue() {
                 arguments: json!({"question": "Which approach?"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Turn 2: LLM gives final answer using the user's response
         AssistantTurn {
             text: Some("Using approach A as requested.".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -169,6 +171,7 @@ async fn test_ch11_ask_then_tool() {
                 arguments: json!({"question": "Which file should I read?"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Turn 2: LLM reads the file the user specified
         AssistantTurn {
@@ -179,12 +182,14 @@ async fn test_ch11_ask_then_tool() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Turn 3: final answer
         AssistantTurn {
             text: Some("The file contains: hello world".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -217,6 +222,7 @@ async fn test_ch11_multiple_asks() {
                 arguments: json!({"question": "What language?", "options": ["Rust", "Python", "Go"]}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Turn 2: ask framework
         AssistantTurn {
@@ -227,12 +233,14 @@ async fn test_ch11_multiple_asks() {
                 arguments: json!({"question": "What framework?", "options": ["Django", "FastAPI"]}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Turn 3: final answer
         AssistantTurn {
             text: Some("Setting up Python with FastAPI.".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 

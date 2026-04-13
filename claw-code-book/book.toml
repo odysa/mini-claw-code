@@ -1,0 +1,8 @@
+[book]
+title = "Building a Coding Agent in Rust — Claude Code Architecture"
+authors = ["Chengxu Bian"]
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "navy"

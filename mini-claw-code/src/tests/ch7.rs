@@ -22,6 +22,7 @@ async fn test_ch7_write_and_read_flow() {
                 arguments: json!({"path": path_str, "content": "Hello from agent!"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Step 2: Read it back
         AssistantTurn {
@@ -32,12 +33,14 @@ async fn test_ch7_write_and_read_flow() {
                 arguments: json!({"path": path_str}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Step 3: Report
         AssistantTurn {
             text: Some("I wrote and read the file. It contains: Hello from agent!".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -72,6 +75,7 @@ async fn test_ch7_edit_flow() {
                 }),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Step 2: Read it back
         AssistantTurn {
@@ -82,12 +86,14 @@ async fn test_ch7_edit_flow() {
                 arguments: json!({"path": path_str}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Step 3: Report
         AssistantTurn {
             text: Some("Done! The file now says: Hello Rust".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -114,11 +120,13 @@ async fn test_ch7_bash_then_report() {
                 arguments: json!({"command": "echo hello-from-bash"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Bash returned: hello-from-bash".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -145,6 +153,7 @@ async fn test_ch7_write_edit_read_flow() {
                 arguments: json!({"path": path_str, "content": "first version"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Edit it
         AssistantTurn {
@@ -159,6 +168,7 @@ async fn test_ch7_write_edit_read_flow() {
                 }),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Read it back
         AssistantTurn {
@@ -169,12 +179,14 @@ async fn test_ch7_write_edit_read_flow() {
                 arguments: json!({"path": path_str}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Report
         AssistantTurn {
             text: Some("File says: second version".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -206,6 +218,7 @@ async fn test_ch7_all_four_tools() {
                 arguments: json!({"command": "echo starting"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Write file
         AssistantTurn {
@@ -216,6 +229,7 @@ async fn test_ch7_all_four_tools() {
                 arguments: json!({"path": file_str, "content": "original content"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Edit file
         AssistantTurn {
@@ -230,6 +244,7 @@ async fn test_ch7_all_four_tools() {
                 }),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Read file
         AssistantTurn {
@@ -240,12 +255,14 @@ async fn test_ch7_all_four_tools() {
                 arguments: json!({"path": file_str}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Report
         AssistantTurn {
             text: Some("All four tools used. File: modified content".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -281,6 +298,7 @@ async fn test_ch7_multiple_writes() {
                 arguments: json!({"path": a_str, "content": "file A"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: None,
@@ -290,11 +308,13 @@ async fn test_ch7_multiple_writes() {
                 arguments: json!({"path": b_str, "content": "file B"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Created both files".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -331,11 +351,13 @@ async fn test_ch7_read_multiple_files() {
                 },
             ],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("alpha and beta".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -362,6 +384,7 @@ async fn test_ch7_bash_and_write() {
                 arguments: json!({"command": "echo file-data"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Write the output
         AssistantTurn {
@@ -372,11 +395,13 @@ async fn test_ch7_bash_and_write() {
                 arguments: json!({"path": path_str, "content": "file-data\n"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Saved bash output to file".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -411,6 +436,7 @@ async fn test_ch7_edit_twice() {
                 }),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Second edit
         AssistantTurn {
@@ -425,11 +451,13 @@ async fn test_ch7_edit_twice() {
                 }),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Edited twice".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -456,6 +484,7 @@ async fn test_ch7_write_nested_dirs_then_read() {
                 arguments: json!({"path": path_str, "content": "deep file"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Read it back
         AssistantTurn {
@@ -466,11 +495,13 @@ async fn test_ch7_write_nested_dirs_then_read() {
                 arguments: json!({"path": path_str}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Deep file: deep file".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -500,6 +531,7 @@ async fn test_ch7_five_step_conversation() {
                 arguments: json!({"command": "echo step1"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Step 2: write
         AssistantTurn {
@@ -510,6 +542,7 @@ async fn test_ch7_five_step_conversation() {
                 arguments: json!({"path": path_str, "content": "initial"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Step 3: read
         AssistantTurn {
@@ -520,6 +553,7 @@ async fn test_ch7_five_step_conversation() {
                 arguments: json!({"path": path_str}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Step 4: edit
         AssistantTurn {
@@ -534,6 +568,7 @@ async fn test_ch7_five_step_conversation() {
                 }),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Step 5: read again
         AssistantTurn {
@@ -544,12 +579,14 @@ async fn test_ch7_five_step_conversation() {
                 arguments: json!({"path": path_str}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Final
         AssistantTurn {
             text: Some("Complete: final".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -581,6 +618,7 @@ async fn test_ch7_overwrite_file() {
                 arguments: json!({"path": path_str, "content": "version 1"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Overwrite
         AssistantTurn {
@@ -591,6 +629,7 @@ async fn test_ch7_overwrite_file() {
                 arguments: json!({"path": path_str, "content": "version 2"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Read
         AssistantTurn {
@@ -601,11 +640,13 @@ async fn test_ch7_overwrite_file() {
                 arguments: json!({"path": path_str}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Final version: version 2".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -627,6 +668,7 @@ async fn test_ch7_chat_basic() {
         text: Some("Hello!".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let agent = SimpleAgent::new(provider);
@@ -655,11 +697,13 @@ async fn test_ch7_chat_with_tool_call() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("File says: chat content".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -680,11 +724,13 @@ async fn test_ch7_chat_multi_turn() {
             text: Some("First reply".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Second reply".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 

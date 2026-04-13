@@ -142,6 +142,7 @@ fn test_ch6_convert_messages_assistant_with_text() {
         text: Some("response".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     })];
 
     let converted = OpenRouterProvider::convert_messages(&messages);
@@ -161,6 +162,7 @@ fn test_ch6_convert_messages_assistant_with_tool_calls() {
             arguments: json!({"path": "file.txt"}),
         }],
         stop_reason: StopReason::ToolUse,
+        usage: None,
     })];
 
     let converted = OpenRouterProvider::convert_messages(&messages);
@@ -187,6 +189,7 @@ fn test_ch6_convert_messages_full_conversation() {
                 arguments: json!({"path": "file.txt"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         }),
         Message::ToolResult {
             id: "tc_1".into(),
@@ -196,6 +199,7 @@ fn test_ch6_convert_messages_full_conversation() {
             text: Some("The file contains: file contents".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         }),
     ];
 
@@ -321,6 +325,7 @@ fn test_ch6_convert_assistant_multiple_tool_calls() {
             },
         ],
         stop_reason: StopReason::ToolUse,
+        usage: None,
     })];
 
     let converted = OpenRouterProvider::convert_messages(&messages);
@@ -343,6 +348,7 @@ fn test_ch6_convert_tool_call_arguments_serialized() {
             arguments: json!({"path": "out.txt", "content": "hello"}),
         }],
         stop_reason: StopReason::ToolUse,
+        usage: None,
     })];
 
     let converted = OpenRouterProvider::convert_messages(&messages);

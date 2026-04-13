@@ -266,6 +266,7 @@ The LLM would see the block reason in the tool result and switch to read-only to
 pub struct ShellHook {
     command: String,
     event_filter: Vec<String>,
+    timeout: std::time::Duration,
 }
 
 impl ShellHook {
@@ -273,7 +274,13 @@ impl ShellHook {
         Self {
             command: command.into(),
             event_filter: Vec::new(),
+            timeout: std::time::Duration::from_secs(30),
         }
+    }
+
+    pub fn timeout(mut self, timeout: std::time::Duration) -> Self {
+        self.timeout = timeout;
+        self
     }
 
     pub fn on_events(mut self, events: Vec<String>) -> Self {
@@ -288,6 +295,8 @@ impl ShellHook {
 ```
 
 The `ShellHook` bridges the gap between Rust code and external commands. Instead of implementing policy in Rust, it delegates to a shell command. The command receives context through environment variables and signals its decision through its exit code.
+
+The `timeout` field defaults to 30 seconds. A shell command that takes longer is killed and treated as a failure -- this prevents a hung hook from stalling the agent indefinitely. The `timeout()` builder method overrides the default.
 
 The `on_events` builder method restricts which events the hook fires for. Without it, the hook fires for all tool events. With it, you can say "only fire for `pre_tool_call`" or "only fire for `post_tool_call`". The `should_fire` method implements this: an empty filter means "fire for everything"; a non-empty filter means "fire only for listed event names".
 
@@ -308,16 +317,15 @@ impl Hook for ShellHook {
             return HookAction::Continue;
         }
 
-        let result = tokio::process::Command::new("sh")
+        let fut = tokio::process::Command::new("sh")
             .arg("-c")
             .arg(&self.command)
             .env("HOOK_TOOL_NAME", tool_name)
             .env("HOOK_EVENT", event_name)
-            .output()
-            .await;
+            .output();
 
-        match result {
-            Ok(output) => {
+        match tokio::time::timeout(self.timeout, fut).await {
+            Ok(Ok(output)) => {
                 if !output.status.success() && event_name == "pre_tool_call" {
                     let stderr = String::from_utf8_lossy(&output.stderr);
                     HookAction::Block(format!(
@@ -328,7 +336,11 @@ impl Hook for ShellHook {
                     HookAction::Continue
                 }
             }
-            Err(e) => HookAction::Block(format!("hook command error: {}", e)),
+            Ok(Err(e)) => HookAction::Block(format!("hook command error: {}", e)),
+            Err(_) => HookAction::Block(format!(
+                "hook command timed out after {:?}",
+                self.timeout
+            )),
         }
     }
 }
@@ -340,11 +352,11 @@ The execution flow:
 
 2. **Check the filter.** If the event name is not in the filter, return `Continue` immediately.
 
-3. **Run the command.** Uses `tokio::process::Command` to spawn `sh -c <command>` with two environment variables: `HOOK_TOOL_NAME` (the tool being called) and `HOOK_EVENT` (which lifecycle point). The `.output()` method captures stdout and stderr.
+3. **Run the command with a timeout.** Uses `tokio::process::Command` to spawn `sh -c <command>` with two environment variables: `HOOK_TOOL_NAME` (the tool being called) and `HOOK_EVENT` (which lifecycle point). The command is wrapped in `tokio::time::timeout(self.timeout, ...)` -- if the command takes longer than the configured timeout (default 30 seconds), it is killed and treated as a failure.
 
 4. **Interpret the exit code.** A non-zero exit on a `pre_tool_call` event means "block this call." The stderr is captured and included in the block reason, so the hook author can provide a human-readable explanation. A non-zero exit on any other event (including `post_tool_call`) is ignored -- the tool already ran, so blocking would be pointless. A zero exit always means `Continue`.
 
-5. **Handle errors.** If the command itself fails to spawn (binary not found, permission denied), the hook blocks with an error message. This is conservative -- if the hook system cannot evaluate the policy, it refuses to proceed.
+5. **Handle errors.** If the command itself fails to spawn (binary not found, permission denied) or times out, the hook blocks with an error message. This is conservative -- if the hook system cannot evaluate the policy, it refuses to proceed.
 
 Here is a concrete example. Suppose you want to block any bash command that touches production databases:
 

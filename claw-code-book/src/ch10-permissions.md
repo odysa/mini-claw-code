@@ -135,7 +135,7 @@ pub struct PermissionEngine {
     mode: PermissionMode,
     rules: Vec<PermissionRule>,
     /// Tools the user has approved during this session.
-    session_approvals: Mutex<HashSet<String>>,
+    session_approvals: RwLock<HashSet<String>>,
 }
 ```
 
@@ -143,7 +143,7 @@ Three fields:
 
 - **`mode`** -- The active permission mode. Set once at construction.
 - **`rules`** -- An ordered list of permission rules. First match wins. Set via the builder.
-- **`session_approvals`** -- A set of tool names the user has approved during this session. Protected by a `Mutex` because the engine might be shared across async tasks.
+- **`session_approvals`** -- A set of tool names the user has approved during this session. Protected by a `RwLock` because the engine might be shared across async tasks. We use `RwLock` rather than `Mutex` because `check()` and `is_session_approved()` only need read access -- and `RwLock` allows concurrent readers without blocking each other. Only `approve_session()` and `clear_session()` take a write lock.
 
 The constructor and builder are minimal:
 
@@ -153,7 +153,7 @@ impl PermissionEngine {
         Self {
             mode,
             rules: Vec::new(),
-            session_approvals: Mutex::new(HashSet::new()),
+            session_approvals: RwLock::new(HashSet::new()),
         }
     }
 
@@ -368,7 +368,7 @@ When the `check` method returns `Permission::Ask`, the caller (typically the Que
 ```rust
 pub fn approve_session(&self, tool_name: &str) {
     self.session_approvals
-        .lock()
+        .write()
         .unwrap()
         .insert(tool_name.to_string());
 }
@@ -379,19 +379,19 @@ Subsequent checks for the same tool will find it in the session approvals set (s
 ```rust
 pub fn is_session_approved(&self, tool_name: &str) -> bool {
     self.session_approvals
-        .lock()
+        .read()
         .unwrap()
         .contains(tool_name)
 }
 ```
 
-The approval is stored as a tool name string in a `HashSet`, protected by a `Mutex`. The `Mutex` is necessary because the `PermissionEngine` might be shared across async tasks (for example, the QueryEngine and the UI running concurrently). The lock is held only for the duration of the `insert` or `contains` call -- microseconds at most -- so contention is not a concern.
+The approval is stored as a tool name string in a `HashSet`, protected by an `RwLock`. We use `RwLock` because the permission engine might be shared across async tasks (for example, the QueryEngine and the UI running concurrently), and the read path (`is_session_approved`, called inside `check()`) is far more frequent than the write path (`approve_session`). With `RwLock`, multiple concurrent `check()` calls can read the session set without blocking each other.
 
 Session approvals can be cleared explicitly:
 
 ```rust
 pub fn clear_session(&self) {
-    self.session_approvals.lock().unwrap().clear();
+    self.session_approvals.write().unwrap().clear();
 }
 ```
 

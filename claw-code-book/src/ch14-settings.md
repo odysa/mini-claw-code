@@ -437,7 +437,7 @@ pub fn summary(&self) -> String {
 }
 ```
 
-Produces a string like `"tokens: 5000 in + 1000 out | cost: $0.0300"`. Four decimal places gives sub-cent precision. This is what the TUI (Chapter 26) displays in the status bar -- a constant reminder of what the session is costing.
+Produces a string like `"tokens: 5000 in + 1000 out | cost: $0.0300"`. Four decimal places gives sub-cent precision. A TUI would display this in the status bar -- a constant reminder of what the session is costing.
 
 ### Reset
 

@@ -159,9 +159,7 @@ virtual `exit_plan` tool are available. Here is the full implementation:
 
 ```rust
 pub async fn plan(&self, messages: &mut Vec<Message>) -> anyhow::Result<String> {
-    // Inject planning system prompt if not already present
     self.maybe_inject_plan_prompt(messages);
-
     let plan_defs = self.plan_definitions();
     let mut turns = 0;
 
@@ -179,28 +177,10 @@ pub async fn plan(&self, messages: &mut Vec<Message>) -> anyhow::Result<String> 
                 return Ok(text);
             }
             StopReason::ToolUse => {
-                // Check for exit_plan
-                if turn.tool_calls.iter().any(|c| c.name == "exit_plan") {
-                    let text = turn.text.clone().unwrap_or_default();
-                    messages.push(Message::Assistant(turn));
-                    // Push a tool result for exit_plan
-                    let exit_call = messages
-                        .iter()
-                        .rev()
-                        .find_map(|m| {
-                            if let Message::Assistant(a) = m {
-                                a.tool_calls.iter().find(|c| c.name == "exit_plan")
-                            } else {
-                                None
-                            }
-                        })
-                        .map(|c| c.id.clone())
-                        .unwrap_or_default();
-                    messages.push(Message::tool_result(exit_call, "Plan phase complete."));
+                if let Some(text) = self.handle_exit_plan(&turn, messages) {
                     return Ok(text);
                 }
 
-                // Execute allowed tools, block others
                 let results = self.execute_plan_tools(&turn.tool_calls).await;
                 messages.push(Message::Assistant(turn));
                 for (id, result) in results {
@@ -211,6 +191,25 @@ pub async fn plan(&self, messages: &mut Vec<Message>) -> anyhow::Result<String> 
 
         turns += 1;
     }
+}
+```
+
+The `handle_exit_plan` helper extracts the exit_plan call ID from the turn *before* moving the turn into the message history, then pushes both the assistant message and a synthetic tool result:
+
+```rust
+fn handle_exit_plan(
+    &self,
+    turn: &AssistantMessage,
+    messages: &mut Vec<Message>,
+) -> Option<String> {
+    let exit_id = turn.tool_calls.iter()
+        .find(|c| c.name == "exit_plan")
+        .map(|c| c.id.clone())?;
+
+    let text = turn.text.clone().unwrap_or_default();
+    messages.push(Message::Assistant(turn.clone()));
+    messages.push(Message::tool_result(exit_id, "Plan phase complete."));
+    Some(text)
 }
 ```
 

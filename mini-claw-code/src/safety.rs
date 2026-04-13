@@ -24,9 +24,7 @@ pub struct PathValidator {
 impl PathValidator {
     pub fn new(allowed_dir: impl Into<PathBuf>) -> Self {
         let raw_dir: PathBuf = allowed_dir.into();
-        let allowed_dir = raw_dir
-            .canonicalize()
-            .unwrap_or_else(|_| raw_dir.clone());
+        let allowed_dir = raw_dir.canonicalize().unwrap_or_else(|_| raw_dir.clone());
         Self {
             allowed_dir,
             raw_dir,

@@ -50,14 +50,11 @@ impl Tool for GrepTool {
         let re = regex::Regex::new(pattern)
             .map_err(|e| anyhow::anyhow!("invalid regex pattern: {e}"))?;
 
-        let search_path = args
-            .get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or(".");
+        let search_path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
 
         let include_pattern = args.get("include").and_then(|v| v.as_str());
         let include_glob = include_pattern
-            .map(|p| glob::Pattern::new(p))
+            .map(glob::Pattern::new)
             .transpose()
             .map_err(|e| anyhow::anyhow!("invalid include pattern: {e}"))?;
 
@@ -113,11 +110,7 @@ async fn search_file(re: &regex::Regex, path: &Path, matches: &mut Vec<String>) 
 }
 
 /// Recursively collect files from a directory, optionally filtering by glob.
-fn collect_files(
-    dir: &Path,
-    include: &Option<glob::Pattern>,
-    out: &mut Vec<std::path::PathBuf>,
-) {
+fn collect_files(dir: &Path, include: &Option<glob::Pattern>, out: &mut Vec<std::path::PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };

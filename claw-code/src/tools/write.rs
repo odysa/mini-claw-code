@@ -10,9 +10,12 @@ pub struct WriteTool {
 impl WriteTool {
     pub fn new() -> Self {
         Self {
-            def: ToolDefinition::new("write", "Write content to a file, creating directories as needed")
-                .param("path", "string", "Absolute path to write to", true)
-                .param("content", "string", "Content to write", true),
+            def: ToolDefinition::new(
+                "write",
+                "Write content to a file, creating directories as needed",
+            )
+            .param("path", "string", "Absolute path to write to", true)
+            .param("content", "string", "Content to write", true),
         }
     }
 }
@@ -38,12 +41,12 @@ impl Tool for WriteTool {
             .ok_or_else(|| anyhow::anyhow!("missing 'content' argument"))?;
 
         // Create parent directories
-        if let Some(parent) = std::path::Path::new(path).parent() {
-            if !parent.as_os_str().is_empty() {
-                tokio::fs::create_dir_all(parent)
-                    .await
-                    .map_err(|e| anyhow::anyhow!("failed to create directories for '{path}': {e}"))?;
-            }
+        if let Some(parent) = std::path::Path::new(path).parent()
+            && !parent.as_os_str().is_empty()
+        {
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(|e| anyhow::anyhow!("failed to create directories for '{path}': {e}"))?;
         }
 
         tokio::fs::write(path, content)

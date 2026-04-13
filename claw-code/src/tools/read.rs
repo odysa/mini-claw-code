@@ -12,7 +12,12 @@ impl ReadTool {
         Self {
             def: ToolDefinition::new("read", "Read the contents of a file")
                 .param("path", "string", "Absolute path to the file", true)
-                .param("offset", "integer", "Line number to start reading from (1-based)", false)
+                .param(
+                    "offset",
+                    "integer",
+                    "Line number to start reading from (1-based)",
+                    false,
+                )
                 .param("limit", "integer", "Maximum number of lines to read", false),
         }
     }

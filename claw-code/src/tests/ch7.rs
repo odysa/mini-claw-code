@@ -5,20 +5,14 @@ use crate::tools::{BashTool, Tool};
 #[tokio::test]
 async fn test_ch7_bash_echo() {
     let tool = BashTool::new();
-    let result = tool
-        .call(json!({ "command": "echo hello" }))
-        .await
-        .unwrap();
+    let result = tool.call(json!({ "command": "echo hello" })).await.unwrap();
     assert!(result.content.trim().contains("hello"));
 }
 
 #[tokio::test]
 async fn test_ch7_bash_exit_code() {
     let tool = BashTool::new();
-    let result = tool
-        .call(json!({ "command": "exit 42" }))
-        .await
-        .unwrap();
+    let result = tool.call(json!({ "command": "exit 42" })).await.unwrap();
     assert!(result.content.contains("exit code: 42"));
 }
 
@@ -48,10 +42,7 @@ async fn test_ch7_bash_stdout_and_stderr() {
 #[tokio::test]
 async fn test_ch7_bash_no_output() {
     let tool = BashTool::new();
-    let result = tool
-        .call(json!({ "command": "true" }))
-        .await
-        .unwrap();
+    let result = tool.call(json!({ "command": "true" })).await.unwrap();
     assert_eq!(result.content, "(no output)");
 }
 

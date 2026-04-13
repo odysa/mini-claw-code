@@ -12,7 +12,12 @@ impl GlobTool {
         Self {
             def: ToolDefinition::new("glob", "Find files matching a glob pattern")
                 .param("pattern", "string", "Glob pattern (e.g. \"**/*.rs\")", true)
-                .param("path", "string", "Base directory to search in (default: current directory)", false),
+                .param(
+                    "path",
+                    "string",
+                    "Base directory to search in (default: current directory)",
+                    false,
+                ),
         }
     }
 }
@@ -34,10 +39,7 @@ impl Tool for GlobTool {
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("missing 'pattern' argument"))?;
 
-        let base = args
-            .get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or(".");
+        let base = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
 
         let full_pattern = if pattern.starts_with('/') || pattern.starts_with('.') {
             pattern.to_string()

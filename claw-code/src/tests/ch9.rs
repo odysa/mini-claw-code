@@ -47,9 +47,7 @@ fn test_ch9_registry_definitions() {
 
 #[test]
 fn test_ch9_registry_names() {
-    let tools = ToolSet::new()
-        .with(GlobTool::new())
-        .with(GrepTool::new());
+    let tools = ToolSet::new().with(GlobTool::new()).with(GrepTool::new());
 
     let mut names = tools.names();
     names.sort();
@@ -68,12 +66,7 @@ fn test_ch9_read_only_tools() {
     let read_only: Vec<&str> = tools
         .definitions()
         .iter()
-        .filter(|d| {
-            tools
-                .get(d.name)
-                .map(|t| t.is_read_only())
-                .unwrap_or(false)
-        })
+        .filter(|d| tools.get(d.name).map(|t| t.is_read_only()).unwrap_or(false))
         .map(|d| d.name)
         .collect();
 
@@ -148,10 +141,7 @@ async fn test_ch9_engine_with_file_tools() {
 
     let result = engine.run("write and read a file").await.unwrap();
     assert!(result.contains("Done!"));
-    assert_eq!(
-        std::fs::read_to_string(&path).unwrap(),
-        "hello from agent"
-    );
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "hello from agent");
 }
 
 #[tokio::test]

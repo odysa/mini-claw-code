@@ -276,10 +276,7 @@ fn test_ch6_tool_summaries() {
     assert_eq!(read.summary(&json!({"path": "foo.rs"})), "[read: foo.rs]");
 
     let write = WriteTool::new();
-    assert_eq!(
-        write.summary(&json!({"path": "bar.rs"})),
-        "[write: bar.rs]"
-    );
+    assert_eq!(write.summary(&json!({"path": "bar.rs"})), "[write: bar.rs]");
 
     let edit = EditTool::new();
     assert_eq!(edit.summary(&json!({"path": "baz.rs"})), "[edit: baz.rs]");

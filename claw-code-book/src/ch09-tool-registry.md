@@ -122,12 +122,12 @@ All three override `is_read_only()` and `is_concurrent_safe()` to return `true`.
 let write = WriteTool::new();
 assert!(!write.is_read_only());       // false (default)
 assert!(!write.is_concurrent_safe()); // false (default)
-assert!(!write.is_destructive());     // false -- explicitly set
+assert!(!write.is_destructive());     // false (default)
 ```
 
-Write and Edit modify files, so they are not read-only. They are not concurrent-safe because two writes to the same file would race. But they are not marked destructive either -- file writes are recoverable (you can revert with git or rewrite the file). The `WriteTool` explicitly overrides `is_destructive()` to return `false`, making this classification visible rather than relying on the default.
+Write and Edit modify files, so they are not read-only. They are not concurrent-safe because two writes to the same file would race. But they are not marked destructive either -- file writes are recoverable (you can revert with git or rewrite the file).
 
-`EditTool` uses all defaults: not read-only, not concurrent-safe, not destructive. It modifies files (not read-only), cannot safely run in parallel (two edits to the same file would conflict), and is recoverable (not destructive).
+Both `WriteTool` and `EditTool` use all the default safety flags: not read-only, not concurrent-safe, not destructive. They modify files (not read-only), cannot safely run in parallel (two edits to the same file would conflict), and are recoverable (not destructive). There is no need to explicitly override `is_destructive()` to `false` -- that is already the default.
 
 ### Destructive tools: BashTool
 

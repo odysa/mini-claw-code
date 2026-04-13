@@ -93,7 +93,6 @@ impl Tool for ReadTool {
         let end = (start + limit).min(total);
         let selected = &lines[start..end];
 
-        // Format with line numbers
         let numbered: Vec<String> = selected
             .iter()
             .enumerate()
@@ -109,13 +108,6 @@ impl Tool for ReadTool {
 
     fn is_concurrent_safe(&self) -> bool {
         true
-    }
-
-    fn summary(&self, args: &Value) -> String {
-        match args.get("path").and_then(|v| v.as_str()) {
-            Some(p) => format!("[read: {p}]"),
-            None => "[read]".into(),
-        }
     }
 
     fn activity_description(&self, _args: &Value) -> Option<String> {
@@ -156,9 +148,13 @@ digits.
 never modifies anything. `is_concurrent_safe: true` tells the query engine it
 is safe to run multiple reads in parallel -- there is no shared mutable state.
 
-**Display overrides.** `summary` produces `[read: /path/to/file]` for the
-terminal. `activity_description` returns `"Reading file..."` for the TUI
-spinner. Both are small touches that improve the user experience.
+**No `summary()` override.** The default `summary()` from the `Tool` trait
+checks for common argument names (`command`, `path`, `question`, `pattern`) and
+formats them as `[name: detail]`. Since `ReadTool` uses `path`, the default
+produces `[read: /path/to/file]` -- exactly what we want. Only override
+`summary()` when your tool's primary argument is not one of the standard names.
+
+**`activity_description`** returns `"Reading file..."` for the TUI spinner.
 
 ### What the output looks like
 
@@ -264,17 +260,6 @@ impl Tool for WriteTool {
         Ok(ToolResult::text(format!("wrote {bytes} bytes to {path}")))
     }
 
-    fn is_destructive(&self) -> bool {
-        false
-    }
-
-    fn summary(&self, args: &Value) -> String {
-        match args.get("path").and_then(|v| v.as_str()) {
-            Some(p) => format!("[write: {p}]"),
-            None => "[write]".into(),
-        }
-    }
-
     fn activity_description(&self, _args: &Value) -> Option<String> {
         Some("Writing file...".into())
     }
@@ -302,16 +287,13 @@ LLM wants to modify an existing file, it should use the Edit tool.
 This gives the model confirmation that the write succeeded and how much data was
 written. It is a small detail that helps the model verify its own work.
 
-**Not destructive.** `is_destructive` returns `false`. This might seem wrong --
-overwriting a file sounds destructive. But in practice, any file the agent writes
+**Not destructive.** `WriteTool` uses all the default safety flags: not
+read-only, not concurrent-safe, not destructive. This might seem wrong for
+a tool that overwrites files, but in practice any file the agent writes
 is either new (no data loss) or already tracked by git (recoverable with
 `git checkout`). Claude Code makes the same classification. Truly destructive
 operations are things like `rm -rf` or database drops -- irreversible even with
 version control.
-
-Note that `WriteTool` does not override `is_read_only` or `is_concurrent_safe`.
-Those default to `false`, which is correct -- writing is not read-only, and
-concurrent writes to the same file would race.
 
 ---
 
@@ -420,13 +402,6 @@ impl Tool for EditTool {
             };
         }
         ValidationResult::Ok
-    }
-
-    fn summary(&self, args: &Value) -> String {
-        match args.get("path").and_then(|v| v.as_str()) {
-            Some(p) => format!("[edit: {p}]"),
-            None => "[edit]".into(),
-        }
     }
 
     fn activity_description(&self, _args: &Value) -> Option<String> {

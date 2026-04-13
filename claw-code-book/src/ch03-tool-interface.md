@@ -164,6 +164,14 @@ Claude Code's tool system is substantially larger:
 
 Despite these differences, the core protocol is identical. An LLM sees a list of tool schemas, decides to call one, the agent executes it, and the result goes back to the LLM. Everything else -- validation, permissions, progress, rendering -- is orchestration around that loop. Understanding the `Tool` trait gives you the foundation to understand Claude Code's full system.
 
+## Implementation note
+
+There is no new source file to create in this chapter. The `EchoTool` exists
+only in the test file (`src/tests/ch3.rs`). Your job is to verify that the types
+you built in Chapter 1 -- `Tool`, `ToolDefinition`, `ToolResult`, `ToolSet` --
+work correctly with a concrete tool implementation. If the chapter 3 tests pass,
+your type definitions are correct.
+
 ## Run the tests
 
 ```bash

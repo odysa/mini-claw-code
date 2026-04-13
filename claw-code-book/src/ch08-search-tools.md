@@ -100,13 +100,6 @@ impl Tool for GlobTool {
         true
     }
 
-    fn summary(&self, args: &Value) -> String {
-        match args.get("pattern").and_then(|v| v.as_str()) {
-            Some(p) => format!("[glob: {p}]"),
-            None => "[glob]".into(),
-        }
-    }
-
     fn activity_description(&self, _args: &Value) -> Option<String> {
         Some("Searching files...".into())
     }
@@ -230,13 +223,6 @@ impl Tool for GrepTool {
 
     fn is_concurrent_safe(&self) -> bool {
         true
-    }
-
-    fn summary(&self, args: &Value) -> String {
-        match args.get("pattern").and_then(|v| v.as_str()) {
-            Some(p) => format!("[grep: {p}]"),
-            None => "[grep]".into(),
-        }
     }
 
     fn activity_description(&self, _args: &Value) -> Option<String> {

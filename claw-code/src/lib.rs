@@ -4,7 +4,6 @@ pub mod provider;
 pub mod tools;
 pub mod types;
 
-// Phase 2+
 pub mod agents;
 pub mod config;
 pub mod context;
@@ -18,7 +17,11 @@ pub mod tui;
 mod tests;
 
 // Re-exports for convenience
+pub use agents::PlanEngine;
+pub use config::{Config, ConfigLoader, CostTracker};
 pub use engine::QueryEngine;
+pub use hooks::{Hook, HookAction, HookEvent, HookRunner};
+pub use permission::{PermissionEngine, SafetyChecker};
 pub use provider::{MockProvider, MockStreamProvider};
 pub use tools::{BashTool, EditTool, GlobTool, GrepTool, ReadTool, ToolSet, WriteTool};
 pub use types::*;

@@ -23,7 +23,7 @@
 
 ---
 
-# Part III: Safety & Control (coming soon)
+# Part III: Safety & Control
 
 - [Chapter 10: Permission Engine](./ch10-permissions.md)
 - [Chapter 11: Safety Checks](./ch11-safety.md)
@@ -32,7 +32,7 @@
 
 ---
 
-# Part IV: Configuration & Context (coming soon)
+# Part IV: Configuration & Context
 
 - [Chapter 14: Settings Hierarchy](./ch14-settings.md)
 - [Chapter 15: Project Instructions](./ch15-instructions.md)

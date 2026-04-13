@@ -196,6 +196,61 @@ impl ToolSet {
     pub fn is_empty(&self) -> bool {
         self.tools.is_empty()
     }
+
+    /// Execute a list of tool calls, returning results paired with call IDs.
+    ///
+    /// Handles lookup, validation, execution, and truncation in one place.
+    /// Both `QueryEngine` and `PlanEngine` delegate to this.
+    pub async fn execute_calls(
+        &self,
+        calls: &[ToolCall],
+        max_result_chars: usize,
+    ) -> Vec<(String, ToolResult)> {
+        let mut results = Vec::with_capacity(calls.len());
+        for call in calls {
+            let result = match self.get(&call.name) {
+                Some(t) => {
+                    match t.validate_input(&call.arguments) {
+                        ValidationResult::Ok => {}
+                        ValidationResult::Error { message, .. } => {
+                            results.push((call.id.clone(), ToolResult::error(message)));
+                            continue;
+                        }
+                    }
+                    match t.call(call.arguments.clone()).await {
+                        Ok(mut r) => {
+                            if r.content.len() > max_result_chars {
+                                let truncate_at = truncate_utf8(&r.content, max_result_chars);
+                                r.content = format!(
+                                    "{}... [truncated, {} chars total]",
+                                    &r.content[..truncate_at],
+                                    r.content.len()
+                                );
+                                r.is_truncated = true;
+                            }
+                            r
+                        }
+                        Err(e) => ToolResult::error(e.to_string()),
+                    }
+                }
+                None => ToolResult::error(format!("unknown tool `{}`", call.name)),
+            };
+            results.push((call.id.clone(), result));
+        }
+        results
+    }
+}
+
+/// Find the largest byte index <= `max_bytes` that falls on a UTF-8 char boundary.
+pub fn truncate_utf8(s: &str, max_bytes: usize) -> usize {
+    if max_bytes >= s.len() {
+        return s.len();
+    }
+    let mut idx = max_bytes;
+    while idx > 0 && !s.is_char_boundary(idx) {
+        idx -= 1;
+    }
+    idx
 }
 
 impl Default for ToolSet {

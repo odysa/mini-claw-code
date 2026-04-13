@@ -133,7 +133,6 @@ impl PermissionEngine {
                     )
                 }
             }
-            // Bypass, DontAsk, Plan handled above
             _ => unreachable!(),
         }
     }

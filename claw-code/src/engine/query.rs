@@ -3,6 +3,9 @@ use tokio::sync::mpsc;
 use crate::provider::Provider;
 use crate::types::*;
 
+/// Maximum characters for tool result previews in events.
+const DISPLAY_TRUNCATE_LIMIT: usize = 200;
+
 /// Events emitted by the query engine during execution.
 #[derive(Debug)]
 pub enum QueryEvent {
@@ -16,6 +19,41 @@ pub enum QueryEvent {
     Done(String),
     /// The engine encountered an error.
     Error(String),
+}
+
+/// Emit ToolStart and ToolEnd events for a set of tool calls and results.
+///
+/// Shared between `QueryEngine::chat_with_events` and `PlanEngine::plan_with_events`.
+pub(crate) fn emit_tool_events(
+    events: &mpsc::UnboundedSender<QueryEvent>,
+    calls: &[ToolCall],
+    results: &[(String, ToolResult)],
+    tools: &ToolSet,
+) {
+    for call in calls {
+        if let Some(t) = tools.get(&call.name) {
+            let _ = events.send(QueryEvent::ToolStart {
+                name: call.name.clone(),
+                summary: t.summary(&call.arguments),
+            });
+        }
+    }
+    for (id, result) in results {
+        let call_name = calls
+            .iter()
+            .find(|c| c.id == *id)
+            .map(|c| c.name.clone())
+            .unwrap_or_default();
+        let _ = events.send(QueryEvent::ToolEnd {
+            name: call_name,
+            result: if result.content.len() > DISPLAY_TRUNCATE_LIMIT {
+                let at = crate::types::truncate_utf8(&result.content, DISPLAY_TRUNCATE_LIMIT);
+                format!("{}...", &result.content[..at])
+            } else {
+                result.content.clone()
+            },
+        });
+    }
 }
 
 /// Configuration for the query engine.
@@ -88,33 +126,7 @@ impl<P: Provider> QueryEngine<P> {
     /// The caller pushes messages before calling. On return, the vec
     /// contains the full conversation including the assistant's final turn.
     pub async fn chat(&self, messages: &mut Vec<Message>) -> anyhow::Result<String> {
-        let defs = self.tools.definitions();
-        let mut turns = 0;
-
-        loop {
-            if turns >= self.config.max_turns {
-                anyhow::bail!("exceeded max turns ({})", self.config.max_turns);
-            }
-
-            let turn = self.provider.chat(messages, &defs).await?;
-
-            match turn.stop_reason {
-                StopReason::Stop => {
-                    let text = turn.text.clone().unwrap_or_default();
-                    messages.push(Message::Assistant(turn));
-                    return Ok(text);
-                }
-                StopReason::ToolUse => {
-                    let results = self.execute_tools(&turn.tool_calls).await;
-                    messages.push(Message::Assistant(turn));
-                    for (id, result) in results {
-                        messages.push(Message::tool_result(id, result.content));
-                    }
-                }
-            }
-
-            turns += 1;
-        }
+        crate::agents::chat_loop(&self.provider, &self.tools, &self.config, messages).await
     }
 
     /// Run with event streaming via channel.
@@ -162,33 +174,8 @@ impl<P: Provider> QueryEngine<P> {
                     return;
                 }
                 StopReason::ToolUse => {
-                    for call in &turn.tool_calls {
-                        if let Some(t) = self.tools.get(&call.name) {
-                            let _ = events.send(QueryEvent::ToolStart {
-                                name: call.name.clone(),
-                                summary: t.summary(&call.arguments),
-                            });
-                        }
-                    }
-
                     let results = self.execute_tools(&turn.tool_calls).await;
-
-                    for (id, result) in &results {
-                        let call_name = turn
-                            .tool_calls
-                            .iter()
-                            .find(|c| c.id == *id)
-                            .map(|c| c.name.clone())
-                            .unwrap_or_default();
-                        let _ = events.send(QueryEvent::ToolEnd {
-                            name: call_name,
-                            result: if result.content.len() > 200 {
-                                format!("{}...", &result.content[..200])
-                            } else {
-                                result.content.clone()
-                            },
-                        });
-                    }
+                    emit_tool_events(&events, &turn.tool_calls, &results, &self.tools);
 
                     messages.push(Message::Assistant(turn));
                     for (id, result) in results {

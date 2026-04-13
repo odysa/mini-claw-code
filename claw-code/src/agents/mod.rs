@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use tokio::sync::mpsc;
 
-use crate::engine::{QueryConfig, QueryEvent};
+use crate::engine::{QueryConfig, QueryEvent, emit_tool_events};
 use crate::provider::Provider;
 use crate::types::*;
 
@@ -85,9 +85,7 @@ impl<P: Provider> PlanEngine<P> {
     /// The `exit_plan` tool is injected to let the model signal completion.
     /// Returns the plan text.
     pub async fn plan(&self, messages: &mut Vec<Message>) -> anyhow::Result<String> {
-        // Inject planning system prompt if not already present
         self.maybe_inject_plan_prompt(messages);
-
         let plan_defs = self.plan_definitions();
         let mut turns = 0;
 
@@ -108,20 +106,10 @@ impl<P: Provider> PlanEngine<P> {
                     return Ok(text);
                 }
                 StopReason::ToolUse => {
-                    // Check for exit_plan — capture ID before moving turn
-                    if let Some(exit_id) = turn
-                        .tool_calls
-                        .iter()
-                        .find(|c| c.name == "exit_plan")
-                        .map(|c| c.id.clone())
-                    {
-                        let text = turn.text.clone().unwrap_or_default();
-                        messages.push(Message::Assistant(turn));
-                        messages.push(Message::tool_result(exit_id, "Plan phase complete."));
+                    if let Some(text) = self.handle_exit_plan(&turn, messages) {
                         return Ok(text);
                     }
 
-                    // Execute allowed tools, block others
                     let results = self.execute_plan_tools(&turn.tool_calls).await;
                     messages.push(Message::Assistant(turn));
                     for (id, result) in results {
@@ -141,7 +129,6 @@ impl<P: Provider> PlanEngine<P> {
         events: mpsc::UnboundedSender<QueryEvent>,
     ) -> Option<String> {
         self.maybe_inject_plan_prompt(messages);
-
         let plan_defs = self.plan_definitions();
         let mut turns = 0;
 
@@ -183,33 +170,8 @@ impl<P: Provider> PlanEngine<P> {
                         return Some(text);
                     }
 
-                    for call in &turn.tool_calls {
-                        if let Some(t) = self.tools.get(&call.name) {
-                            let _ = events.send(QueryEvent::ToolStart {
-                                name: call.name.clone(),
-                                summary: t.summary(&call.arguments),
-                            });
-                        }
-                    }
-
                     let results = self.execute_plan_tools(&turn.tool_calls).await;
-
-                    for (id, result) in &results {
-                        let call_name = turn
-                            .tool_calls
-                            .iter()
-                            .find(|c| c.id == *id)
-                            .map(|c| c.name.clone())
-                            .unwrap_or_default();
-                        let _ = events.send(QueryEvent::ToolEnd {
-                            name: call_name,
-                            result: if result.content.len() > 200 {
-                                format!("{}...", &result.content[..200])
-                            } else {
-                                result.content.clone()
-                            },
-                        });
-                    }
+                    emit_tool_events(&events, &turn.tool_calls, &results, &self.tools);
 
                     messages.push(Message::Assistant(turn));
                     for (id, result) in results {
@@ -227,39 +189,7 @@ impl<P: Provider> PlanEngine<P> {
     /// Call this after `plan()` returns and the user has approved.
     /// The message history from planning is preserved.
     pub async fn execute(&self, messages: &mut Vec<Message>) -> anyhow::Result<String> {
-        let defs = self.tools.definitions();
-        let mut turns = 0;
-
-        loop {
-            if turns >= self.config.max_turns {
-                anyhow::bail!(
-                    "exceeded max turns ({}) during execution",
-                    self.config.max_turns
-                );
-            }
-
-            let turn = self.provider.chat(messages, &defs).await?;
-
-            match turn.stop_reason {
-                StopReason::Stop => {
-                    let text = turn.text.clone().unwrap_or_default();
-                    messages.push(Message::Assistant(turn));
-                    return Ok(text);
-                }
-                StopReason::ToolUse => {
-                    let results = self
-                        .tools
-                        .execute_calls(&turn.tool_calls, self.config.max_result_chars)
-                        .await;
-                    messages.push(Message::Assistant(turn));
-                    for (id, result) in results {
-                        messages.push(Message::tool_result(id, result.content));
-                    }
-                }
-            }
-
-            turns += 1;
-        }
+        chat_loop(&self.provider, &self.tools, &self.config, messages).await
     }
 
     // --- Private helpers ---
@@ -271,7 +201,6 @@ impl<P: Provider> PlanEngine<P> {
              or provide your plan as a text response.",
         );
 
-        // Don't inject if already present
         let already_has = messages
             .iter()
             .any(|m| matches!(m, Message::System(s) if s.tag.as_deref() == Some("plan_mode")));
@@ -288,11 +217,29 @@ impl<P: Provider> PlanEngine<P> {
         }
     }
 
+    /// Check for exit_plan in a tool-use turn. If found, push messages and
+    /// return the plan text. Returns None if exit_plan was not called.
+    fn handle_exit_plan(
+        &self,
+        turn: &AssistantMessage,
+        messages: &mut Vec<Message>,
+    ) -> Option<String> {
+        let exit_id = turn
+            .tool_calls
+            .iter()
+            .find(|c| c.name == "exit_plan")
+            .map(|c| c.id.clone())?;
+
+        let text = turn.text.clone().unwrap_or_default();
+        messages.push(Message::Assistant(turn.clone()));
+        messages.push(Message::tool_result(exit_id, "Plan phase complete."));
+        Some(text)
+    }
+
     fn is_plan_allowed(&self, tool_name: &str) -> bool {
         if !self.plan_tools.is_empty() {
             return self.plan_tools.contains(tool_name);
         }
-        // Default: check is_read_only on the tool
         self.tools
             .get(tool_name)
             .map(|t| t.is_read_only())
@@ -311,26 +258,68 @@ impl<P: Provider> PlanEngine<P> {
     }
 
     async fn execute_plan_tools(&self, calls: &[ToolCall]) -> Vec<(String, ToolResult)> {
-        let mut results = Vec::with_capacity(calls.len());
+        let mut blocked = Vec::new();
+        let mut allowed: Vec<ToolCall> = Vec::new();
+
         for call in calls {
             if call.name == "exit_plan" {
                 continue;
             }
-            let result = if !self.is_plan_allowed(&call.name) {
-                (
+            if !self.is_plan_allowed(&call.name) {
+                blocked.push((
                     call.id.clone(),
                     ToolResult::error(format!("`{}` is not available in planning mode", call.name)),
-                )
+                ));
             } else {
-                // Delegate single call to shared execute_calls
-                let mut r = self
-                    .tools
-                    .execute_calls(std::slice::from_ref(call), self.config.max_result_chars)
-                    .await;
-                r.pop().unwrap()
-            };
-            results.push(result);
+                allowed.push(call.clone());
+            }
         }
+
+        let mut results = self
+            .tools
+            .execute_calls(&allowed, self.config.max_result_chars)
+            .await;
+        results.extend(blocked);
         results
+    }
+}
+
+/// The core agent loop shared by `QueryEngine::chat` and `PlanEngine::execute`.
+///
+/// Loops: call provider → match stop_reason → execute tools → push results.
+pub(crate) async fn chat_loop<P: Provider>(
+    provider: &P,
+    tools: &ToolSet,
+    config: &QueryConfig,
+    messages: &mut Vec<Message>,
+) -> anyhow::Result<String> {
+    let defs = tools.definitions();
+    let mut turns = 0;
+
+    loop {
+        if turns >= config.max_turns {
+            anyhow::bail!("exceeded max turns ({})", config.max_turns);
+        }
+
+        let turn = provider.chat(messages, &defs).await?;
+
+        match turn.stop_reason {
+            StopReason::Stop => {
+                let text = turn.text.clone().unwrap_or_default();
+                messages.push(Message::Assistant(turn));
+                return Ok(text);
+            }
+            StopReason::ToolUse => {
+                let results = tools
+                    .execute_calls(&turn.tool_calls, config.max_result_chars)
+                    .await;
+                messages.push(Message::Assistant(turn));
+                for (id, result) in results {
+                    messages.push(Message::tool_result(id, result.content));
+                }
+            }
+        }
+
+        turns += 1;
     }
 }

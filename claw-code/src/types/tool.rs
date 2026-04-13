@@ -242,7 +242,7 @@ impl ToolSet {
 }
 
 /// Find the largest byte index <= `max_bytes` that falls on a UTF-8 char boundary.
-fn truncate_utf8(s: &str, max_bytes: usize) -> usize {
+pub fn truncate_utf8(s: &str, max_bytes: usize) -> usize {
     if max_bytes >= s.len() {
         return s.len();
     }

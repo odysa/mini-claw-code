@@ -70,40 +70,9 @@ impl<P: Provider> QueryEngine<P> {
 
     /// Execute all tool calls and return results.
     async fn execute_tools(&self, calls: &[ToolCall]) -> Vec<(String, ToolResult)> {
-        let mut results = Vec::with_capacity(calls.len());
-        for call in calls {
-            let result = match self.tools.get(&call.name) {
-                Some(t) => {
-                    // Validate input
-                    match t.validate_input(&call.arguments) {
-                        ValidationResult::Ok => {}
-                        ValidationResult::Error { message, .. } => {
-                            results.push((call.id.clone(), ToolResult::error(message)));
-                            continue;
-                        }
-                    }
-                    // Execute
-                    match t.call(call.arguments.clone()).await {
-                        Ok(mut r) => {
-                            // Truncate large results
-                            if r.content.len() > self.config.max_result_chars {
-                                r.content = format!(
-                                    "{}... [truncated, {} chars total]",
-                                    &r.content[..self.config.max_result_chars],
-                                    r.content.len()
-                                );
-                                r.is_truncated = true;
-                            }
-                            r
-                        }
-                        Err(e) => ToolResult::error(e.to_string()),
-                    }
-                }
-                None => ToolResult::error(format!("unknown tool `{}`", call.name)),
-            };
-            results.push((call.id.clone(), result));
-        }
-        results
+        self.tools
+            .execute_calls(calls, self.config.max_result_chars)
+            .await
     }
 
     /// Run the query engine with a single prompt.

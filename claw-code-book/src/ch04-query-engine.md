@@ -317,7 +317,85 @@ pub async fn run_with_events(
 
 `run_with_events` returns `Vec<Message>` instead of `Result<String>` -- errors are sent as `QueryEvent::Error` rather than propagated. This keeps the event-driven API simple: the receiver always gets a terminal event (`Done` or `Error`).
 
-`chat_with_events` has the same structure as `chat()` but with events woven in. Rather than reproducing the full listing, here are the key differences from `chat()`:
+`chat_with_events` has the same structure as `chat()` but with events woven in. Here is the full implementation:
+
+```rust
+pub async fn chat_with_events(
+    &self,
+    messages: &mut Vec<Message>,
+    events: mpsc::UnboundedSender<QueryEvent>,
+) {
+    let defs = self.tools.definitions();
+    let mut turns = 0;
+
+    loop {
+        if turns >= self.config.max_turns {
+            let _ = events.send(QueryEvent::Error(format!(
+                "exceeded max turns ({})",
+                self.config.max_turns
+            )));
+            return;
+        }
+
+        let turn = match self.provider.chat(messages, &defs).await {
+            Ok(t) => t,
+            Err(e) => {
+                let _ = events.send(QueryEvent::Error(e.to_string()));
+                return;
+            }
+        };
+
+        match turn.stop_reason {
+            StopReason::Stop => {
+                let text = turn.text.clone().unwrap_or_default();
+                let _ = events.send(QueryEvent::Done(text));
+                messages.push(Message::Assistant(turn));
+                return;
+            }
+            StopReason::ToolUse => {
+                // Emit ToolStart events before execution
+                for call in &turn.tool_calls {
+                    if let Some(t) = self.tools.get(&call.name) {
+                        let _ = events.send(QueryEvent::ToolStart {
+                            name: call.name.clone(),
+                            summary: t.summary(&call.arguments),
+                        });
+                    }
+                }
+
+                let results = self.execute_tools(&turn.tool_calls).await;
+
+                // Emit ToolEnd events with truncated previews
+                for (id, result) in &results {
+                    let call_name = turn
+                        .tool_calls
+                        .iter()
+                        .find(|c| c.id == *id)
+                        .map(|c| c.name.clone())
+                        .unwrap_or_default();
+                    let _ = events.send(QueryEvent::ToolEnd {
+                        name: call_name,
+                        result: if result.content.len() > 200 {
+                            format!("{}...", &result.content[..200])
+                        } else {
+                            result.content.clone()
+                        },
+                    });
+                }
+
+                messages.push(Message::Assistant(turn));
+                for (id, result) in results {
+                    messages.push(Message::tool_result(id, result.content));
+                }
+            }
+        }
+
+        turns += 1;
+    }
+}
+```
+
+The key differences from `chat()`:
 
 1. **Provider errors** are caught with `match` instead of `?`, and sent as `QueryEvent::Error`.
 2. **Max turns** sends an error event instead of returning `Err`.

@@ -14,7 +14,7 @@
 
 ---
 
-# Part II: Tools (coming soon)
+# Part II: Tools
 
 - [Chapter 6: File Tools](./ch06-file-tools.md)
 - [Chapter 7: Bash Tool](./ch07-bash-tool.md)

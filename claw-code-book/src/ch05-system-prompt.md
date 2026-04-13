@@ -56,7 +56,7 @@ the parts that change from the parts that do not.
 
 ## The section architecture
 
-Open `claw-code-starter/src/prompt/sections.rs`. The smallest unit of the prompt
+Open `src/prompt/sections.rs`. The smallest unit of the prompt
 is a `PromptSection` -- a named chunk of text:
 
 ```rust
@@ -204,7 +204,7 @@ Also implement `section_count()` (returns the total across both lists) and the
 ## The default system prompt
 
 With the builder in place, assemble a minimal default prompt in
-`claw-code-starter/src/prompt/mod.rs`. The function `build_default_system_prompt`
+`src/prompt/mod.rs`. The function `build_default_system_prompt`
 takes a working directory string and wires up three sections:
 
 1. **Identity** (static) -- tells the model it is a coding agent with tools.
@@ -223,7 +223,7 @@ files let users customize the agent's behavior per project -- preferred coding
 style, test commands, things to avoid. The agent discovers them by walking up
 the filesystem from the current working directory.
 
-Open `claw-code-starter/src/prompt/instructions.rs`.
+Open `src/prompt/instructions.rs`.
 
 ### The struct
 
@@ -370,7 +370,7 @@ provider that supports caching sends `static_prompt()` with cache control and
 Run the Chapter 5 tests:
 
 ```bash
-cargo test -p claw-code-starter test_ch5
+cargo test -p claw-code test_ch5
 ```
 
 ### What the tests verify

@@ -63,17 +63,27 @@ impl CostTracker {
     /// Estimated total cost in USD.
     pub fn total_cost(&self) -> f64 {
         let inner = self.inner.lock().unwrap();
-        (inner.total_input as f64 * self.input_price
-            + inner.total_output as f64 * self.output_price)
-            / 1_000_000.0
+        Self::compute_cost(
+            inner.total_input,
+            inner.total_output,
+            self.input_price,
+            self.output_price,
+        )
+    }
+
+    fn compute_cost(input: u64, output: u64, input_price: f64, output_price: f64) -> f64 {
+        (input as f64 * input_price + output as f64 * output_price) / 1_000_000.0
     }
 
     /// Format a summary string: `"tokens: 1234 in + 567 out | cost: $0.0123"`
     pub fn summary(&self) -> String {
         let inner = self.inner.lock().unwrap();
-        let cost = (inner.total_input as f64 * self.input_price
-            + inner.total_output as f64 * self.output_price)
-            / 1_000_000.0;
+        let cost = Self::compute_cost(
+            inner.total_input,
+            inner.total_output,
+            self.input_price,
+            self.output_price,
+        );
         format!(
             "tokens: {} in + {} out | cost: ${:.4}",
             inner.total_input, inner.total_output, cost

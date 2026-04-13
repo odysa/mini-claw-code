@@ -452,10 +452,11 @@ impl StreamProvider for OpenRouterProvider {
         let mut buffer = String::new();
 
         while let Some(chunk) = resp.chunk().await.context("read chunk")? {
-            buffer.push_str(&String::from_utf8_lossy(&chunk));
+            let text = std::str::from_utf8(&chunk).context("invalid UTF-8 in SSE stream")?;
+            buffer.push_str(text);
             while let Some(pos) = buffer.find('\n') {
-                let line = buffer[..pos].trim_end_matches('\r').to_string();
-                buffer = buffer[pos + 1..].to_string();
+                let line = buffer[..pos].trim_end_matches('\r').to_owned();
+                buffer.drain(..=pos);
                 if line.is_empty() {
                     continue;
                 }

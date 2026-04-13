@@ -50,7 +50,7 @@ We use RPITIT rather than `async fn` in the trait signature because it gives us 
 
 ### Your task
 
-In `claw-code-starter/src/provider/mod.rs`, define the `Provider` trait exactly as shown above. You will need these imports:
+In `src/provider/mod.rs`, define the `Provider` trait exactly as shown above. You will need these imports:
 
 ```rust
 use std::future::Future;
@@ -211,7 +211,7 @@ Notice that the test ignores the `messages` input -- the mock does not look at w
 
 ### Your task
 
-Create `claw-code-starter/src/provider/mock.rs` with the `MockProvider` struct and its `Provider` impl. Wire it up from `mod.rs` with `pub use`.
+Create `src/provider/mock.rs` with the `MockProvider` struct and its `Provider` impl. Wire it up from `mod.rs` with `pub use`.
 
 ---
 
@@ -225,7 +225,55 @@ The struct wraps a `MockProvider` and its `stream_chat` impl works in three step
 2. Decompose it into events: text is sent **character-by-character** as `TextDelta` events, each tool call emits a `ToolCallStart` + single `ToolCallDelta`, and a final `Done` is sent
 3. Return the original `AssistantMessage` unchanged
 
-This avoids duplicating the response queue logic. The `let _ = tx.send(...)` pattern intentionally ignores send errors -- if the receiver is dropped, nobody is listening, and that is fine.
+Here is the full implementation:
+
+```rust
+pub struct MockStreamProvider {
+    inner: MockProvider,
+}
+
+impl MockStreamProvider {
+    pub fn new(responses: VecDeque<AssistantMessage>) -> Self {
+        Self {
+            inner: MockProvider::new(responses),
+        }
+    }
+}
+
+impl StreamProvider for MockStreamProvider {
+    async fn stream_chat(
+        &self,
+        messages: &[Message],
+        tools: &[&ToolDefinition],
+        tx: mpsc::UnboundedSender<StreamEvent>,
+    ) -> anyhow::Result<AssistantMessage> {
+        let turn = self.inner.chat(messages, tools).await?;
+
+        // Synthesize stream events from the complete turn
+        if let Some(ref text) = turn.text {
+            for ch in text.chars() {
+                let _ = tx.send(StreamEvent::TextDelta(ch.to_string()));
+            }
+        }
+        for (i, call) in turn.tool_calls.iter().enumerate() {
+            let _ = tx.send(StreamEvent::ToolCallStart {
+                index: i,
+                id: call.id.clone(),
+                name: call.name.clone(),
+            });
+            let _ = tx.send(StreamEvent::ToolCallDelta {
+                index: i,
+                arguments: call.arguments.to_string(),
+            });
+        }
+        let _ = tx.send(StreamEvent::Done);
+
+        Ok(turn)
+    }
+}
+```
+
+This avoids duplicating the response queue logic -- the `inner.chat()` call handles the `VecDeque` pop. The `let _ = tx.send(...)` pattern intentionally ignores send errors -- if the receiver is dropped, nobody is listening, and that is fine.
 
 ### Your task
 
@@ -307,7 +355,7 @@ The tests verify the parser against three cases: a text delta line produces `Str
 
 ### Your task
 
-Create `claw-code-starter/src/provider/openrouter.rs`. Start with the `parse_sse_line` function and the SSE chunk types it deserializes into (`ChunkResponse`, `ChunkChoice`, `Delta`, `DeltaToolCall`, `DeltaFunction`). You will extend this file with the full provider later.
+Create `src/provider/openrouter.rs`. Start with the `parse_sse_line` function and the SSE chunk types it deserializes into (`ChunkResponse`, `ChunkChoice`, `Delta`, `DeltaToolCall`, `DeltaFunction`). You will extend this file with the full provider later.
 
 ---
 
@@ -508,7 +556,7 @@ dotenvy = "0.15"
 
 ## Putting it all together
 
-Your `claw-code-starter/src/provider/mod.rs` should export:
+Your `src/provider/mod.rs` should export:
 
 ```rust
 mod mock;

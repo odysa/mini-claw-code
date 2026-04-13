@@ -15,13 +15,21 @@ pub trait SafetyCheck: Send + Sync {
 
 /// Validates that file paths stay within an allowed directory.
 pub struct PathValidator {
+    /// Pre-canonicalized allowed directory (resolved once at construction).
     allowed_dir: PathBuf,
+    /// Original (non-canonicalized) path, used for joining relative paths.
+    raw_dir: PathBuf,
 }
 
 impl PathValidator {
     pub fn new(allowed_dir: impl Into<PathBuf>) -> Self {
+        let raw_dir: PathBuf = allowed_dir.into();
+        let allowed_dir = raw_dir
+            .canonicalize()
+            .unwrap_or_else(|_| raw_dir.clone());
         Self {
-            allowed_dir: allowed_dir.into(),
+            allowed_dir,
+            raw_dir,
         }
     }
 
@@ -33,15 +41,8 @@ impl PathValidator {
         let resolved = if target.is_absolute() {
             target.to_path_buf()
         } else {
-            self.allowed_dir.join(target)
+            self.raw_dir.join(target)
         };
-
-        // Canonicalize both paths for comparison. If the target doesn't
-        // exist yet, canonicalize its parent.
-        let canonical_allowed = self
-            .allowed_dir
-            .canonicalize()
-            .map_err(|e| format!("cannot resolve allowed directory: {e}"))?;
 
         let canonical_target = if resolved.exists() {
             resolved
@@ -66,13 +67,13 @@ impl PathValidator {
             }
         };
 
-        if canonical_target.starts_with(&canonical_allowed) {
+        if canonical_target.starts_with(&self.allowed_dir) {
             Ok(())
         } else {
             Err(format!(
                 "path {} is outside allowed directory {}",
                 canonical_target.display(),
-                canonical_allowed.display()
+                self.allowed_dir.display()
             ))
         }
     }

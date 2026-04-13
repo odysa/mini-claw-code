@@ -20,5 +20,5 @@ mod tests;
 // Re-exports for convenience
 pub use engine::QueryEngine;
 pub use provider::{MockProvider, MockStreamProvider};
-pub use tools::ToolSet;
+pub use tools::{BashTool, EditTool, GlobTool, GrepTool, ReadTool, ToolSet, WriteTool};
 pub use types::*;

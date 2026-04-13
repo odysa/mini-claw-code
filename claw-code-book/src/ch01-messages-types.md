@@ -2,7 +2,7 @@
 
 Every coding agent is, at its core, a loop over a conversation. The user speaks, the model replies, tools produce results, and those results go back to the model. Before we can build that loop, we need a type system that represents every participant and every kind of payload in the conversation.
 
-In this chapter you will implement the foundational types that the rest of the codebase depends on. By the end, `cargo test -p claw-code-starter test_ch1` should pass.
+In this chapter you will implement the foundational types that the rest of the codebase depends on. By the end, `cargo test -p claw-code test_ch1` should pass.
 
 ## Why a rich message type?
 
@@ -218,11 +218,11 @@ Every constructor calls `new_id()` to generate a fresh UUID. The `impl Into<Stri
 **Implement these** in `src/types/message.rs`. You can verify with:
 
 ```bash
-cargo test -p claw-code-starter test_ch1_create_user_message
-cargo test -p claw-code-starter test_ch1_create_system_message
-cargo test -p claw-code-starter test_ch1_create_tool_result
-cargo test -p claw-code-starter test_ch1_create_assistant_message
-cargo test -p claw-code-starter test_ch1_unique_message_ids
+cargo test -p claw-code test_ch1_create_user_message
+cargo test -p claw-code test_ch1_create_system_message
+cargo test -p claw-code test_ch1_create_tool_result
+cargo test -p claw-code test_ch1_create_assistant_message
+cargo test -p claw-code test_ch1_unique_message_ids
 ```
 
 ---
@@ -245,7 +245,7 @@ This tiny enum drives the entire agent loop. When the provider parses the LLM re
 The `PartialEq` derive is essential -- the agent loop literally matches `stop_reason == StopReason::Stop` to decide whether to break.
 
 ```bash
-cargo test -p claw-code-starter test_ch1_stop_reason_equality
+cargo test -p claw-code test_ch1_stop_reason_equality
 ```
 
 ---
@@ -270,7 +270,7 @@ When the LLM responds with `StopReason::ToolUse`, it includes one or more `ToolC
 The agent loop uses `name` to look up the tool in the `ToolSet`, passes `arguments` to `tool.call()`, and wraps the output in a `ToolResultMessage` whose `tool_use_id` matches the `ToolCall`'s `id`.
 
 ```bash
-cargo test -p claw-code-starter test_ch1_assistant_with_tool_calls
+cargo test -p claw-code test_ch1_assistant_with_tool_calls
 ```
 
 ---
@@ -376,8 +376,8 @@ Some parameters need richer schemas -- enums, arrays, nested objects. `param_raw
 **Implement `ToolDefinition`** in `src/types/tool.rs`, then verify:
 
 ```bash
-cargo test -p claw-code-starter test_ch1_tool_definition_builder
-cargo test -p claw-code-starter test_ch1_tool_definition_optional_param
+cargo test -p claw-code test_ch1_tool_definition_builder
+cargo test -p claw-code test_ch1_tool_definition_optional_param
 ```
 
 ---
@@ -416,8 +416,8 @@ impl ToolResult {
 Note how `error()` prefixes the message with `"error: "`. This convention is important -- the model sees the tool result as plain text, and the prefix signals that the operation failed. Claude Code uses the same pattern so the LLM can distinguish success from failure and decide whether to retry or report the error to the user.
 
 ```bash
-cargo test -p claw-code-starter test_ch1_tool_result_text
-cargo test -p claw-code-starter test_ch1_tool_result_error
+cargo test -p claw-code test_ch1_tool_result_text
+cargo test -p claw-code test_ch1_tool_result_error
 ```
 
 ---
@@ -572,7 +572,7 @@ A few design points:
 - **`Box<dyn Tool>`** is the trait object that makes heterogeneous storage possible. The `'static` bound on `push`/`with` ensures the tool lives long enough.
 
 ```bash
-cargo test -p claw-code-starter test_ch1_toolset_empty
+cargo test -p claw-code test_ch1_toolset_empty
 ```
 
 ---
@@ -631,9 +631,9 @@ impl ModelUsage {
 `ModelUsage` accumulates totals across an entire session. The `record()` method is called after each provider response. The `cost_usd` is computed by the caller (provider layer) because pricing varies per model. The `turn_count` tracks how many API calls have been made -- useful for the TUI's status line and for cost-per-turn calculations.
 
 ```bash
-cargo test -p claw-code-starter test_ch1_token_usage_default
-cargo test -p claw-code-starter test_ch1_token_usage_total
-cargo test -p claw-code-starter test_ch1_model_usage_record
+cargo test -p claw-code test_ch1_token_usage_default
+cargo test -p claw-code test_ch1_token_usage_total
+cargo test -p claw-code test_ch1_model_usage_record
 ```
 
 ---
@@ -737,7 +737,7 @@ This is used for logging and debugging. When a tool call is unexpectedly denied,
 After implementing all four files, run the full chapter test suite:
 
 ```bash
-cargo test -p claw-code-starter test_ch1
+cargo test -p claw-code test_ch1
 ```
 
 You should see all 15 tests pass:

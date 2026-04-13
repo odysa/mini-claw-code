@@ -2,7 +2,7 @@
 
 In the last chapter we gave our agent a voice by connecting it to an LLM provider. But a model that can only produce text is like a programmer who can only talk about code without ever touching a keyboard. In this chapter we give the agent hands.
 
-We will build the `Tool` trait -- the interface every tool must implement to participate in the agent loop. By the end you will have a `ToolDefinition` schema builder, the `Tool` trait with its full suite of methods, a `ToolResult` type for returning output, and a `ToolSet` registry that holds tools by name. You will wire it all together by implementing a simple `EchoTool`.
+You already defined the tool types in Chapter 1 -- `ToolDefinition`, `Tool` trait, `ToolResult`, `ValidationResult`, and `ToolSet`. In this chapter we will understand *why* those types are designed the way they are, explore the critical distinction between `#[async_trait]` and RPITIT, and then wire everything together by implementing your first concrete tool: an `EchoTool`.
 
 ## Design context: how Claude Code models tools
 
@@ -21,167 +21,9 @@ We are going to keep the shape but cut the ceremony. In our Rust version:
 
 The key simplification: we drop the generic parameters. Claude Code needs `<Input, Output, Progress>` because each tool has a distinct strongly-typed input shape and renders different UI. We use `serde_json::Value` for both input and output, which lets us store heterogeneous tools in a single collection without type erasure gymnastics.
 
-## ToolDefinition: telling the LLM what a tool can do
-
-When the agent sends a request to the LLM, it includes a list of tool schemas -- JSON objects describing each tool's name, purpose, and parameters. The LLM uses these schemas to decide which tool to call and what arguments to pass. This is the `ToolDefinition`:
-
-```rust
-pub struct ToolDefinition {
-    pub name: &'static str,
-    pub description: &'static str,
-    pub parameters: Value,
-}
-```
-
-The `name` is what the LLM will use in its tool-call response. The `description` helps the LLM decide when to use the tool. The `parameters` field holds a JSON Schema object describing the expected arguments.
-
-We provide a builder API so you never have to write raw JSON Schema by hand:
-
-```rust
-impl ToolDefinition {
-    pub fn new(name: &'static str, description: &'static str) -> Self {
-        Self {
-            name,
-            description,
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {},
-                "required": []
-            }),
-        }
-    }
-
-    pub fn param(
-        mut self,
-        name: &str,
-        type_: &str,
-        description: &str,
-        required: bool,
-    ) -> Self {
-        self.parameters["properties"][name] = serde_json::json!({
-            "type": type_,
-            "description": description
-        });
-        if required {
-            self.parameters["required"]
-                .as_array_mut()
-                .unwrap()
-                .push(Value::String(name.to_string()));
-        }
-        self
-    }
-}
-```
-
-The `new` constructor starts with an empty object schema. Each `param()` call chains on a property. The builder pattern makes definitions readable:
-
-```rust
-ToolDefinition::new("read_file", "Read a file from disk")
-    .param("path", "string", "Absolute path to the file", true)
-    .param("offset", "integer", "Line to start reading from", false)
-    .param("limit", "integer", "Max lines to read", false)
-```
-
-There is also `param_raw()` for cases where you need a more complex schema than a simple type/description pair -- for example, an enum constraint or a nested object:
-
-```rust
-pub fn param_raw(mut self, name: &str, schema: Value, required: bool) -> Self {
-    self.parameters["properties"][name] = schema;
-    if required {
-        self.parameters["required"]
-            .as_array_mut()
-            .unwrap()
-            .push(Value::String(name.to_string()));
-    }
-    self
-}
-```
-
-In Claude Code, tool schemas are defined with Zod and automatically converted to JSON Schema. We skip the intermediate schema library and write JSON Schema directly. It is a few more characters but one fewer dependency, and it keeps the mental model simple: what you build is exactly what the LLM receives.
-
-## The Tool trait
-
-Here is the full trait:
-
-```rust
-#[async_trait]
-pub trait Tool: Send + Sync {
-    // --- Identity ---
-    fn definition(&self) -> &ToolDefinition;
-
-    // --- Execution ---
-    async fn call(&self, args: Value) -> anyhow::Result<ToolResult>;
-
-    // --- Validation ---
-    fn validate_input(&self, _args: &Value) -> ValidationResult {
-        ValidationResult::Ok
-    }
-
-    // --- Safety & Behavior ---
-    fn is_read_only(&self) -> bool { false }
-    fn is_concurrent_safe(&self) -> bool { false }
-    fn is_destructive(&self) -> bool { false }
-
-    // --- Display ---
-    fn summary(&self, args: &Value) -> String {
-        let name = self.definition().name;
-        let detail = args
-            .get("command")
-            .or_else(|| args.get("path"))
-            .or_else(|| args.get("question"))
-            .or_else(|| args.get("pattern"))
-            .and_then(|v| v.as_str());
-        match detail {
-            Some(s) => format!("[{name}: {s}]"),
-            None => format!("[{name}]"),
-        }
-    }
-
-    fn activity_description(&self, _args: &Value) -> Option<String> {
-        None
-    }
-}
-```
-
-Let's walk through each method.
-
-### `definition(&self) -> &ToolDefinition`
-
-The only identity method. Returns the tool's schema. Every tool must implement this -- there is no default. The agent loop calls `definition()` on every registered tool to build the schema list sent to the LLM.
-
-Returning a reference (`&ToolDefinition`) means the tool struct owns its definition. Typically you store a `ToolDefinition` as a field and return a reference to it.
-
-### `call(&self, args: Value) -> anyhow::Result<ToolResult>`
-
-The core execution method. `args` is the JSON object the LLM produced. You parse out the fields you need, do the work, and return a `ToolResult`. This is `async` because most tools perform I/O (reading files, running subprocesses, making network calls).
-
-Note that `call` takes `&self`, not `&mut self`. Tools are shared across the agent loop and potentially across concurrent executions. If a tool needs mutable state, use interior mutability (`Mutex`, `RwLock`, etc.).
-
-### `validate_input(&self, args: &Value) -> ValidationResult`
-
-Optional pre-execution validation. The default implementation returns `ValidationResult::Ok` unconditionally. Override it when you want to catch bad arguments before doing any work -- for example, rejecting an empty `path` argument or checking that a file exists before attempting to edit it.
-
-### `is_read_only(&self) -> bool`
-
-Returns `true` if the tool never modifies anything -- files, environment, network state. The permission system uses this flag: in plan mode, only read-only tools are allowed to execute. Default: `false` (conservative -- assume a tool writes until told otherwise).
-
-### `is_concurrent_safe(&self) -> bool`
-
-Whether it is safe to run this tool in parallel with other tools. A read-file tool is concurrent-safe; a bash tool that might write to the filesystem is not. The query engine checks this flag before dispatching multiple tool calls simultaneously. Default: `false`.
-
-### `is_destructive(&self) -> bool`
-
-Whether the tool performs operations that are hard to undo -- deleting files, force-pushing branches, dropping databases. The permission system can require explicit user confirmation for destructive tools. Default: `false`.
-
-### `summary(&self, args: &Value) -> String`
-
-Produces a one-line string for terminal display, like `[bash: ls -la]` or `[read_file: src/main.rs]`. The default implementation looks for common argument names (`command`, `path`, `question`, `pattern`) and formats them. Override it if your tool has a different primary argument or needs custom formatting.
-
-### `activity_description(&self, args: &Value) -> Option<String>`
-
-Returns a short description for spinner display while the tool is executing, like `"Reading file..."` or `"Running command..."`. Default: `None` (the TUI will show a generic spinner). Override this when you want the user to see what the tool is actively doing.
-
 ## Why `#[async_trait]` for tools but not for providers
+
+This is the most important design decision in the type system, and it is worth understanding deeply.
 
 Look at the `Provider` trait from Chapter 2:
 
@@ -210,105 +52,21 @@ Tool:     stored in Box<dyn>    -> #[async_trait] (boxed future, object-safe)
 
 This split is a deliberate design choice. If Rust stabilizes `dyn async fn` in the future, we could drop `async_trait` entirely. Until then, the two-strategy approach gives us the best of both worlds.
 
-## ToolResult: why errors are values, not `Err`
+Note that in the `MockProvider` impl from Chapter 2, we wrote `async fn chat(...)` directly. That works because Rust 1.75+ allows `async fn` in trait impls even when the trait signature uses the RPITIT form. The compiler desugars it correctly. You can do the same for `Tool` impls -- write `async fn call(...)` and the `#[async_trait]` macro handles the rest.
+
+## Why errors are values, not `Err`
 
 When a tool fails -- a file doesn't exist, a command exits non-zero, an edit can't be applied -- we do **not** return `Err(...)`. Instead, we return `Ok(ToolResult::error("..."))`.
-
-```rust
-pub struct ToolResult {
-    pub content: String,
-    pub is_truncated: bool,
-}
-
-impl ToolResult {
-    pub fn text(content: impl Into<String>) -> Self {
-        Self {
-            content: content.into(),
-            is_truncated: false,
-        }
-    }
-
-    pub fn error(msg: impl Into<String>) -> Self {
-        Self {
-            content: format!("error: {}", msg.into()),
-            is_truncated: false,
-        }
-    }
-}
-```
 
 Why? Because a tool failure is not an agent failure. If the LLM asks to read a file that doesn't exist, the correct behavior is to tell the LLM "error: file not found" and let it recover -- try a different path, ask the user, or move on. Returning `Err(...)` would bubble up through the agent loop and terminate the conversation.
 
 Reserve `Err(...)` for genuinely unrecoverable situations: a network failure talking to the LLM, a serialization bug, or a programming error. Tool-level "this didn't work" is always `Ok(ToolResult::error(...))`.
 
-The `is_truncated` field signals that the output was cut short (e.g., a file was too large to return in full). The LLM can use this information to request a specific range.
-
-## ValidationResult
-
-```rust
-pub enum ValidationResult {
-    Ok,
-    Error { message: String, code: u32 },
-}
-```
-
-Two variants, no surprises. When validation fails, the error message is returned to the LLM and the tool is not executed. The `code` field allows categorizing errors (invalid argument, missing field, permission denied) if you need to handle them programmatically.
-
-Most tools leave `validate_input` at its default and handle bad arguments inside `call` instead. The validation hook is most useful when you want to reject a call before any side effects occur -- for example, blocking a bash command that matches a dangerous pattern.
-
-## ToolSet: the tool registry
-
-Tools need a home. The `ToolSet` is a `HashMap<String, Box<dyn Tool>>` with a convenience API:
-
-```rust
-pub struct ToolSet {
-    tools: HashMap<String, Box<dyn Tool>>,
-}
-```
-
-### Building a ToolSet
-
-Two styles, depending on whether you are building the set all at once or adding tools incrementally:
-
-```rust
-// Builder style (immutable chain)
-let tools = ToolSet::new()
-    .with(BashTool::new())
-    .with(ReadTool::new())
-    .with(WriteTool::new());
-
-// Incremental style (mutable push)
-let mut tools = ToolSet::new();
-tools.push(BashTool::new());
-tools.push(ReadTool::new());
-```
-
-The `with` method takes `self` by value and returns `Self`, enabling chaining. The `push` method takes `&mut self` for when you need to add tools conditionally.
-
-### Lookup and enumeration
-
-```rust
-// Get a tool by name (returns Option<&dyn Tool>)
-if let Some(tool) = tools.get("bash") {
-    let result = tool.call(args).await?;
-}
-
-// Get all definitions (for sending to the LLM)
-let defs: Vec<&ToolDefinition> = tools.definitions();
-
-// List tool names
-let names: Vec<&str> = tools.names();
-
-// Size checks
-assert!(!tools.is_empty());
-assert_eq!(tools.len(), 3);
-```
-
-The `definitions()` method is what the query engine calls before each LLM request. It collects references to every registered tool's `ToolDefinition`, which get serialized into the request payload. The LLM sees the full catalog of available tools on every turn.
+This distinction will become critical in the next chapter when we build the query engine loop. The loop matches on `Ok` vs `Err` to decide whether to continue or abort -- and we want tool failures to continue, not abort.
 
 ## Hands-on: building an EchoTool
 
-Time to implement. We will build a minimal `EchoTool` that takes a `text` argument and returns it unchanged. This covers the full lifecycle: defining a schema, implementing the trait, and registering with a `ToolSet`.
+Time to implement your first concrete tool. We will build a minimal `EchoTool` that takes a `text` argument and returns it unchanged. This covers the full lifecycle: defining a schema, implementing the trait, and registering with a `ToolSet`.
 
 ### Step 1: the struct and definition
 
@@ -378,7 +136,7 @@ That is the full round-trip. Definition goes to the LLM, the LLM produces a `Too
 
 ## Default methods: what to override and when
 
-Here is a quick reference:
+Here is a quick reference for the `Tool` trait methods you defined in Chapter 1:
 
 | Method | Default | Override when... |
 |--------|---------|-----------------|
@@ -404,7 +162,7 @@ Claude Code's tool system is substantially larger:
 - **Tool groups and permissions** -- tools are organized into permission groups with allow/deny lists. We will build our permission system in Chapter 10, but it will be simpler.
 - **Cost hints** -- tools can declare estimated token costs to help the context manager. We will add token tracking in Chapter 17 at the session level.
 
-Despite these differences, the core protocol is identical. An LLM sees a list of tool schemas, decides to call one, the agent executes it, and the result goes back to the LLM. Everything else -- validation, permissions, progress, rendering -- is orchestration around that loop. Understanding the `Tool` trait in this chapter gives you the foundation to understand Claude Code's full system.
+Despite these differences, the core protocol is identical. An LLM sees a list of tool schemas, decides to call one, the agent executes it, and the result goes back to the LLM. Everything else -- validation, permissions, progress, rendering -- is orchestration around that loop. Understanding the `Tool` trait gives you the foundation to understand Claude Code's full system.
 
 ## Run the tests
 
@@ -426,13 +184,10 @@ You should see these tests pass:
 
 ## Summary
 
-You now have the complete tool interface:
+This chapter focused on the *why* behind the tool types you defined in Chapter 1:
 
-- **ToolDefinition** describes a tool's schema for the LLM, built with a chainable API.
-- **Tool** is the async trait every tool implements. Two required methods (`definition`, `call`), seven optional methods with sensible defaults.
-- **ToolResult** carries output back to the LLM. Errors are values, not panics.
-- **ValidationResult** gates execution before side effects.
-- **ToolSet** is a registry that maps names to boxed tools for the agent loop.
-- **`#[async_trait]`** makes the trait object-safe so heterogeneous tools can coexist in a `HashMap`.
+- **`#[async_trait]` vs RPITIT** -- the critical distinction. Tools need object safety for heterogeneous storage; providers need zero-cost generics. The two-strategy approach gives you both.
+- **Errors are values** -- tool failures return `Ok(ToolResult::error(...))`, not `Err(...)`. The agent loop continues. The model adapts.
+- **EchoTool** -- your first concrete tool, demonstrating the full lifecycle: schema definition, trait implementation, registration, execution.
 
 In the next chapter we build the query engine -- the loop that ties providers and tools together into a functioning agent.

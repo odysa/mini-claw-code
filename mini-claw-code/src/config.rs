@@ -148,29 +148,30 @@ impl ConfigLoader {
 
     /// Merge a partial config into the base. Non-default values override.
     fn merge(base: &mut Config, overlay: Config) {
-        // Only override if the overlay has non-default values
-        if overlay.model != Config::default().model {
+        let defaults = Config::default();
+
+        if overlay.model != defaults.model {
             base.model = overlay.model;
         }
-        if overlay.base_url != Config::default().base_url {
+        if overlay.base_url != defaults.base_url {
             base.base_url = overlay.base_url;
         }
-        if overlay.max_context_tokens != Config::default().max_context_tokens {
+        if overlay.max_context_tokens != defaults.max_context_tokens {
             base.max_context_tokens = overlay.max_context_tokens;
         }
-        if overlay.preserve_recent != Config::default().preserve_recent {
+        if overlay.preserve_recent != defaults.preserve_recent {
             base.preserve_recent = overlay.preserve_recent;
         }
         if overlay.allowed_directory.is_some() {
             base.allowed_directory = overlay.allowed_directory;
         }
         if !overlay.protected_patterns.is_empty()
-            && overlay.protected_patterns != Config::default().protected_patterns
+            && overlay.protected_patterns != defaults.protected_patterns
         {
             base.protected_patterns = overlay.protected_patterns;
         }
         if !overlay.blocked_commands.is_empty()
-            && overlay.blocked_commands != Config::default().blocked_commands
+            && overlay.blocked_commands != defaults.blocked_commands
         {
             base.blocked_commands = overlay.blocked_commands;
         }

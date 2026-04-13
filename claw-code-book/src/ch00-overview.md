@@ -44,18 +44,15 @@ claw-code/src/
 
 ## How to use this book
 
-This is a **starter-template** book. The `claw-code-starter/` crate contains the same module structure as `claw-code/`, but with `unimplemented!()` stubs where you need to fill in code. Each chapter explains the concepts, walks through the design, and points you to the tests that verify your implementation.
+Each chapter explains the concepts, walks through the design, and provides complete code listings. The `claw-code/` crate contains the reference implementation. Read the chapter, study the code, then verify your understanding by running the tests.
 
 **Run tests to check your progress:**
 
 ```bash
 # Run tests for a specific chapter
-cargo test -p claw-code-starter test_ch1
+cargo test -p claw-code test_ch1
 
 # Run all tests
-cargo test -p claw-code-starter
-
-# Check the reference solution
 cargo test -p claw-code
 ```
 

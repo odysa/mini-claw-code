@@ -1,5 +1,8 @@
 # Chapter 11: Safety Checks
 
+> **File(s) to edit:** `src/safety.rs`
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch18`
+
 The permission engine from Chapter 10 gates every tool call -- it decides whether to allow, deny, or ask the user before execution proceeds. But it makes that decision based on the *tool*, not the *arguments*. A `write` call in auto mode is allowed regardless of whether the target path is `src/main.rs` or `.env`. A `bash` call in default mode prompts the user whether the command is `ls` or `rm -rf /`. The permission engine knows *who* is knocking. It does not look at what they are carrying.
 
 Safety checks fill that gap. The `SafetyChecker` performs static analysis on tool arguments *before* the permission engine runs. It examines the actual path being written or the actual command being executed, and blocks operations that are dangerous regardless of what the permission mode says. This is defense-in-depth: even if the permission engine would allow a tool call, the safety checker can still reject it.
@@ -7,7 +10,7 @@ Safety checks fill that gap. The `SafetyChecker` performs static analysis on too
 Why two layers? Because they protect against different failure modes. The permission engine protects against the LLM doing things the user did not authorize. The safety checker protects against the LLM doing things that are *never* safe -- writing to `.env`, running `rm -rf /`, executing a fork bomb. A user who sets bypass mode is saying "I trust the agent." The safety checker says "trust has limits."
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch11
+cargo test -p mini-claw-code-starter test_ch18
 ```
 
 ---
@@ -243,45 +246,17 @@ This means safety checks are the inner defense layer. Even with `allow_all()` pe
 
 ## Tests
 
-Run the chapter 11 tests:
+Run the safety check tests:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch11
+cargo test -p mini-claw-code-starter test_ch18
 ```
 
-The tests verify each safety check implementation independently and then test them composed through `SafeToolWrapper`.
+Note: The safety check tests are in `test_ch18`, following the V1 chapter
+numbering where safety was Chapter 18.
 
-### PathValidator tests
-
-- **`test_ch11_path_inside_allowed_directory`** -- Creates a `PathValidator` for a temp directory. Validates a path inside that directory. Returns `Ok(())`.
-
-- **`test_ch11_path_outside_allowed_directory`** -- Same validator, but validates `/etc/passwd`. Returns `Err` -- the path does not start with the allowed directory.
-
-- **`test_ch11_path_validator_resolves_relative`** -- Validates a relative path. The validator resolves it against `raw_dir` before checking. Tests that relative paths are handled correctly.
-
-### CommandFilter tests
-
-- **`test_ch11_blocked_rm_rf`** -- Filter with default patterns. Checks `rm -rf /`. Blocked.
-
-- **`test_ch11_blocked_sudo`** -- Filter with `sudo *` pattern. Checks `sudo rm -rf /tmp`. Blocked.
-
-- **`test_ch11_allowed_command`** -- Filter with default patterns. Checks `ls -la`. Allowed -- no blocked patterns match.
-
-### ProtectedFileCheck tests
-
-- **`test_ch11_protected_env_file`** -- Check with `.env` pattern. Checks a `write` call with path `/project/.env`. Returns `Err`.
-
-- **`test_ch11_unprotected_file_allowed`** -- Same check, but with path `/project/src/main.rs`. Returns `Ok(())`.
-
-- **`test_ch11_read_not_checked`** -- A `read` call with a protected path. Returns `Ok(())` -- `ProtectedFileCheck` only fires for `write` and `edit`.
-
-### SafeToolWrapper tests
-
-- **`test_ch11_safe_wrapper_blocks`** -- Wraps a tool with a safety check that fails. The wrapper returns `Ok("error: ...")` instead of calling the inner tool.
-
-- **`test_ch11_safe_wrapper_passes`** -- Wraps a tool with a safety check that passes. The wrapper calls the inner tool normally.
-
-- **`test_ch11_safe_wrapper_multiple_checks`** -- Wraps a tool with multiple safety checks. If any check fails, the call is blocked.
+The tests verify each safety check implementation independently and then test
+them composed through `SafeToolWrapper`.
 
 ---
 

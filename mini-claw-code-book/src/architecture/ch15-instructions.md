@@ -1,5 +1,8 @@
 # Chapter 15: Project Instructions
 
+> **File(s) to edit:** `src/instructions.rs`, `src/context.rs`
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch17` (InstructionLoader), `cargo test -p mini-claw-code-starter test_ch15` (SystemPromptBuilder, context integration)
+
 In Chapter 5 you built two things that did not yet know about each other. The
 `SystemPromptBuilder` assembles a prompt from static and dynamic sections. The
 `InstructionLoader` discovers CLAUDE.md files by walking up the filesystem. You
@@ -17,7 +20,8 @@ produces a different system prompt than launching it from `/home/user/other`.
 The pieces were already built. Now they form a pipeline.
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch15
+cargo test -p mini-claw-code-starter test_ch17  # InstructionLoader
+cargo test -p mini-claw-code-starter test_ch15  # SystemPromptBuilder, context
 ```
 
 ---
@@ -382,83 +386,16 @@ dynamic prompt sections. Everything else is refinement.
 
 ## Tests
 
-Run the chapter 15 tests:
+Run the tests:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch15
+cargo test -p mini-claw-code-starter test_ch17  # InstructionLoader
+cargo test -p mini-claw-code-starter test_ch15  # SystemPromptBuilder, context
 ```
 
-The tests are organized in three groups: discovery, loading, and integration.
-
-### Discovery tests
-
-- **`test_ch15_discover_single_file`** -- Creates a temp directory with a
-  single CLAUDE.md file. Calls `discover()` and verifies it finds exactly one
-  path, and that path matches the file we created.
-
-- **`test_ch15_discover_nested_hierarchy`** -- Creates a root directory with a
-  CLAUDE.md and a nested `project/backend` subdirectory with its own CLAUDE.md.
-  Calls `discover()` from the backend directory. Verifies both files are found
-  and the root-level file comes before the subdirectory file in the result
-  vector. This is the root-first ordering test.
-
-- **`test_ch15_discover_no_files`** -- Creates an empty temp directory. Calls
-  `discover()` and verifies it either finds no files or only finds files
-  outside the temp directory (from parent directories on the actual
-  filesystem). The key assertion is that it does not panic.
-
-- **`test_ch15_discover_custom_file_names`** -- Creates a RULES.md file and
-  constructs an `InstructionLoader` with `["RULES.md"]` instead of the default
-  file names. Verifies `discover()` finds the custom file. This tests the
-  parameterization -- the loader is not hardcoded to CLAUDE.md.
-
-- **`test_ch15_discover_claw_instructions`** -- Creates a `.claw/instructions.md`
-  file in the temp directory. Uses `default_files()` and verifies `discover()`
-  finds the file. This tests the alternative instruction file location.
-
-### Loading tests
-
-- **`test_ch15_load_single_file`** -- Creates a CLAUDE.md with content. Calls
-  `load()` and verifies the result contains the file's content and the
-  `"Instructions from"` header prefix.
-
-- **`test_ch15_load_multiple_files`** -- Creates a root CLAUDE.md and a
-  subdirectory CLAUDE.md. Calls `load()` from the subdirectory. Verifies both
-  files' content appears in the result and the `---` separator is present
-  between them.
-
-- **`test_ch15_load_empty_files_skipped`** -- Creates an empty CLAUDE.md. Calls
-  `load()` and verifies it returns `None`. Empty files should not produce empty
-  sections in the prompt.
-
-- **`test_ch15_load_no_files_returns_none`** -- Calls `load()` in a temp
-  directory with no instruction files. Verifies it does not panic. (It may
-  return `None` or `Some` depending on whether the temp directory's parent
-  chain contains any CLAUDE.md files.)
-
-### Integration tests
-
-- **`test_ch15_instructions_in_system_prompt`** -- The end-to-end test. Creates
-  a CLAUDE.md, loads it with `InstructionLoader`, and injects it as a dynamic
-  section into a `SystemPromptBuilder` alongside static identity and safety
-  sections. Calls `build()` and verifies the final prompt contains text from
-  all three sections. This proves the pipeline works from file to prompt.
-
-- **`test_ch15_static_dynamic_separation`** -- Creates a CLAUDE.md and builds
-  a prompt with one static section (identity) and one dynamic section
-  (instructions). Verifies that `static_prompt()` contains the identity text
-  but not the instructions, `dynamic_prompt()` contains the instructions but
-  not the identity text, and `build()` contains both. This is the cache
-  boundary test -- it ensures instructions are always on the dynamic side.
-
-- **`test_ch15_config_instructions_override`** -- Adds both file-based
-  instructions and config-based instructions as separate dynamic sections.
-  Verifies the final prompt contains both. The config section appears after the
-  file section, giving it higher effective priority.
-
-- **`test_ch15_section_count`** -- Builds a prompt with 2 static sections and
-  1 dynamic section. Verifies `section_count()` returns 3. A simple bookkeeping
-  check that catches off-by-one errors in the builder.
+Note: InstructionLoader tests are in `test_ch17` (V1 instructions chapter).
+SystemPromptBuilder and context integration tests are in `test_ch15` (V1
+context management chapter).
 
 ---
 

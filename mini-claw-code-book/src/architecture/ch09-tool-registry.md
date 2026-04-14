@@ -1,5 +1,8 @@
 # Chapter 9: Tool Registry
 
+> **File(s) to edit:** `src/types.rs` (ToolSet)
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch7` (integration tests)
+
 You have five tools. You have a `SimpleAgent`. This chapter wires them together.
 
 Over the past chapters you built the individual tools that let your agent interact with the world -- file reading and writing (Chapter 6), command execution (Chapter 7), and optionally pattern search (Chapter 8). Each tool implements the `Tool` trait, has a JSON schema, and returns a `String`. But they exist in isolation. The agent has no way to discover them, expose their schemas to the LLM, or dispatch calls by name.
@@ -7,7 +10,7 @@ Over the past chapters you built the individual tools that let your agent intera
 The tool registry is the bridge. It holds every available tool in a single `ToolSet`, exposes their schemas to the LLM so it knows what it can call, and dispatches incoming tool calls to the correct implementation by name. By the end of this chapter, you will have a fully functional coding agent that can read, write, edit, and execute commands -- the complete tool loop, now with real tools instead of test doubles.
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch9
+cargo test -p mini-claw-code-starter test_ch7
 ```
 
 ---
@@ -306,31 +309,14 @@ Despite these differences, the core protocol is identical. The LLM sees a list o
 
 ## Tests
 
-Run all chapter 9 tests:
+Run the integration tests:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch9
+cargo test -p mini-claw-code-starter test_ch7
 ```
 
-Here is what each test covers:
-
-- **`test_ch9_registry_all_tools`** -- Builds a `ToolSet` with all 6 tools. Verifies `len()` is 6 and each tool is retrievable by name. Also checks that looking up a nonexistent name returns `None`.
-
-- **`test_ch9_registry_definitions`** -- Builds a `ToolSet` with 3 tools. Calls `definitions()` and verifies all 3 schemas are present with correct names.
-
-- **`test_ch9_registry_names`** -- Builds a `ToolSet` with `GlobTool` and `GrepTool`. Calls `names()`, sorts the result, and verifies the expected names.
-
-- **`test_ch9_read_only_tools`** -- Builds a `ToolSet` with 5 tools. Filters by `is_read_only()`. Verifies that `read`, `glob`, and `grep` are read-only, while `write` and `bash` are not.
-
-- **`test_ch9_destructive_tools`** -- Checks the `is_destructive()` flag on individual tools. `BashTool` is destructive. `WriteTool` and `ReadTool` are not.
-
-- **`test_ch9_engine_with_file_tools`** -- The full integration test described above. Three-turn interaction: write a file, read it back, return a final answer. Verifies both the engine output and the file on disk.
-
-- **`test_ch9_engine_with_bash`** -- Two-turn interaction. The LLM calls `bash("echo hello-from-bash")`, the engine executes it, and the final answer references the output.
-
-- **`test_ch9_engine_unknown_tool_recovery`** -- The error recovery test described above. The LLM hallucinates a tool, gets an error, and recovers gracefully.
-
-- **`test_ch9_default_toolset_builder`** -- Defines a `default_tools()` helper function, builds the tool set, and verifies that all 6 tools have non-empty names and descriptions.
+Note: The integration tests are in `test_ch7`, following the V1 chapter
+numbering.
 
 ---
 

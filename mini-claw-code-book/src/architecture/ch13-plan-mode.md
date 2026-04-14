@@ -1,5 +1,8 @@
 # Chapter 13: Plan Mode
 
+> **File(s) to edit:** `src/planning.rs`
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch12`
+
 Your agent can now read files, write code, run shell commands, and do all of it
 under a permission system with safety checks and hooks. There is one problem:
 it does everything at once. The model reads a file, immediately rewrites it,
@@ -21,7 +24,7 @@ the model reason about a task before committing to changes. The `is_read_only()`
 flag you set on tools back in Chapter 9 has been waiting for exactly this moment.
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch13
+cargo test -p mini-claw-code-starter test_ch12
 ```
 
 ---
@@ -453,67 +456,14 @@ modes that allow some writes but not others.
 
 ## Tests
 
-Run the chapter 13 tests:
+Run the plan mode tests:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch13
+cargo test -p mini-claw-code-starter test_ch12
 ```
 
-Here is what each test covers:
-
-**`test_ch13_plan_text_only`** -- The simplest plan scenario. The provider
-returns `StopReason::Stop` with text. The plan phase should return that text
-without executing any tools. Verifies the basic plan-as-text path.
-
-**`test_ch13_plan_allows_read_only`** -- A `ReadTool` is registered. During
-planning, the model reads a file and gets the contents back. The plan text
-references what was read. Verifies that read-only tools work in plan mode.
-
-**`test_ch13_plan_blocks_write_tools`** -- A `WriteTool` is registered, and the
-model tries to call it during planning. The engine should return a
-`ToolResult::error` containing "not available in planning mode". The model
-recovers after seeing the error. Verifies the execution guard.
-
-**`test_ch13_exit_plan_ends_planning`** -- The model calls `exit_plan`. The plan
-phase should terminate immediately and return. Verifies the virtual tool
-mechanism.
-
-**`test_ch13_execute_allows_write`** -- During execution (not planning), the
-model calls `WriteTool`. The file should be written to disk. Verifies that the
-execution phase has no tool restrictions.
-
-**`test_ch13_full_plan_execute_flow`** -- The complete workflow: read a file
-during planning, produce a plan, receive approval, write during execution,
-produce a final answer. Verifies the end-to-end two-phase pattern with real
-file I/O.
-
-**`test_ch13_message_continuity`** -- Calls `plan()` then `execute()` on the
-same message vec. Verifies that messages accumulate across phases -- the
-execution phase sees everything from the planning phase.
-
-**`test_ch13_custom_plan_tools`** -- Uses `plan_tool_names(&["bash"])` to
-override the default read-only filter. During planning, `BashTool` is allowed
-and executes successfully. Verifies the custom override mechanism.
-
-**`test_ch13_system_prompt_injected`** -- After calling `plan()`, the message
-history should contain a `Message::System` with `tag == Some("plan_mode")`.
-Verifies system prompt injection.
-
-**`test_ch13_system_prompt_not_duplicated`** -- Calls `plan()` twice on the same
-message vec (simulating a plan revision). The message history should contain
-exactly one `plan_mode` system message, not two. Verifies the deduplication
-logic.
-
-**`test_ch13_custom_plan_prompt`** -- Uses `plan_prompt("You are a security
-auditor.")`. After calling `plan()`, the `plan_mode` system message should
-contain the custom text, not the default. Verifies the prompt override.
-
-**`test_ch13_provider_error_in_plan`** -- An empty `MockProvider` with no
-responses. The `plan()` call should return `Err`. Verifies that provider errors
-propagate correctly from the plan phase.
-
-**`test_ch13_provider_error_in_execute`** -- Same as above, but for `execute()`.
-Verifies that provider errors propagate from the execution phase.
+Note: The plan mode tests are in `test_ch12`, following the V1 chapter
+numbering where plan mode was Chapter 12.
 
 ---
 

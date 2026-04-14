@@ -1,5 +1,8 @@
 # Chapter 2: Provider & Streaming
 
+> **File(s) to edit:** `src/mock.rs`, `src/streaming.rs`, `src/providers/openrouter.rs`
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch1` (MockProvider), `cargo test -p mini-claw-code-starter test_ch6` (OpenRouterProvider), `cargo test -p mini-claw-code-starter test_ch10` (streaming)
+
 In Chapter 1 we defined the data that flows through our agent. Now we need something to *drive* that data -- an LLM backend that takes a conversation and returns an assistant response. In this chapter you will build:
 
 1. A `Provider` trait that abstracts over any LLM backend
@@ -10,10 +13,12 @@ In Chapter 1 we defined the data that flows through our agent. Now we need somet
 6. An SSE line parser and a `StreamAccumulator` that reassembles events into a complete message
 7. The `OpenRouterProvider` that talks to a real API
 
-By the end, every test prefixed with `test_ch2_` should pass.
+By the end, the mock provider tests in `test_ch1`, the OpenRouter tests in `test_ch6`, and the streaming tests in `test_ch10` should pass.
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch2
+cargo test -p mini-claw-code-starter test_ch1
+cargo test -p mini-claw-code-starter test_ch6
+cargo test -p mini-claw-code-starter test_ch10
 ```
 
 ---
@@ -555,10 +560,12 @@ The provider-related code lives across three files in the starter:
 ## Run the tests
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch2
+cargo test -p mini-claw-code-starter test_ch1   # MockProvider tests
+cargo test -p mini-claw-code-starter test_ch6   # OpenRouterProvider tests
+cargo test -p mini-claw-code-starter test_ch10  # Streaming tests
 ```
 
-All ten tests should pass: four for `MockProvider` (text, tool calls, sequence, exhaustion), one for `MockStreamProvider`, three for SSE parsing, and two for the accumulator.
+The MockProvider tests are in `test_ch1`, the OpenRouterProvider tests are in `test_ch6`, and the streaming tests (SSE parsing, accumulator) are in `test_ch10`.
 
 ---
 

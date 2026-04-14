@@ -1,5 +1,8 @@
 # Chapter 3: Tool Interface
 
+> **File(s) to edit:** `src/tools/read.rs`
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch2`
+
 In the last chapter we gave our agent a voice by connecting it to an LLM provider. But a model that can only produce text is like a programmer who can only talk about code without ever touching a keyboard. In this chapter we give the agent hands.
 
 You already defined the tool types in Chapter 1 -- `ToolDefinition`, `Tool` trait, and `ToolSet`. In this chapter we will understand *why* those types are designed the way they are, explore the critical distinction between `#[async_trait]` and RPITIT, and then wire everything together by implementing your first concrete tool: an `EchoTool`.
@@ -161,7 +164,7 @@ your type definitions are correct.
 ## Run the tests
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch3
+cargo test -p mini-claw-code-starter test_ch2
 ```
 
 You should see these tests pass:

@@ -1,5 +1,8 @@
 # Chapter 7: Bash Tool
 
+> **File(s) to edit:** `src/tools/bash.rs`
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch4` (bash tests are grouped with other tools)
+
 The bash tool is the most powerful tool in a coding agent. It is also the most dangerous. With a single tool call, the LLM can compile code, run tests, install packages, inspect processes, query databases, or delete your entire filesystem. Every other tool -- read, write, edit, grep -- does one thing. Bash does everything.
 
 This power is what makes a coding agent useful. An agent that can only read and write files is a fancy text editor. An agent that can run arbitrary shell commands is a programmer. It can try things, see what happens, and iterate -- the same workflow a human developer follows. Claude Code's bash tool is its most-used tool by far, accounting for the majority of all tool invocations in a typical session.
@@ -258,27 +261,28 @@ Our version is the core protocol without the safety wrapping -- the minimal viab
 
 ## Tests
 
-Run the chapter 7 tests:
+Run the bash tool tests (grouped with other tool tests):
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch7
+cargo test -p mini-claw-code-starter test_ch4
 ```
 
-Here is what each test verifies:
+Note: BashTool tests are in `test_ch4`, grouped alongside WriteTool and EditTool
+tests. The test file numbering follows the V1 chapter structure.
 
-**`test_ch7_bash_echo`** -- The simplest case. Runs `echo hello` and checks that the output contains "hello". Verifies that basic command execution works and stdout is captured.
+Here is what the bash-specific tests verify:
 
-**`test_ch7_bash_stderr`** -- Runs `echo oops >&2` (redirects to stderr) and checks that the output contains the "stderr:" prefix and the message. Verifies that stderr is captured and labeled.
+**`test_ch4_bash_definition`** -- Checks that the tool name is "bash".
 
-**`test_ch7_bash_stdout_and_stderr`** -- Runs `echo out; echo err >&2` and checks that both streams appear in the output. Verifies that stdout and stderr are combined correctly when both are present.
+**`test_ch4_bash_runs_command`** -- Runs a simple command and checks that stdout is captured.
 
-**`test_ch7_bash_no_output`** -- Runs `true` (a command that succeeds silently) and checks that the output is exactly `"(no output)"`. Verifies the sentinel string for commands with no output.
+**`test_ch4_bash_captures_stderr`** -- Runs a command that writes to stderr and checks that the output contains the stderr content.
 
-**`test_ch7_bash_definition`** -- Checks that the tool name is "bash" and the description mentions "bash". Verifies the tool definition.
+**`test_ch4_bash_stdout_and_stderr`** -- Runs a command that produces both stdout and stderr, and verifies both appear in the output.
 
-**`test_ch7_bash_multiline`** -- Runs `echo one; echo two; echo three` and checks that all three lines appear. Verifies that multi-command pipelines work through `bash -c`.
+**`test_ch4_bash_no_output`** -- Runs `true` (a command that succeeds silently) and checks that the output indicates no output was produced.
 
-**`test_ch7_bash_with_file`** -- An integration test. Creates a temp directory, runs `echo 'created by bash' > <path>`, then reads the file with `std::fs` to verify the content was written. Demonstrates that bash commands have real filesystem side effects.
+**`test_ch4_bash_multiline_output`** -- Runs a multi-command pipeline and checks that all output lines appear.
 
 ## Recap
 

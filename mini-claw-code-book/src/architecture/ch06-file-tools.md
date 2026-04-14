@@ -1,5 +1,8 @@
 # Chapter 6: File Tools
 
+> **File(s) to edit:** `src/tools/read.rs`, `src/tools/write.rs`, `src/tools/edit.rs`
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch2` (ReadTool), `cargo test -p mini-claw-code-starter test_ch4` (WriteTool, EditTool)
+
 A coding agent that cannot touch the filesystem is just a chatbot with delusions
 of grandeur. It can describe code changes, suggest fixes, explain algorithms --
 but it cannot do any of it. The tools you built in Chapter 3 gave your agent
@@ -531,39 +534,35 @@ without reaching into individual modules.
 
 ## 6.7 Tests
 
-Run the chapter 6 tests:
+Run the file tool tests:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch6
+cargo test -p mini-claw-code-starter test_ch2  # ReadTool tests
+cargo test -p mini-claw-code-starter test_ch4  # WriteTool, EditTool tests
 ```
+
+Note: The test file numbering follows the V1 chapter structure. ReadTool tests
+are in `test_ch2`, and WriteTool/EditTool tests are in `test_ch4`.
 
 Here is what each test verifies:
 
-### ReadTool tests
+### ReadTool tests (in `test_ch2`)
 
-- **`test_ch6_read_file`** -- Reads a three-line file and verifies all lines appear in the output.
-- **`test_ch6_read_nonexistent`** -- Attempts to read a file that does not exist. Verifies that the result is an `Err`.
+- **`test_ch2_read_definition`** -- Checks that the tool definition has the name "read".
+- **`test_ch2_read_file`** -- Reads a file and verifies the content appears in the output.
+- **`test_ch2_read_missing_file`** -- Attempts to read a file that does not exist. Verifies that the result is an `Err`.
 
-### WriteTool tests
+### WriteTool tests (in `test_ch4`)
 
-- **`test_ch6_write_file`** -- Writes "hello world" to a new file, verifies the result contains "wrote", and reads back the file to confirm the content.
-- **`test_ch6_write_creates_directories`** -- Writes to `a/b/c/deep.txt` inside a temp directory. All intermediate directories are created automatically.
-- **`test_ch6_write_overwrites`** -- Writes to a file that already has content. Verifies the old content is replaced.
+- **`test_ch4_write_creates_file`** -- Writes content to a new file, verifies the result contains a confirmation, and reads back the file to confirm the content.
+- **`test_ch4_write_creates_dirs`** -- Writes to a file inside nested directories. All intermediate directories are created automatically.
+- **`test_ch4_write_overwrites_existing`** -- Writes to a file that already has content. Verifies the old content is replaced.
 
-### EditTool tests
+### EditTool tests (in `test_ch4`)
 
-- **`test_ch6_edit_replace`** -- Edits "world" to "rust" in a file containing "hello world". Verifies the result says "edited" and the file now reads "hello rust".
-- **`test_ch6_edit_not_found`** -- Attempts to replace a string that does not exist. Verifies the result is an `Err` containing "not found".
-- **`test_ch6_edit_ambiguous`** -- Attempts to replace "aa" in a file containing "aa bb aa" (two occurrences). Verifies the error mentions "2 times".
-
-### Integration tests
-
-- **`test_ch6_write_then_read`** -- Writes a two-line file, then reads it back. Verifies the round-trip preserves content.
-- **`test_ch6_write_edit_read`** -- The full workflow: writes a file containing `println!("hello")`, edits "hello" to "goodbye", reads it back, and verifies "goodbye" is present and "hello" is gone.
-
-### Definition tests
-
-- **`test_ch6_tool_definitions`** -- Checks that each tool's definition returns the correct name: "read", "write", "edit".
+- **`test_ch4_edit_replaces_string`** -- Edits a string in a file. Verifies the result says "edited" and the file is updated.
+- **`test_ch4_edit_not_found`** -- Attempts to replace a string that does not exist. Verifies the result is an `Err`.
+- **`test_ch4_edit_not_unique`** -- Attempts to replace a string that appears multiple times. Verifies the error mentions the ambiguity.
 
 ---
 

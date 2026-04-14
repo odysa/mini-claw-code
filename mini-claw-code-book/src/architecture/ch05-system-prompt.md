@@ -1,5 +1,8 @@
 # Chapter 5: System Prompt
 
+> **File(s) to edit:** `src/instructions.rs`
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch17` (InstructionLoader)
+
 Every LLM-based agent starts with a system prompt -- an invisible preamble that
 shapes every response the model produces. A sloppy prompt gives you a chatbot.
 A carefully engineered prompt gives you a coding agent that follows safety rules,
@@ -282,19 +285,22 @@ the instruction loading piece, which is the most practically useful component.
 
 ## Running the tests
 
-Run the Chapter 5 tests:
+Run the InstructionLoader tests:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch5
+cargo test -p mini-claw-code-starter test_ch17
 ```
+
+Note: The InstructionLoader tests are in `test_ch17`, not `test_ch5`. The test
+file numbering follows the V1 chapter structure, not V2.
 
 ### What the tests verify
 
-- **`test_ch5_instruction_loader_discover`**: Creates a temp directory with a
+- **`test_ch17_instruction_loader_discover`**: Creates a temp directory with a
   CLAUDE.md file and verifies `discover()` finds it.
-- **`test_ch5_instruction_loader_load`**: Same setup, verifies `load()` returns
+- **`test_ch17_instruction_loader_load`**: Same setup, verifies `load()` returns
   the file's content.
-- **`test_ch5_instruction_loader_no_files`**: No instruction files exist.
+- **`test_ch17_instruction_loader_no_files`**: No instruction files exist.
   `load()` returns `None`.
 
 ## Recap

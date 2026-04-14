@@ -1,4 +1,7 @@
-# Chapter 4: The Agent Loop
+# Chapter 4: The Agentic Loop
+
+> **File(s) to edit:** `src/agent.rs`
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch3` (single_turn), `cargo test -p mini-claw-code-starter test_ch5` (SimpleAgent)
 
 This is the chapter where everything clicks.
 
@@ -381,27 +384,14 @@ The good news: the architecture is the same. Every feature in the right column p
 
 ## Tests
 
-Run the chapter 4 tests to verify your implementation:
+Run the tests to verify your implementation:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch4
+cargo test -p mini-claw-code-starter test_ch3  # single_turn tests
+cargo test -p mini-claw-code-starter test_ch5  # SimpleAgent tests
 ```
 
-Here is what each test covers:
-
-**`test_ch4_direct_text_response`** -- The simplest case. The provider returns `StopReason::Stop` on the first call. The agent should return the text without executing any tools.
-
-**`test_ch4_single_tool_call`** -- The provider returns a tool call, then a final text. Tests the full loop: call tool, push results, call provider again, return.
-
-**`test_ch4_multi_step_loop`** -- Two rounds of tool use before the final answer. Verifies the loop handles multiple iterations correctly.
-
-**`test_ch4_unknown_tool`** -- The LLM requests a tool that does not exist. The agent should return an error result (not crash), and the model should see it and respond.
-
-**`test_ch4_chat_preserves_history`** -- Calls `chat()` twice on the same message vec. Verifies that history accumulates correctly across calls, enabling multi-turn conversations.
-
-**`test_ch4_events_emitted`** -- Uses `run_with_events` with a channel. Checks that `ToolCall` and `Done` events are emitted in the correct order.
-
-**`test_ch4_provider_error`** -- An empty `MockProvider` with no responses. The first `provider.chat()` call fails. The agent should propagate the error.
+The single-turn tests (`test_ch3`) verify the basic provider-tool cycle. The SimpleAgent tests (`test_ch5`) verify the full agent loop with `chat()`, `run()`, and event streaming.
 
 ## Implementation checklist
 

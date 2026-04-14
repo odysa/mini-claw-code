@@ -1,5 +1,8 @@
 # Chapter 10: Permission Engine
 
+> **File(s) to edit:** `src/permissions.rs`
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch19`
+
 Your agent does whatever the LLM tells it to.
 
 Think about that for a moment. In Chapters 1-9 you built a fully functional coding agent with several tools. The LLM can read files, write files, edit files, and execute arbitrary shell commands. The SimpleAgent dutifully dispatches every tool call the model requests. If the model says `bash("rm -rf /")`, the agent runs it. If it writes garbage over your source files, the agent writes. If it decides to `curl | sh` something from the internet, the agent curls. There is nothing between the LLM's request and the tool's execution.
@@ -11,7 +14,7 @@ Chapter 10 changes that. We build the `PermissionEngine` -- the gatekeeper that 
 This is the first chapter of Part III: Safety & Control. By the end of it, your agent will no longer blindly obey the LLM. It will ask permission first.
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch10
+cargo test -p mini-claw-code-starter test_ch19
 ```
 
 ---
@@ -333,45 +336,17 @@ The core insight is the same in both systems: the permission engine is a functio
 
 ## Tests
 
-Run all chapter 10 tests:
+Run the permission engine tests:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch10
+cargo test -p mini-claw-code-starter test_ch19
 ```
 
-The tests verify the permission engine's core behavior: rule matching, session approvals, default permissions, and the convenience constructors.
+Note: The permission engine tests are in `test_ch19`, following the V1 chapter
+numbering where permissions were Chapter 19.
 
-Here is what each test covers:
-
-### Rule evaluation tests
-
-- **`test_ch10_rule_allow_overrides_default`** -- An engine with `ask_by_default` and a rule that allows `write`. The rule overrides the default (which would ask). Result: `Allow`.
-
-- **`test_ch10_rule_deny`** -- An engine with a rule that denies `bash`. The tool is blocked regardless of the default permission.
-
-- **`test_ch10_wildcard_rule`** -- A rule with pattern `"*"` and permission `Allow`. Matches everything.
-
-- **`test_ch10_prefix_wildcard_rule`** -- A rule with pattern `"file_*"` and permission `Allow`. Matches `"file_read"` but not `"bash"`. The non-matching tool falls through to the default permission.
-
-- **`test_ch10_first_rule_wins`** -- Two rules: `bash -> Deny`, then `* -> Allow`. The `bash` tool hits the first rule and is denied. This verifies that rule evaluation stops at the first match.
-
-### Default permission tests
-
-- **`test_ch10_ask_by_default`** -- Creates an engine with `ask_by_default` and no rules. Every tool returns `Ask`.
-
-- **`test_ch10_allow_all`** -- Creates an engine with `allow_all()`. Every tool returns `Allow`. No rules, no prompts.
-
-### Session approval tests
-
-- **`test_ch10_session_approval`** -- An engine with `ask_by_default`. A tool initially returns `Ask`. After calling `record_session_allow("write")`, the same check returns `Allow`.
-
-- **`test_ch10_session_approval_does_not_cross_tools`** -- Records a session allow for `write`, then checks that `bash` still returns `Ask`. Per-tool isolation.
-
-### Convenience method tests
-
-- **`test_ch10_is_allowed`** -- Verifies that `is_allowed()` returns `true` for `Allow` and `false` for `Ask`/`Deny`.
-
-- **`test_ch10_needs_approval`** -- Verifies that `needs_approval()` returns `true` for `Ask` and `false` for `Allow`/`Deny`.
+The tests verify the permission engine's core behavior: rule matching, session
+approvals, default permissions, and the convenience constructors.
 
 ---
 

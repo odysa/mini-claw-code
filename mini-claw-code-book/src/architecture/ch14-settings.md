@@ -1,13 +1,17 @@
 # Chapter 14: Settings Hierarchy
 
+> **File(s) to edit:** `src/config.rs`, `src/usage.rs`
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch16` (Config, ConfigLoader), `cargo test -p mini-claw-code-starter test_ch14` (CostTracker)
+
 Your agent works. It reads files, writes code, runs commands, checks permissions, enforces safety rules, and restricts itself in plan mode. But every one of those behaviors is hardcoded. The model name is a string literal. The blocked commands list is baked into the source. The maximum context window is a constant. If you want to change any of them, you recompile.
 
 Real tools do not work this way. A developer using Claude Code on a Rust project wants different settings than one working on a Python monorepo. A CI pipeline needs different defaults than an interactive session. A user who routes through a self-hosted proxy needs a different base URL. The agent must be configurable -- and the configuration must come from multiple sources, layered by priority, so that project settings override user settings, and environment variables override everything.
 
-This chapter builds a 4-level configuration hierarchy and a cost tracker. By the end, `cargo test -p mini-claw-code-starter test_ch14` should pass.
+This chapter builds a 4-level configuration hierarchy and a cost tracker. By the end, both `test_ch16` (config) and `test_ch14` (cost tracker) should pass.
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch14
+cargo test -p mini-claw-code-starter test_ch16  # Config, ConfigLoader
+cargo test -p mini-claw-code-starter test_ch14  # CostTracker
 ```
 
 ---
@@ -515,61 +519,16 @@ Despite these differences, the layered architecture is the same. Settings flow f
 
 ## Tests
 
-Run the chapter 14 tests:
+Run the tests:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch14
+cargo test -p mini-claw-code-starter test_ch16  # Config, ConfigLoader
+cargo test -p mini-claw-code-starter test_ch14  # CostTracker
 ```
 
-There are 19 tests organized into four groups.
-
-### Config defaults
-
-**`test_ch14_config_defaults`** -- Constructs `Config::default()` and checks every field. The model contains `"claude"`, the base URL contains `"openrouter"`, `max_context_tokens` is 200,000, `preserve_recent` is 10, and all optional/collection fields are empty.
-
-### Config merging
-
-**`test_ch14_merge_override_model`** -- Merges a default base with an overlay that sets a custom model. The merged config has the overlay's model.
-
-**`test_ch14_merge_keeps_base_when_overlay_is_default`** -- Merges a base with a custom model against a default overlay. The base's custom model survives because the overlay's model matches the default.
-
-**`test_ch14_merge_optional_fields`** -- Merges a base with `allowed_directory = Some("/home/user")` against an overlay with `None`. The base's value is preserved -- `None` does not override `Some`.
-
-**`test_ch14_merge_overlay_replaces_optional`** -- Merges a base with `allowed_directory = Some("/home/user")` against an overlay with `Some("/workspace")`. The overlay wins.
-
-**`test_ch14_merge_collections_replace`** -- Merges base `protected_patterns = [".env"]` with overlay `protected_patterns = [".secret", ".key"]`. The result is `[".secret", ".key"]` -- full replacement, not `[".env", ".secret", ".key"]`.
-
-**`test_ch14_merge_empty_collection_keeps_base`** -- Merges base `blocked_commands = ["rm -rf /"]` with a default overlay (empty `blocked_commands`). The base's commands survive because an empty overlay collection means "not set."
-
-### Config file loading
-
-**`test_ch14_load_toml_file`** -- Creates a temp TOML file with `model`, `max_context_tokens`, and `protected_patterns`. Loads it with `ConfigLoader::load_file`. Verifies all three fields parsed correctly.
-
-**`test_ch14_load_missing_file`** -- Calls `load_file` with a nonexistent path. Returns `None`.
-
-**`test_ch14_load_invalid_toml`** -- Creates a file with invalid TOML syntax. Returns `None`.
-
-### ConfigLoader integration
-
-**`test_ch14_loader_with_project_dir`** -- Creates a temp directory with `.claw/config.toml` containing a custom model and blocked commands. Loads via `ConfigLoader::new().project_dir(dir).load()`. Verifies the project settings are applied and other fields remain default.
-
-**`test_ch14_loader_no_config_files`** -- Points the loader at an empty temp directory. All fields are defaults -- no config files means no overrides.
-
-### CostTracker
-
-**`test_ch14_cost_tracker_empty`** -- A fresh tracker has zero tokens, zero turns, and zero cost.
-
-**`test_ch14_cost_tracker_single_turn`** -- Records one `TokenUsage` with 1000 input and 500 output tokens. Verifies the totals and turn count.
-
-**`test_ch14_cost_tracker_accumulation`** -- Records two usages. Verifies tokens add up across turns and the turn count reaches 2.
-
-**`test_ch14_cost_calculation`** -- Records 1 million input and 1 million output tokens at $3/$15 per million. Verifies the total cost is $18.00 (within floating-point tolerance).
-
-**`test_ch14_cost_small_numbers`** -- Records 100 input and 50 output tokens. Verifies the cost is $0.00105 -- this catches integer truncation bugs that would zero out small token counts.
-
-**`test_ch14_cost_summary_format`** -- Records usage and checks that `summary()` contains the token counts and a dollar sign. Does not check exact formatting -- just that the key information is present.
-
-**`test_ch14_cost_tracker_reset`** -- Records usage, resets, and verifies everything is back to zero. Confirms that reset clears tokens and turns but does not need to verify pricing (it is immutable).
+Note: Config and ConfigLoader tests are in `test_ch16` (following the V1
+numbering where configuration was Chapter 16). CostTracker tests are in
+`test_ch14` (V1 token tracking chapter).
 
 ---
 

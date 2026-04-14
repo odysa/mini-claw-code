@@ -1,4 +1,7 @@
-# Chapter 12: Hook System
+# Chapter 12: Hooks
+
+> **File(s) to edit:** `src/hooks.rs`
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch20`
 
 The permission engine from Chapter 10 decides whether a tool call runs. The safety checks from Chapter 11 catch dangerous patterns before the user even sees a prompt. But both systems are baked into the agent -- they enforce rules that you, the developer, chose at compile time. What about the user?
 
@@ -7,7 +10,7 @@ Users have policies that the agent author cannot anticipate. A team might requir
 This chapter builds the hook system. Hooks are event-driven: they fire at key lifecycle points (before a tool call, after a tool call, when the agent starts, when it ends) and they can observe, modify, or block execution. The trait-based design means anyone can implement a hook -- a logging hook for debugging, a blocking hook for policy enforcement, a shell hook that delegates decisions to external commands.
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch12
+cargo test -p mini-claw-code-starter test_ch20
 ```
 
 ---
@@ -348,51 +351,16 @@ The `ShellHook` bridges this gap -- it delegates to external commands just like 
 
 ## Tests
 
-Run all chapter 12 tests:
+Run the hook system tests:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch12
+cargo test -p mini-claw-code-starter test_ch20
 ```
 
+Note: The hook tests are in `test_ch20`, following the V1 chapter numbering
+where hooks were Chapter 20.
+
 The tests verify each hook type and the registry's dispatch behavior.
-
-### HookAction basics
-
-- **`test_ch12_hook_action_continue`** -- Constructs `HookAction::Continue` and verifies it equals itself.
-
-- **`test_ch12_hook_action_block`** -- Constructs `HookAction::Block("reason")` and verifies equality.
-
-- **`test_ch12_hook_action_modify_args`** -- Constructs `HookAction::ModifyArgs(json!({"path": "/new/path"}))` and verifies equality.
-
-### LoggingHook
-
-- **`test_ch12_logging_hook_records_events`** -- Creates a `LoggingHook`, fires a `PreToolCall` event for `"bash"`, verifies the action is `Continue` and `messages()` contains `"pre:bash"`.
-
-- **`test_ch12_logging_hook_multiple_events`** -- Fires all four event types through a single `LoggingHook`. Verifies `messages()` has 4 entries.
-
-### BlockingHook
-
-- **`test_ch12_blocking_hook_blocks_tool`** -- Creates a `BlockingHook` that blocks `"bash"`. Fires a `PreToolCall` for bash. Verifies the action is `Block`.
-
-- **`test_ch12_blocking_hook_allows_other_tools`** -- Same hook, but fires a `PreToolCall` for `"read"`. Verifies `Continue`.
-
-- **`test_ch12_blocking_hook_ignores_post_events`** -- Fires a `PostToolCall` for `"bash"`. Verifies `Continue` -- the blocking hook only cares about pre-tool events.
-
-### HookRegistry
-
-- **`test_ch12_registry_empty`** -- Creates an empty registry. Verifies `is_empty()` is true. Dispatches a `PreToolCall` event. Verifies the result is `Continue`.
-
-- **`test_ch12_registry_block_short_circuits`** -- Builds a registry with a `BlockingHook` first and a `LoggingHook` second. Dispatches a `PreToolCall` for bash. Verifies the result is `Block`. The `BlockingHook` fires first and short-circuits.
-
-- **`test_ch12_registry_multiple_hooks`** -- Builds a registry with two `LoggingHook` instances. Dispatches a `PreToolCall`. Verifies the result is `Continue`.
-
-### ShellHook
-
-- **`test_ch12_shell_hook_success`** -- Creates a `ShellHook` with the command `"true"` (always exits 0). Fires a `PreToolCall`. Verifies `Continue`.
-
-- **`test_ch12_shell_hook_failure_blocks`** -- Creates a `ShellHook` with `"false"` (always exits 1). Fires a `PreToolCall`. Verifies the result is `Block(...)`.
-
-- **`test_ch12_shell_hook_tool_pattern`** -- Creates a `ShellHook` with `for_tool("bash")`. Fires a `PreToolCall` for `"bash"` (matches pattern, fires). Fires a `PreToolCall` for `"read"` (does not match, returns `Continue` without running the command).
 
 ---
 

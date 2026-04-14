@@ -1,5 +1,8 @@
 # Chapter 8: Search Tools
 
+> **File(s) to edit:** (extension -- no stubs in starter)
+> **Tests:** No tests in the starter. GlobTool and GrepTool are extension tools.
+
 A coding agent that can only read files it already knows about is like a developer who never uses `find` or `grep`. You can hand it a specific file path and it will read it faithfully, but drop it into an unfamiliar codebase and it is blind. It cannot discover which files exist, cannot search for where a function is defined, cannot find all the places a type is used. Without search, the LLM has to guess file paths -- and it will guess wrong.
 
 Search tools fix this. In this chapter we explore two: **GlobTool** finds files by name pattern, and **GrepTool** searches file contents by regex. Together they give the LLM the ability to navigate any codebase, no matter how large or unfamiliar. These are the eyes of the agent.
@@ -379,12 +382,13 @@ Our versions skip all of this. We use the `glob` crate instead of ripgrep, we ha
 
 ## Tests
 
-Since GlobTool and GrepTool are extensions not included in the starter, the
-tests for this chapter live in the reference implementation. If you add these
-tools to your starter, you can run them with:
+Since GlobTool and GrepTool are extensions not included in the starter, there
+are no tests for this chapter in the starter. The tests below live in the
+reference implementation (`mini-claw-code`). If you add these tools to your
+starter, you can run them with:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch8
+cargo test -p mini-claw-code test_ch8
 ```
 
 Here is what each test in the reference implementation verifies:

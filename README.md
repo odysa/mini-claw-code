@@ -20,6 +20,10 @@
 
 ---
 
+> **V2 is here!** A new deep-dive series — [**Claude Code Architecture in Rust**](https://odysa.github.io/mini-claw-code/en/architecture/ch00-overview.html) — reverse-engineers how [Claude Code](https://claude.ai/code) actually works: streaming, permissions, hooks, MCP, subagents, and more. 26 chapters, built progressively from your first LLM response to a production-grade agent. The original hands-on tutorial (V1) is still available below.
+
+---
+
 You use coding agents every day. Ever wonder how they actually work?
 
 <p align="center">

@@ -10,47 +10,62 @@
 - [Chapter 2: Your First LLM Response](./architecture/ch02-provider-streaming.md)
 - [Chapter 3: Your First Tool Call](./architecture/ch03-tool-interface.md)
 - [Chapter 4: The Agentic Loop](./architecture/ch04-query-engine.md)
+- [Chapter 5: System Prompt](./architecture/ch05-system-prompt.md)
 
 ---
 
 # Building Your Toolbox
 
-- [Chapter 5: File Tools](./architecture/ch06-file-tools.md)
-- [Chapter 6: Bash Tool](./architecture/ch07-bash-tool.md)
-- [Chapter 7: Search Tools](./architecture/ch08-search-tools.md)
-- [Chapter 8: Tool Registry](./architecture/ch09-tool-registry.md)
-
----
-
-# Making It Smart
-
-- [Chapter 9: System Prompt](./architecture/ch05-system-prompt.md)
-- [Chapter 10: Project Instructions](./architecture/ch15-instructions.md)
-- [Chapter 11: Settings Hierarchy](./architecture/ch14-settings.md)
+- [Chapter 6: File Tools](./architecture/ch06-file-tools.md)
+- [Chapter 7: Bash Tool](./architecture/ch07-bash-tool.md)
+- [Chapter 8: Search Tools](./architecture/ch08-search-tools.md)
+- [Chapter 9: Tool Registry](./architecture/ch09-tool-registry.md)
 
 ---
 
 # Safety & Control
 
-- [Chapter 12: Permission Engine](./architecture/ch10-permissions.md)
-- [Chapter 13: Safety Checks](./architecture/ch11-safety.md)
-- [Chapter 14: Hook System](./architecture/ch12-hooks.md)
-- [Chapter 15: Plan Mode](./architecture/ch13-plan-mode.md)
+- [Chapter 10: Permission Engine](./architecture/ch10-permissions.md)
+- [Chapter 11: Safety Checks](./architecture/ch11-safety.md)
+- [Chapter 12: Hook System](./architecture/ch12-hooks.md)
+- [Chapter 13: Plan Mode](./architecture/ch13-plan-mode.md)
 
 ---
 
-# Advanced Topics
+# Configuration & Context
 
+- [Chapter 14: Settings Hierarchy](./architecture/ch14-settings.md)
+- [Chapter 15: Project Instructions](./architecture/ch15-instructions.md)
 - [Chapter 16: Memory System](./architecture/ch16-memory.md)
 - [Chapter 17: Token & Cost Tracking](./architecture/ch17-tokens.md)
+
+---
+
+# Context Management
+
 - [Chapter 18: Context Compaction](./architecture/ch18-compaction.md)
 - [Chapter 19: Session Management](./architecture/ch19-sessions.md)
 - [Chapter 20: Session Restore](./architecture/ch20-restore.md)
+
+---
+
+# Integration
+
 - [Chapter 21: MCP Protocol](./architecture/ch21-mcp-protocol.md)
 - [Chapter 22: MCP Client & Tools](./architecture/ch22-mcp-client.md)
+
+---
+
+# Agents
+
 - [Chapter 23: Subagents](./architecture/ch23-subagents.md)
 - [Chapter 24: Multi-Agent Coordination](./architecture/ch24-multi-agent.md)
 - [Chapter 25: User Input](./architecture/ch25-user-input.md)
+
+---
+
+# Terminal UI
+
 - [Chapter 26: Terminal UI](./architecture/ch26-tui.md)
 
 ---

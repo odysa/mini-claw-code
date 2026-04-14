@@ -38,9 +38,17 @@ mini-claw-code-starter/src/
 
 ## How to use this book
 
-Each chapter explains the concepts, walks through the design, and tells you what to fill in. The `mini-claw-code-starter` crate contains stub implementations with `unimplemented!()` markers and doc comments describing what to do. Read the chapter, fill in the stubs, then verify your work by running the tests.
+**Start with the Getting Started section.** Three short, hands-on chapters get you from zero to a working agent in under an hour:
 
-**Important: Chapter numbers do NOT match test file numbers.** The V2 chapters were reorganized into a progressive learning path, but the test files kept their original numbering. Use the mapping table below to find the correct test command for each chapter.
+1. [**Your First LLM Call**](./intro01-first-llm-call.md) — implement `MockProvider` (`test_ch1`)
+2. [**Your First Tool Call**](./intro02-first-tool.md) — implement `ReadTool` (`test_ch2`)
+3. [**The Agentic Loop**](./intro03-agentic-loop.md) — implement `single_turn` and `SimpleAgent` (`test_ch3`, `test_ch5`)
+
+Then dive into the **Deep Dive** chapters (1-15) for the full architecture: streaming, permissions, hooks, plan mode, configuration, and more.
+
+The `mini-claw-code-starter` crate contains stub implementations with `unimplemented!()` markers and doc comments describing what to do. Read the chapter, fill in the stubs, then verify your work by running the tests.
+
+**Important: Deep dive chapter numbers do NOT match test file numbers.** The chapters were reorganized by topic, but test files kept their original numbering. Use the mapping table below to find the correct test command for each chapter.
 
 **Run tests to check your progress:**
 

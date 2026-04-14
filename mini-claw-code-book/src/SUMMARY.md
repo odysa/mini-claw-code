@@ -6,67 +6,67 @@
 
 ## Part I: Core Engine
 
-- [Messages & Types](./architecture/ch01-messages-types.md)
-- [Provider & Streaming](./architecture/ch02-provider-streaming.md)
-- [Tool Interface](./architecture/ch03-tool-interface.md)
-- [Query Engine](./architecture/ch04-query-engine.md)
-- [System Prompt](./architecture/ch05-system-prompt.md)
+- [Chapter 1: Messages & Types](./architecture/ch01-messages-types.md)
+- [Chapter 2: Provider & Streaming](./architecture/ch02-provider-streaming.md)
+- [Chapter 3: Tool Interface](./architecture/ch03-tool-interface.md)
+- [Chapter 4: Query Engine](./architecture/ch04-query-engine.md)
+- [Chapter 5: System Prompt](./architecture/ch05-system-prompt.md)
 
 ---
 
 ## Part II: Tools
 
-- [File Tools](./architecture/ch06-file-tools.md)
-- [Bash Tool](./architecture/ch07-bash-tool.md)
-- [Search Tools](./architecture/ch08-search-tools.md)
-- [Tool Registry](./architecture/ch09-tool-registry.md)
+- [Chapter 6: File Tools](./architecture/ch06-file-tools.md)
+- [Chapter 7: Bash Tool](./architecture/ch07-bash-tool.md)
+- [Chapter 8: Search Tools](./architecture/ch08-search-tools.md)
+- [Chapter 9: Tool Registry](./architecture/ch09-tool-registry.md)
 
 ---
 
 ## Part III: Safety & Control
 
-- [Permission Engine](./architecture/ch10-permissions.md)
-- [Safety Checks](./architecture/ch11-safety.md)
-- [Hook System](./architecture/ch12-hooks.md)
-- [Plan Mode](./architecture/ch13-plan-mode.md)
+- [Chapter 10: Permission Engine](./architecture/ch10-permissions.md)
+- [Chapter 11: Safety Checks](./architecture/ch11-safety.md)
+- [Chapter 12: Hook System](./architecture/ch12-hooks.md)
+- [Chapter 13: Plan Mode](./architecture/ch13-plan-mode.md)
 
 ---
 
 ## Part IV: Configuration & Context
 
-- [Settings Hierarchy](./architecture/ch14-settings.md)
-- [Project Instructions](./architecture/ch15-instructions.md)
-- [Memory System](./architecture/ch16-memory.md)
-- [Token & Cost Tracking](./architecture/ch17-tokens.md)
+- [Chapter 14: Settings Hierarchy](./architecture/ch14-settings.md)
+- [Chapter 15: Project Instructions](./architecture/ch15-instructions.md)
+- [Chapter 16: Memory System](./architecture/ch16-memory.md)
+- [Chapter 17: Token & Cost Tracking](./architecture/ch17-tokens.md)
 
 ---
 
 ## Part V: Context Management
 
-- [Context Compaction](./architecture/ch18-compaction.md)
-- [Session Management](./architecture/ch19-sessions.md)
-- [Session Restore](./architecture/ch20-restore.md)
+- [Chapter 18: Context Compaction](./architecture/ch18-compaction.md)
+- [Chapter 19: Session Management](./architecture/ch19-sessions.md)
+- [Chapter 20: Session Restore](./architecture/ch20-restore.md)
 
 ---
 
 ## Part VI: Integration
 
-- [MCP Protocol](./architecture/ch21-mcp-protocol.md)
-- [MCP Client & Tools](./architecture/ch22-mcp-client.md)
+- [Chapter 21: MCP Protocol](./architecture/ch21-mcp-protocol.md)
+- [Chapter 22: MCP Client & Tools](./architecture/ch22-mcp-client.md)
 
 ---
 
 ## Part VII: Agents
 
-- [Subagents](./architecture/ch23-subagents.md)
-- [Multi-Agent Coordination](./architecture/ch24-multi-agent.md)
-- [User Input](./architecture/ch25-user-input.md)
+- [Chapter 23: Subagents](./architecture/ch23-subagents.md)
+- [Chapter 24: Multi-Agent Coordination](./architecture/ch24-multi-agent.md)
+- [Chapter 25: User Input](./architecture/ch25-user-input.md)
 
 ---
 
 ## Part VIII: Terminal UI
 
-- [Terminal UI](./architecture/ch26-tui.md)
+- [Chapter 26: Terminal UI](./architecture/ch26-tui.md)
 
 ---
 

@@ -1,13 +1,26 @@
 use crate::types::*;
+use tokio::sync::mpsc;
+
+/// Events emitted by the agent during execution.
+#[derive(Debug)]
+pub enum AgentEvent {
+    /// A chunk of text streamed from the LLM (streaming mode only).
+    TextDelta(String),
+    /// A tool is being called.
+    ToolCall { name: String, summary: String },
+    /// The agent finished with a final response.
+    Done(String),
+    /// The agent encountered an error.
+    Error(String),
+}
 
 /// Format a one-line summary of a tool call for terminal output.
-fn tool_summary(call: &ToolCall) -> String {
-    // Pick the most useful argument to display:
-    // "command" for bash, "path" for read/write/edit.
+pub(crate) fn tool_summary(call: &ToolCall) -> String {
     let detail = call
         .arguments
         .get("command")
         .or_else(|| call.arguments.get("path"))
+        .or_else(|| call.arguments.get("question"))
         .and_then(|v| v.as_str());
 
     match detail {
@@ -68,11 +81,45 @@ impl<P: Provider> SimpleAgent<P> {
         unimplemented!("Push the tool into self.tools, return self")
     }
 
-    /// Run the agent loop with the given prompt.
-    pub async fn run(&self, _prompt: &str) -> anyhow::Result<String> {
+    /// Execute all tool calls and return `(call_id, result_string)` pairs.
+    ///
+    /// Hints:
+    /// - For each call, look up the tool with self.tools.get(&call.name)
+    /// - If found, call it. Catch errors with unwrap_or_else.
+    /// - If not found, return "error: unknown tool `{name}`"
+    async fn execute_tools(&self, calls: &[ToolCall]) -> Vec<(String, String)> {
+        unimplemented!("Loop over calls, execute each, collect (id, content) pairs")
+    }
+
+    /// Push an assistant turn and its tool results into the message history.
+    fn push_results(
+        messages: &mut Vec<Message>,
+        turn: AssistantTurn,
+        results: Vec<(String, String)>,
+    ) {
+        unimplemented!("Push Message::Assistant(turn), then Message::ToolResult for each result")
+    }
+
+    /// Run the agent loop with existing message history and emit events.
+    ///
+    /// # Chapter 9: Events
+    ///
+    /// Like `chat()` but takes ownership of messages and sends AgentEvents
+    /// through the channel instead of printing. Returns the full message history.
+    pub async fn run_with_history(
+        &self,
+        mut messages: Vec<Message>,
+        events: mpsc::UnboundedSender<AgentEvent>,
+    ) -> Vec<Message> {
         unimplemented!(
-            "Loop: send messages to provider, match on stop_reason, execute tool calls, repeat until Stop"
+            "Agent loop that sends AgentEvent::ToolCall and AgentEvent::Done through channel"
         )
+    }
+
+    /// Run the agent loop, sending events through the channel.
+    pub async fn run_with_events(&self, prompt: &str, events: mpsc::UnboundedSender<AgentEvent>) {
+        let messages = vec![Message::User(prompt.to_string())];
+        self.run_with_history(messages, events).await;
     }
 
     /// Run the agent loop, accumulating into the provided message history.
@@ -90,5 +137,10 @@ impl<P: Provider> SimpleAgent<P> {
         unimplemented!(
             "Same loop as run(), but use the provided messages vec instead of creating a new one"
         )
+    }
+
+    /// Run the agent loop with the given prompt.
+    pub async fn run(&self, prompt: &str) -> anyhow::Result<String> {
+        unimplemented!("Create messages with Message::User(prompt), delegate to chat()")
     }
 }

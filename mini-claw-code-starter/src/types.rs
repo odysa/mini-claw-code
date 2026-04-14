@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::future::Future;
+use std::sync::Arc;
 
 use serde_json::Value;
 
@@ -42,6 +43,20 @@ impl ToolDefinition {
         }
         self
     }
+
+    /// Add a parameter with a raw JSON schema value.
+    ///
+    /// Use this for complex types (arrays, nested objects) that `param()` can't express.
+    pub fn param_raw(mut self, name: &str, schema: Value, required: bool) -> Self {
+        self.parameters["properties"][name] = schema;
+        if required {
+            self.parameters["required"]
+                .as_array_mut()
+                .unwrap()
+                .push(serde_json::Value::String(name.to_string()));
+        }
+        self
+    }
 }
 
 pub struct ToolCall {
@@ -58,10 +73,19 @@ pub enum StopReason {
     ToolUse,
 }
 
+/// Token usage reported by the API for a single request.
+#[derive(Debug, Clone, Default)]
+pub struct TokenUsage {
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+}
+
 pub struct AssistantTurn {
     pub text: Option<String>,
     pub tool_calls: Vec<ToolCall>,
     pub stop_reason: StopReason,
+    /// Token usage for this turn, if reported by the provider.
+    pub usage: Option<TokenUsage>,
 }
 
 pub enum Message {
@@ -71,6 +95,10 @@ pub enum Message {
     ToolResult { id: String, content: String },
 }
 
+/// The `Tool` trait uses `#[async_trait]` (instead of RPITIT like `Provider`)
+/// because tools are stored as `Box<dyn Tool>` in `ToolSet`, which requires
+/// object safety. RPITIT methods (`-> impl Future`) are not object-safe,
+/// so `async_trait` desugars them into `-> Pin<Box<dyn Future>>` which is.
 #[async_trait::async_trait]
 pub trait Tool: Send + Sync {
     fn definition(&self) -> &ToolDefinition;
@@ -118,10 +146,27 @@ impl Default for ToolSet {
     }
 }
 
+/// `Provider` uses RPITIT (return-position `impl Trait` in trait) because it
+/// is always used as a generic parameter (`P: Provider`), never as `dyn Provider`.
+/// This avoids the heap allocation that `#[async_trait]` requires.
 pub trait Provider: Send + Sync {
     fn chat<'a>(
         &'a self,
         messages: &'a [Message],
         tools: &'a [&'a ToolDefinition],
     ) -> impl Future<Output = anyhow::Result<AssistantTurn>> + Send + 'a;
+}
+
+/// Blanket impl: `Arc<P>` is a `Provider` whenever `P` is.
+///
+/// This lets parent and child agents share the same provider via `Arc`
+/// without cloning. Needed for subagents (Chapter 13).
+impl<P: Provider> Provider for Arc<P> {
+    fn chat<'a>(
+        &'a self,
+        messages: &'a [Message],
+        tools: &'a [&'a ToolDefinition],
+    ) -> impl Future<Output = anyhow::Result<AssistantTurn>> + Send + 'a {
+        (**self).chat(messages, tools)
+    }
 }

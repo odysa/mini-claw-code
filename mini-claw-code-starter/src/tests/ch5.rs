@@ -12,6 +12,7 @@ async fn test_ch5_text_response() {
         text: Some("Hello!".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let agent = SimpleAgent::new(provider);
@@ -35,11 +36,13 @@ async fn test_ch5_single_tool_call() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("The file contains: file content".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -60,11 +63,13 @@ async fn test_ch5_unknown_tool() {
                 arguments: json!({}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Sorry, that tool doesn't exist.".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -90,6 +95,7 @@ async fn test_ch5_multi_step_loop() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Step 2: call read again
         AssistantTurn {
@@ -100,12 +106,14 @@ async fn test_ch5_multi_step_loop() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         // Step 3: return text
         AssistantTurn {
             text: Some("Done reading twice".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -121,6 +129,7 @@ async fn test_ch5_empty_response() {
         text: None,
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let agent = SimpleAgent::new(provider);
@@ -148,6 +157,7 @@ async fn test_ch5_multiple_tools_registered() {
         text: Some("Ready".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let agent = SimpleAgent::new(provider)
@@ -175,6 +185,7 @@ async fn test_ch5_three_step_loop() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: None,
@@ -184,6 +195,7 @@ async fn test_ch5_three_step_loop() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: None,
@@ -193,11 +205,13 @@ async fn test_ch5_three_step_loop() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Read three times".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -228,11 +242,13 @@ async fn test_ch5_tool_error_propagates() {
                 arguments: json!({"path": "/tmp/__mini_claw_code_no_such_file_ch5__.txt"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("File not found".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -266,11 +282,13 @@ async fn test_ch5_multiple_tool_calls_single_turn() {
                 },
             ],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Read both".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -293,11 +311,13 @@ async fn test_ch5_bash_tool_in_loop() {
                 arguments: json!({"command": "echo hi"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("bash said hi".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -324,6 +344,7 @@ async fn test_ch5_write_then_read() {
                 arguments: json!({"path": path_str, "content": "written data"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: None,
@@ -333,11 +354,13 @@ async fn test_ch5_write_then_read() {
                 arguments: json!({"path": path_str}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("File says: written data".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -373,11 +396,13 @@ async fn test_ch5_unknown_among_known() {
                 },
             ],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("handled".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -395,6 +420,7 @@ async fn test_ch5_immediate_stop_with_tools_registered() {
         text: Some("No tools needed".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let agent = SimpleAgent::new(provider)
@@ -422,11 +448,13 @@ async fn test_ch5_text_in_tool_use_turn() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("The file contains: data".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 

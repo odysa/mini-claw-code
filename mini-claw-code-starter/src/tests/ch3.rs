@@ -12,6 +12,7 @@ async fn test_ch3_direct_response() {
         text: Some("Hello!".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let tools = ToolSet::new();
@@ -35,11 +36,13 @@ async fn test_ch3_one_tool_call() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("The file contains: file content".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -62,11 +65,13 @@ async fn test_ch3_unknown_tool() {
                 arguments: json!({}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Sorry, that tool doesn't exist.".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -86,6 +91,7 @@ async fn test_ch3_empty_text_response() {
         text: None,
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let tools = ToolSet::new();
@@ -110,11 +116,13 @@ async fn test_ch3_tool_call_with_text() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("The data is: data".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -151,11 +159,13 @@ async fn test_ch3_multiple_tool_calls_one_round() {
                 },
             ],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Both read".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -179,11 +189,13 @@ async fn test_ch3_tool_error_propagates() {
                 arguments: json!({"path": "/tmp/__mini_claw_code_no_such_file_ch3__.txt"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("File not found".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -202,6 +214,7 @@ async fn test_ch3_no_tools_registered() {
         text: Some("I can answer without tools".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let tools = ToolSet::new();
@@ -239,11 +252,13 @@ async fn test_ch3_final_response_none_text() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: None,
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -266,11 +281,13 @@ async fn test_ch3_tool_call_missing_arg() {
                 arguments: json!({}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Missing path argument".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -306,11 +323,13 @@ async fn test_ch3_mixed_known_and_unknown_tools() {
                 },
             ],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("done".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -330,6 +349,7 @@ async fn test_ch3_long_prompt() {
         text: Some("Got it".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let tools = ToolSet::new();
@@ -354,11 +374,13 @@ async fn test_ch3_multiple_tools_available() {
                 arguments: json!({"path": path.to_str().unwrap()}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         },
         AssistantTurn {
             text: Some("hello".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 

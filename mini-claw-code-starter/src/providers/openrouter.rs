@@ -14,6 +14,8 @@ pub(crate) struct ChatRequest<'a> {
     pub(crate) messages: Vec<ApiMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) tools: Vec<ApiTool>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) stream: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -58,6 +60,13 @@ pub(crate) struct ApiToolDef {
 #[derive(Deserialize)]
 struct ChatResponse {
     choices: Vec<Choice>,
+    usage: Option<ApiUsage>,
+}
+
+#[derive(Deserialize)]
+struct ApiUsage {
+    prompt_tokens: Option<u64>,
+    completion_tokens: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -139,11 +148,36 @@ impl OpenRouterProvider {
     }
 }
 
+impl crate::streaming::StreamProvider for OpenRouterProvider {
+    /// Stream a chat request using SSE.
+    ///
+    /// # Chapter 10: Streaming
+    ///
+    /// Hints:
+    /// 1. Build ChatRequest with stream: true
+    /// 2. Send POST request
+    /// 3. Read response chunks with resp.chunk().await
+    /// 4. Buffer bytes, split on newlines
+    /// 5. Parse each line with parse_sse_line()
+    /// 6. Feed events to StreamAccumulator and send via tx
+    /// 7. Return acc.finish()
+    async fn stream_chat(
+        &self,
+        _messages: &[Message],
+        _tools: &[&ToolDefinition],
+        _tx: tokio::sync::mpsc::UnboundedSender<crate::streaming::StreamEvent>,
+    ) -> anyhow::Result<AssistantTurn> {
+        unimplemented!(
+            "Build request with stream:true, read SSE chunks, parse into events, accumulate into AssistantTurn"
+        )
+    }
+}
+
 impl Provider for OpenRouterProvider {
     /// Send a chat request to the API and parse the response.
     ///
     /// Steps:
-    /// 1. Build a ChatRequest with model, converted messages, and converted tools
+    /// 1. Build a ChatRequest with model, converted messages, converted tools, stream: false
     /// 2. POST to {base_url}/chat/completions with bearer auth
     /// 3. Parse the JSON response as ChatResponse
     /// 4. Extract the first choice's message
@@ -152,11 +186,14 @@ impl Provider for OpenRouterProvider {
     /// 6. Determine stop_reason from choice.finish_reason:
     ///    - "tool_calls" → StopReason::ToolUse
     ///    - anything else → StopReason::Stop
+    /// 7. Extract usage from response if present
     async fn chat(
         &self,
         _messages: &[Message],
         _tools: &[&ToolDefinition],
     ) -> anyhow::Result<AssistantTurn> {
-        unimplemented!("Build request, send HTTP POST, parse response into AssistantTurn")
+        unimplemented!(
+            "Build request, send HTTP POST, parse response into AssistantTurn with usage"
+        )
     }
 }

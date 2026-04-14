@@ -14,21 +14,22 @@ git status, CLAUDE.md contents). This distinction is not cosmetic. It is the
 foundation of **prompt caching**, an optimization that can cut costs and latency
 dramatically.
 
-In this chapter you will build the system prompt infrastructure: a section type,
-a builder that separates static from dynamic content, an instruction loader that
-discovers project-specific CLAUDE.md files, and a default prompt assembler that
-wires it all together.
+In this chapter you will build the `InstructionLoader` -- the component that
+discovers project-specific CLAUDE.md files by walking up the filesystem. We will
+also discuss system prompt architecture concepts (sections, static/dynamic
+splitting, prompt caching) that production agents like Claude Code use. Our
+starter focuses on the instruction loading piece, which is the most practically
+useful part.
 
 ## Goal
 
-Implement the prompt module so that:
+Implement `InstructionLoader` in `src/instructions.rs` so that:
 
-1. `PromptSection` holds a named chunk of prompt text.
-2. `SystemPromptBuilder` collects static and dynamic sections, renders them
-   separately or combined.
-3. `InstructionLoader` walks up the filesystem to discover and load CLAUDE.md
+1. `InstructionLoader` walks up the filesystem to discover and load CLAUDE.md
    files.
-4. `build_default_system_prompt()` assembles a minimal but complete prompt.
+2. `load()` concatenates discovered files into a single string with headers.
+3. `system_prompt_section()` wraps the loaded instructions for inclusion in a
+   system prompt.
 
 ## Why system prompts matter for agents
 
@@ -54,22 +55,17 @@ Claude Code assembles all of these into a single system prompt before each
 conversation. Sections are ordered deliberately, and a cache boundary separates
 the parts that change from the parts that do not.
 
-## The section architecture
+## Concepts: sections and cache boundaries
 
-Open `src/prompt/sections.rs`. The smallest unit of the prompt
-is a `PromptSection` -- a named chunk of text:
+Before diving into the code, let's understand how production agents like Claude
+Code structure their system prompts. These concepts inform the design even though
+our starter takes a simpler approach.
 
-```rust
-/// A named section of the system prompt.
-#[derive(Debug, Clone)]
-pub struct PromptSection {
-    pub name: String,
-    pub content: String,
-}
-```
+### Prompt sections
 
-The `name` field serves as a heading when the section is rendered. The `content`
-field holds the actual prompt text. Each section renders as:
+A production system prompt is built from **modular sections** -- identity,
+safety rules, tool schemas, environment info, project instructions. Each section
+is a named chunk of text that renders as:
 
 ```text
 # identity
@@ -80,38 +76,7 @@ using the tools available to you.
 The heading helps the LLM parse the prompt structure and makes debugging easier
 when you inspect the assembled prompt.
 
-### Implementing `PromptSection`
-
-The constructor accepts anything that converts to `String`, using
-`impl Into<String>`:
-
-```rust
-impl PromptSection {
-    pub fn new(name: impl Into<String>, content: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            content: content.into(),
-        }
-    }
-}
-```
-
-This lets callers pass `&str`, `String`, or `format!(...)` output without
-friction.
-
-## The builder: static vs. dynamic sections
-
-`SystemPromptBuilder` is where the cache boundary concept lives. It maintains
-two separate lists of sections:
-
-```rust
-pub struct SystemPromptBuilder {
-    static_sections: Vec<PromptSection>,
-    dynamic_sections: Vec<PromptSection>,
-}
-```
-
-### Why two lists?
+### Static vs. dynamic: the cache boundary
 
 LLM API calls are expensive. Every token in the system prompt is processed on
 every request. Claude's prompt caching feature lets you mark a prefix of the
@@ -144,77 +109,13 @@ first and the changing parts last:
 
 Claude Code calls this boundary `SYSTEM_PROMPT_DYNAMIC_BOUNDARY`. Everything
 above it is sent with a cache control header. Everything below it is fresh on
-each request. Our builder encodes this same separation structurally.
+each request.
 
-### Implementing the builder
-
-The builder uses a fluent API. Each method takes `self` and returns `Self`:
-
-```rust
-impl SystemPromptBuilder {
-    pub fn new() -> Self {
-        Self {
-            static_sections: Vec::new(),
-            dynamic_sections: Vec::new(),
-        }
-    }
-
-    /// Add a static section (stable across sessions, cacheable).
-    pub fn static_section(mut self, section: PromptSection) -> Self {
-        self.static_sections.push(section);
-        self
-    }
-
-    /// Add a dynamic section (changes per session).
-    pub fn dynamic_section(mut self, section: PromptSection) -> Self {
-        self.dynamic_sections.push(section);
-        self
-    }
-}
-```
-
-This lets you chain calls to build up the prompt:
-
-```rust
-SystemPromptBuilder::new()
-    .static_section(PromptSection::new("identity", "You are a coding agent."))
-    .static_section(PromptSection::new("safety", "Be careful."))
-    .dynamic_section(PromptSection::new("env", "cwd: /home/user/project"))
-```
-
-### Rendering methods
-
-The builder exposes three rendering methods:
-
-- **`static_prompt()`** -- renders only the static sections. Send this half with
-  a cache control header.
-- **`dynamic_prompt()`** -- renders only the dynamic sections. Send this half
-  fresh each request.
-- **`build()`** -- concatenates both halves into a single string. Use this when
-  the provider does not support prompt caching.
-
-Each method formats sections the same way: `# name` heading, then content,
-separated by blank lines. Implement all three -- `static_prompt()` and
-`dynamic_prompt()` iterate their respective lists, and `build()` joins their
-outputs with empty-string checks to avoid stray blank lines.
-
-Also implement `section_count()` (returns the total across both lists) and the
-`Default` trait (delegates to `new()`).
-
-## The default system prompt
-
-With the builder in place, assemble a minimal default prompt in
-`src/prompt/mod.rs`. The function `build_default_system_prompt`
-takes a working directory string and wires up three sections:
-
-1. **Identity** (static) -- tells the model it is a coding agent with tools.
-2. **Safety** (static) -- tells the model to prioritize secure code.
-3. **Environment** (dynamic) -- tells the model the current working directory.
-
-Identity and safety never change between sessions, so they are static. The
-working directory changes every time, so it is dynamic. A production agent would
-add tool schemas (static) and git status, OS info, and CLAUDE.md contents
-(dynamic). The builder makes it trivial to add more sections later.
+A production agent would implement a `SystemPromptBuilder` that maintains
+separate lists of static and dynamic sections, renders each half independently,
+and supports cache-aware providers. Our starter keeps things simpler -- we
+focus on the instruction loading piece, which is the most useful component to
+build from scratch.
 
 ## InstructionLoader: discovering CLAUDE.md
 
@@ -223,29 +124,49 @@ files let users customize the agent's behavior per project -- preferred coding
 style, test commands, things to avoid. The agent discovers them by walking up
 the filesystem from the current working directory.
 
-Open `src/prompt/instructions.rs`.
-
-### The struct
+Open `src/instructions.rs`. Here is the starter stub:
 
 ```rust
 pub struct InstructionLoader {
     file_names: Vec<String>,
 }
-```
 
-The loader is parameterized by file names to search for. The default
-configuration looks for `CLAUDE.md` and `.claw/instructions.md`:
-
-```rust
 impl InstructionLoader {
     pub fn new(file_names: &[&str]) -> Self {
-        Self {
-            file_names: file_names.iter().map(|s| s.to_string()).collect(),
-        }
+        unimplemented!("Convert file_names to Vec<String>")
     }
 
     pub fn default_files() -> Self {
-        Self::new(&["CLAUDE.md", ".claw/instructions.md"])
+        Self::new(&["CLAUDE.md", ".mini-claw/instructions.md"])
+    }
+
+    pub fn discover(&self, start_dir: &Path) -> Vec<PathBuf> {
+        unimplemented!(
+            "Walk up from start_dir, collect matching files, reverse for root-first order"
+        )
+    }
+
+    pub fn load(&self, start_dir: &Path) -> Option<String> {
+        unimplemented!("Discover files, read each, join with headers showing source path")
+    }
+
+    pub fn system_prompt_section(&self, start_dir: &Path) -> Option<String> {
+        unimplemented!("Call load(), wrap with instruction preamble")
+    }
+}
+```
+
+The loader is parameterized by file names to search for. The default
+configuration looks for `CLAUDE.md` and `.mini-claw/instructions.md`.
+
+### Implementing `new()`
+
+The constructor converts the `&[&str]` slice into owned `String` values:
+
+```rust
+pub fn new(file_names: &[&str]) -> Self {
+    Self {
+        file_names: file_names.iter().map(|s| s.to_string()).collect(),
     }
 }
 ```
@@ -313,38 +234,32 @@ Use American English. Prefer explicit error handling.
 Run tests with `cargo test`. Never modify generated files.
 ```
 
-## The full assembly flow
+### `system_prompt_section()` -- wrapping for the prompt
 
-In a production agent, the builder and instruction loader combine into a
-pipeline. Steps 1-3 are static (identical across sessions); steps 4-5 are
-dynamic (recomputed each time):
+The `system_prompt_section()` method calls `load()` and wraps the result with
+an instruction preamble. This produces a string ready to insert into a system
+prompt. If no instruction files are found, it returns `None`.
 
-```text
-  STATIC:   identity -> safety -> tool schemas
-                  ---- CACHE BOUNDARY ----
-  DYNAMIC:  environment -> CLAUDE.md instructions
-```
+## Using InstructionLoader in a system prompt
 
-To wire the instruction loader into the builder:
+In a production agent, the instruction loader is wired into the prompt assembly
+pipeline. The loaded instructions are always dynamic -- they depend on which
+directory the agent is launched from.
+
+Here is how you might use `InstructionLoader` to build a simple system prompt:
 
 ```rust
-let mut builder = SystemPromptBuilder::new()
-    .static_section(PromptSection::new("identity", "..."))
-    .static_section(PromptSection::new("safety", "..."))
-    .dynamic_section(PromptSection::new("environment", format!("cwd: {cwd}")));
+let mut prompt = String::from("You are a coding agent.\n\n");
 
 let loader = InstructionLoader::default_files();
-if let Some(instructions) = loader.load(Path::new(cwd)) {
-    builder = builder.dynamic_section(
-        PromptSection::new("project_instructions", instructions)
-    );
+if let Some(section) = loader.system_prompt_section(Path::new(cwd)) {
+    prompt.push_str(&section);
 }
-
-let prompt = builder.build();
 ```
 
-The instructions are always dynamic -- they depend on which directory the agent
-is launched from.
+A more sophisticated agent would separate static and dynamic sections for prompt
+caching (see the concepts discussion above), but this simple approach works well
+for getting started.
 
 ## How Claude Code does it
 
@@ -360,36 +275,21 @@ provider splits the system message at this boundary and sends the prefix with
 representation and reuses it for subsequent requests, often covering 80%+ of
 the prompt.
 
-Our `SystemPromptBuilder` achieves the same split structurally. The
-`static_prompt()` and `dynamic_prompt()` methods give you the two halves. A
-provider that supports caching sends `static_prompt()` with cache control and
-`dynamic_prompt()` without it.
+As an extension, you could build a `SystemPromptBuilder` that maintains separate
+lists of static and dynamic sections, renders each half independently, and lets
+a cache-aware provider split the prompt at the boundary. Our starter focuses on
+the instruction loading piece, which is the most practically useful component.
 
 ## Running the tests
 
 Run the Chapter 5 tests:
 
 ```bash
-cargo test -p claw-code test_ch5
+cargo test -p mini-claw-code-starter test_ch5
 ```
 
 ### What the tests verify
 
-- **`test_ch5_builder_empty`**: A fresh builder has zero sections and builds to
-  an empty string.
-- **`test_ch5_static_section`**: A builder with one static section renders the
-  section name and content.
-- **`test_ch5_dynamic_section`**: Same for a dynamic section.
-- **`test_ch5_static_and_dynamic`**: Both types of sections are present. The
-  static section appears before the dynamic section in the output.
-- **`test_ch5_multiple_sections`**: Three sections (two static, one dynamic) all
-  appear in the output.
-- **`test_ch5_section_count`**: Verifies `section_count()` returns the total
-  across both lists.
-- **`test_ch5_static_prompt_only`**: `static_prompt()` returns content,
-  `dynamic_prompt()` returns empty when no dynamic sections exist.
-- **`test_ch5_default_system_prompt`**: `build_default_system_prompt()` includes
-  the identity text and the working directory.
 - **`test_ch5_instruction_loader_discover`**: Creates a temp directory with a
   CLAUDE.md file and verifies `discover()` finds it.
 - **`test_ch5_instruction_loader_load`**: Same setup, verifies `load()` returns
@@ -399,23 +299,24 @@ cargo test -p claw-code test_ch5
 
 ## Recap
 
-You have built the system prompt infrastructure:
+You have built the instruction loading infrastructure:
 
-- **`PromptSection`** is a named chunk of prompt text -- the atom of prompt
-  assembly.
-- **`SystemPromptBuilder`** separates static (cacheable) sections from dynamic
-  (per-session) sections. It can render each half independently for prompt
-  caching or combine them with `build()`.
 - **`InstructionLoader`** discovers CLAUDE.md files by walking up the filesystem.
   It concatenates them in root-first order so that global instructions appear
   before project-specific ones.
-- **`build_default_system_prompt()`** assembles a minimal prompt with identity,
-  safety, and environment sections.
+- **`system_prompt_section()`** wraps discovered instructions for inclusion in a
+  system prompt.
 
-The key insight is the **cache boundary**. By separating what changes from what
-does not, you enable prompt caching -- a single optimization that can cut costs
-and latency by an order of magnitude on long prompts. Every production agent
-does this. Now yours does too.
+You also learned the key concepts behind production system prompt architecture:
+
+- **Prompt sections** break the system prompt into named, modular chunks.
+- **The cache boundary** separates what changes from what does not, enabling
+  prompt caching -- a single optimization that can cut costs and latency by an
+  order of magnitude on long prompts. Every production agent does this.
+
+As an extension, you could implement `PromptSection` and `SystemPromptBuilder`
+types to manage the static/dynamic split structurally. The reference
+implementation (`mini-claw-code`) shows one approach.
 
 ## What's next
 

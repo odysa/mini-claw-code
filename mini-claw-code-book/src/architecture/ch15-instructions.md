@@ -17,7 +17,7 @@ produces a different system prompt than launching it from `/home/user/other`.
 The pieces were already built. Now they form a pipeline.
 
 ```bash
-cargo test -p claw-code test_ch15
+cargo test -p mini-claw-code-starter test_ch15
 ```
 
 ---
@@ -216,7 +216,7 @@ Config.instructions                 highest     config
 File-based instructions are discovered by the `InstructionLoader` and appear
 in root-first order. Config-based instructions come from the `Config` struct's
 `instructions` field -- loaded from `.claw/config.toml` or
-`~/.config/claw-code/config.toml`.
+`~/.config/mini-claw/config.toml`.
 
 Both become dynamic sections in the system prompt. File instructions are added
 first, config instructions second. Since the LLM reads the prompt top-to-bottom,
@@ -385,7 +385,7 @@ dynamic prompt sections. Everything else is refinement.
 Run the chapter 15 tests:
 
 ```bash
-cargo test -p claw-code test_ch15
+cargo test -p mini-claw-code-starter test_ch15
 ```
 
 The tests are organized in three groups: discovery, loading, and integration.

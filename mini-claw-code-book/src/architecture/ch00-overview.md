@@ -1,59 +1,44 @@
 # Overview
 
-Welcome to **Building a Coding Agent in Rust** — a hands-on tutorial where you build a production-grade AI coding agent from scratch, mirroring the real architecture of [Claude Code](https://claude.ai/code).
+Welcome to **Building a Coding Agent in Rust** — a hands-on tutorial where you build your own AI coding agent from scratch in the `mini-claw-code-starter` template, guided by the architecture of [Claude Code](https://claude.ai/code).
 
 ## What you'll build
 
 By the end of this book, you'll have built a complete coding agent that:
 
-- **Streams responses** from an LLM in real-time via Server-Sent Events
-- **Uses tools** — file read/write/edit, bash, glob, grep — with a rich Tool trait matching Claude Code's interface
-- **Validates and gates tool execution** through a multi-stage permission pipeline (allow/deny/ask)
-- **Protects the user** with path validation, command filtering, and protected file checks
-- **Extends via hooks** — pre/post tool events with shell commands, blocking, and argument modification
-- **Loads project context** by discovering and injecting CLAUDE.md files
-- **Manages configuration** through a 4-level settings hierarchy (user → project → local → env)
-- **Tracks tokens and cost** per model with cumulative session tracking
-- **Auto-compacts context** when approaching the token limit, using the LLM to summarize
-- **Saves and resumes sessions** via JSONL transcripts
-- **Connects to MCP servers** for third-party tool integration over JSON-RPC/stdio
-- **Spawns subagents** with isolated message histories and shared providers
-- **Coordinates multiple agents** with teams, workers, and shared scratchpads
-- **Renders a rich TUI** with streaming text, tool progress, spinners, and permission dialogs
+- **Connects to an LLM** via an OpenRouter-compatible HTTP provider
+- **Uses tools** — bash, file read/write/edit — with a simple `Tool` trait
+- **Loops autonomously** — the `SimpleAgent` drives the provider-tool cycle until done
+- **Streams events** through channels so a UI can show progress in real-time
+- **Tests deterministically** with a `MockProvider` that returns canned responses
 
 ## Architecture
 
-The codebase mirrors Claude Code's module structure:
+The starter codebase uses a flat module layout:
 
 ```
-claw-code/src/
-  types/          — Messages, tools, permissions, usage
-  engine/         — QueryEngine (the core agent loop)
-  provider/       — LLM backends (OpenRouter, mock)
-  tools/          — Tool implementations (bash, file ops, search)
-  permission/     — Permission engine and safety checks
-  hooks/          — Event-driven extensibility
-  config/         — Layered settings hierarchy
-  context/        — Token tracking and compaction
-  session/        — Transcript persistence
-  mcp/            — Model Context Protocol client
-  prompt/         — System prompt builder with modular sections
-  agents/         — Subagents and multi-agent coordination
-  tui/            — Terminal UI with streaming
+mini-claw-code-starter/src/
+  types.rs          — Messages, tools, ToolSet, Provider trait, TokenUsage
+  agent.rs          — SimpleAgent (the core agent loop) and AgentEvent
+  mock.rs           — MockProvider for deterministic testing
+  streaming.rs      — SSE parsing, StreamAccumulator
+  providers/
+    openrouter.rs   — OpenRouterProvider (real HTTP backend)
+  tools/            — Tool implementations (bash, file read/write/edit)
 ```
 
 ## How to use this book
 
-Each chapter explains the concepts, walks through the design, and provides complete code listings. The `claw-code/` crate contains the reference implementation. Read the chapter, study the code, then verify your understanding by running the tests.
+Each chapter explains the concepts, walks through the design, and tells you what to fill in. The `mini-claw-code-starter` crate contains stub implementations with `unimplemented!()` markers and doc comments describing what to do. Read the chapter, fill in the stubs, then verify your work by running the tests.
 
 **Run tests to check your progress:**
 
 ```bash
 # Run tests for a specific chapter
-cargo test -p claw-code test_ch1
+cargo test -p mini-claw-code-starter test_ch1
 
 # Run all tests
-cargo test -p claw-code
+cargo test -p mini-claw-code-starter
 ```
 
 ## Prerequisites
@@ -64,15 +49,11 @@ cargo test -p claw-code
 
 ## Chapter roadmap
 
-| Section | Chapters | What you build |
-|---------|----------|---------------|
-| **Your First Agent SDK** | 1-3 | First LLM response, first tool call, the agentic loop |
-| **Under the Hood** | 4-5 | Messages & types deep dive, system prompt |
-| **Building Your Toolbox** | 6-9 | File tools, bash, glob/grep, tool registry |
-| **Safety & Control** | 10-13 | Permissions, safety checks, hooks, plan mode |
-| **Configuration** | 14-17 | Settings, CLAUDE.md, memory, token tracking |
-| **Context Management** | 18-20 | Compaction, session save/resume |
-| **MCP Integration** | 21-22 | MCP protocol and client |
-| **Multi-Agent** | 23-26 | Subagents, coordination, user input, TUI |
+| Chapter | What you build |
+|---------|---------------|
+| **1 — Messages & Types** | The `Message` enum, `ToolDefinition`, `ToolSet`, `TokenUsage` |
+| **2 — Provider & Streaming** | `Provider` trait, `MockProvider`, SSE parsing, `OpenRouterProvider` |
+| **3 — Tool Interface** | The `Tool` trait, your first concrete tool |
+| **4 — The Agent Loop** | `SimpleAgent` with `chat()`, `run()`, `AgentEvent` |
 
 Let's start building.

@@ -4,10 +4,10 @@ Your agent works. It reads files, writes code, runs commands, checks permissions
 
 Real tools do not work this way. A developer using Claude Code on a Rust project wants different settings than one working on a Python monorepo. A CI pipeline needs different defaults than an interactive session. A user who routes through a self-hosted proxy needs a different base URL. The agent must be configurable -- and the configuration must come from multiple sources, layered by priority, so that project settings override user settings, and environment variables override everything.
 
-This chapter builds a 4-level configuration hierarchy and a cost tracker. By the end, `cargo test -p claw-code test_ch14` should pass.
+This chapter builds a 4-level configuration hierarchy and a cost tracker. By the end, `cargo test -p mini-claw-code-starter test_ch14` should pass.
 
 ```bash
-cargo test -p claw-code test_ch14
+cargo test -p mini-claw-code-starter test_ch14
 ```
 
 ---
@@ -18,7 +18,7 @@ A flat config file would be simple. One `config.toml`, one source of truth, done
 
 - **User preferences** like model choice and API base URL should follow you across every project. You should not have to set `model = "anthropic/claude-sonnet-4-20250514"` in every repository.
 - **Project settings** like blocked commands and protected file patterns are specific to one codebase. A node project might block `rm -rf node_modules` while a Rust project blocks `cargo publish --allow-dirty`.
-- **Environment overrides** let CI pipelines inject settings without touching config files. `CLAW_MODEL=anthropic/claude-haiku-3-20250414` in a GitHub Actions workflow switches to a cheaper model for automated checks.
+- **Environment overrides** let CI pipelines inject settings without touching config files. `MINI_CLAW_MODEL=anthropic/claude-haiku-3-20250414` in a GitHub Actions workflow switches to a cheaper model for automated checks.
 - **Defaults** provide sane behavior when nothing is configured at all.
 
 The solution is layered configuration. Each layer can set any field. Higher-priority layers override lower ones. Fields not set in a layer fall through to the next one down.
@@ -26,8 +26,8 @@ The solution is layered configuration. Each layer can set any field. Higher-prio
 ```
 Priority (highest to lowest):
 
-  1. Environment variables    CLAW_MODEL, CLAW_BASE_URL, CLAW_MAX_TOKENS
-  2. User config              ~/.config/claw-code/config.toml
+  1. Environment variables    MINI_CLAW_MODEL, MINI_CLAW_BASE_URL, MINI_CLAW_MAX_TOKENS
+  2. User config              ~/.config/mini-claw/config.toml
   3. Project config            .claw/config.toml
   4. Defaults                  hardcoded in code
 ```
@@ -269,9 +269,9 @@ impl ConfigLoader {
             }
         }
 
-        // Layer 2: User config (~/.config/claw-code/config.toml)
+        // Layer 2: User config (~/.config/mini-claw/config.toml)
         if let Some(user_dir) = dirs::config_dir() {
-            let user_path = user_dir.join("claw-code").join("config.toml");
+            let user_path = user_dir.join("mini-claw").join("config.toml");
             if let Some(overlay) = Self::load_file(&user_path) {
                 config = Self::merge(config, overlay);
             }
@@ -293,7 +293,7 @@ The `load()` method applies layers from lowest to highest priority:
 
 1. Start with `Config::default()` -- the absolute baseline.
 2. Merge the project config (`.claw/config.toml`) -- project-specific overrides.
-3. Merge the user config (`~/.config/claw-code/config.toml`) -- user-wide preferences.
+3. Merge the user config (`~/.config/mini-claw/config.toml`) -- user-wide preferences.
 4. Apply environment variables -- the ultimate override.
 
 Each merge takes the current accumulated config as the base and the new layer as the overlay. Non-default overlay values replace the base. This means user config beats project config, and environment variables beat everything.
@@ -329,13 +329,13 @@ This deserializes into a `Config` with the custom model and defaults for everyth
 
 ```rust
 fn apply_env(mut config: Config) -> Config {
-    if let Ok(model) = std::env::var("CLAW_MODEL") {
+    if let Ok(model) = std::env::var("MINI_CLAW_MODEL") {
         config.model = model;
     }
-    if let Ok(url) = std::env::var("CLAW_BASE_URL") {
+    if let Ok(url) = std::env::var("MINI_CLAW_BASE_URL") {
         config.base_url = url;
     }
-    if let Ok(tokens) = std::env::var("CLAW_MAX_TOKENS") {
+    if let Ok(tokens) = std::env::var("MINI_CLAW_MAX_TOKENS") {
         if let Ok(n) = tokens.parse::<u64>() {
             config.max_context_tokens = n;
         }
@@ -348,7 +348,7 @@ Environment variables are the simplest layer -- no files, no parsing, no merge l
 
 Only three fields have environment variable support: `model`, `base_url`, and `max_context_tokens`. These are the fields most commonly overridden in CI and scripting contexts. Safety fields like `blocked_commands` and `protected_patterns` are intentionally excluded from environment overrides -- you do not want a compromised environment variable to disable your safety rules.
 
-Notice the double-parse for `CLAW_MAX_TOKENS`: first `std::env::var` to get the string, then `.parse::<u64>()` to convert it to a number. If the string is not a valid integer, the parse silently fails and the existing value is kept. No panic, no error message. This is the right behavior for environment variables -- a typo in `CLAW_MAX_TOKENS=abc` should not crash the agent.
+Notice the double-parse for `MINI_CLAW_MAX_TOKENS`: first `std::env::var` to get the string, then `.parse::<u64>()` to convert it to a number. If the string is not a valid integer, the parse silently fails and the existing value is kept. No panic, no error message. This is the right behavior for environment variables -- a typo in `MINI_CLAW_MAX_TOKENS=abc` should not crash the agent.
 
 ---
 
@@ -400,7 +400,7 @@ pub fn record(&mut self, usage: &crate::types::TokenUsage) {
 
 Called after each provider response. The `TokenUsage` struct (from Chapter 1) carries the per-request token counts. The tracker accumulates them and increments the turn counter.
 
-Note that `record` takes a reference to `TokenUsage`, not ownership. The caller typically has the usage attached to an `AssistantMessage` and should not have to give it up just to record costs.
+Note that `record` takes a reference to `TokenUsage`, not ownership. The caller typically has the usage attached to an `AssistantTurn` and should not have to give it up just to record costs.
 
 ### Computing cost
 
@@ -479,7 +479,7 @@ blocked_commands = ["rm -rf /", "git push --force"]
 instructions = "Always run cargo fmt after editing Rust files."
 ```
 
-And a user's `~/.config/claw-code/config.toml`:
+And a user's `~/.config/mini-claw/config.toml`:
 
 ```toml
 model = "anthropic/claude-sonnet-4-20250514"
@@ -491,7 +491,7 @@ When both exist, the loader merges them:
 1. **Defaults** -- all fields get their default values.
 2. **Project config** -- `model` overrides (but happens to match default), `max_context_tokens` becomes 100000, `protected_patterns` and `blocked_commands` are set, `instructions` is set.
 3. **User config** -- `model` still matches default so the project value (also default) is kept. `base_url` overrides to the proxy URL.
-4. **Environment** -- if `CLAW_MODEL` is set, it overrides everything.
+4. **Environment** -- if `MINI_CLAW_MODEL` is set, it overrides everything.
 
 The final config has the project's safety rules, the user's proxy URL, and defaults for everything else. Each layer contributes what it knows without needing to repeat what it does not care about.
 
@@ -518,7 +518,7 @@ Despite these differences, the layered architecture is the same. Settings flow f
 Run the chapter 14 tests:
 
 ```bash
-cargo test -p claw-code test_ch14
+cargo test -p mini-claw-code-starter test_ch14
 ```
 
 There are 19 tests organized into four groups.

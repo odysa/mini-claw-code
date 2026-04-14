@@ -8,31 +8,16 @@ In this chapter you will build the `BashTool`. It takes a command string, runs i
 
 ## The BashTool
 
-Open `src/tools/bash.rs`. Here is the complete implementation:
+Open `src/tools/bash.rs`. Here is the starter stub:
 
 ```rust
-use async_trait::async_trait;
+use anyhow::Context;
 use serde_json::Value;
 
 use crate::types::*;
 
 pub struct BashTool {
-    def: ToolDefinition,
-}
-
-impl BashTool {
-    pub fn new() -> Self {
-        Self {
-            def: ToolDefinition::new("bash", "Run a bash command and return its output")
-                .param("command", "string", "The bash command to run", true)
-                .param(
-                    "timeout",
-                    "integer",
-                    "Timeout in seconds (default: 120)",
-                    false,
-                ),
-        }
-    }
+    definition: ToolDefinition,
 }
 
 impl Default for BashTool {
@@ -41,44 +26,60 @@ impl Default for BashTool {
     }
 }
 
-#[async_trait]
+impl BashTool {
+    /// Schema: one required "command" parameter (string).
+    pub fn new() -> Self {
+        unimplemented!(
+            "Use ToolDefinition::new(name, description).param(...) to define a required \"command\" parameter"
+        )
+    }
+}
+
+#[async_trait::async_trait]
 impl Tool for BashTool {
     fn definition(&self) -> &ToolDefinition {
-        &self.def
+        &self.definition
     }
 
-    async fn call(&self, args: Value) -> anyhow::Result<ToolResult> {
+    async fn call(&self, _args: Value) -> anyhow::Result<String> {
+        unimplemented!(
+            "Extract command, run bash -c, combine stdout + stderr, return \"(no output)\" if both empty"
+        )
+    }
+}
+```
+
+You need to fill in `new()` and `call()`. Here is the complete implementation:
+
+```rust
+impl BashTool {
+    pub fn new() -> Self {
+        Self {
+            definition: ToolDefinition::new("bash", "Run a bash command and return its output")
+                .param("command", "string", "The bash command to run", true),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl Tool for BashTool {
+    fn definition(&self) -> &ToolDefinition {
+        &self.definition
+    }
+
+    async fn call(&self, args: Value) -> anyhow::Result<String> {
         let command = args["command"]
             .as_str()
-            .ok_or_else(|| anyhow::anyhow!("missing 'command' argument"))?;
+            .context("missing 'command' argument")?;
 
-        let timeout_secs = args
-            .get("timeout")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(120);
-
-        let output = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_secs),
-            tokio::process::Command::new("bash")
-                .arg("-c")
-                .arg(command)
-                .output(),
-        )
-        .await;
-
-        let output = match output {
-            Ok(Ok(o)) => o,
-            Ok(Err(e)) => return Ok(ToolResult::error(format!("failed to run command: {e}"))),
-            Err(_) => {
-                return Ok(ToolResult::error(format!(
-                    "command timed out after {timeout_secs}s"
-                )));
-            }
-        };
+        let output = tokio::process::Command::new("bash")
+            .arg("-c")
+            .arg(command)
+            .output()
+            .await?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
-        let exit_code = output.status.code().unwrap_or(-1);
 
         let mut result = String::new();
         if !stdout.is_empty() {
@@ -92,40 +93,11 @@ impl Tool for BashTool {
             result.push_str(&stderr);
         }
 
-        if exit_code != 0 {
-            if !result.is_empty() {
-                result.push('\n');
-            }
-            result.push_str(&format!("exit code: {exit_code}"));
-        }
-
         if result.is_empty() {
             result.push_str("(no output)");
         }
 
-        Ok(ToolResult::text(result))
-    }
-
-    fn is_destructive(&self) -> bool {
-        true
-    }
-
-    fn summary(&self, args: &Value) -> String {
-        match args.get("command").and_then(|v| v.as_str()) {
-            Some(cmd) => {
-                let short = if cmd.len() > 60 {
-                    format!("{}...", &cmd[..57])
-                } else {
-                    cmd.to_string()
-                };
-                format!("[bash: {short}]")
-            }
-            None => "[bash]".into(),
-        }
-    }
-
-    fn activity_description(&self, _args: &Value) -> Option<String> {
-        Some("Running command...".into())
+        Ok(result)
     }
 }
 ```
@@ -137,35 +109,56 @@ Let's walk through each piece.
 ```rust
 ToolDefinition::new("bash", "Run a bash command and return its output")
     .param("command", "string", "The bash command to run", true)
-    .param("timeout", "integer", "Timeout in seconds (default: 120)", false)
 ```
 
-Two parameters. `command` is a required string -- the shell command to execute. `timeout` is an optional integer that lets the LLM override the default timeout. Most tool calls will not include a timeout; 120 seconds is generous for typical operations like running tests or compiling code. But if the LLM knows a command will be slow (a large build, a network operation), it can request more time.
+One required parameter: `command` -- the shell command to execute. The
+description "Run a bash command and return its output" is deliberately simple.
+The LLM already knows what bash is. Over-describing the tool wastes prompt
+tokens and can confuse the model into overthinking when to use it.
 
-The description "Run a bash command and return its output" is deliberately simple. The LLM already knows what bash is. Over-describing the tool wastes prompt tokens and can confuse the model into overthinking when to use it.
+As an extension, you could add a `timeout` parameter to let the LLM override
+the default timeout for long-running commands. The reference implementation
+includes this.
 
 ### Argument extraction
 
 ```rust
 let command = args["command"]
     .as_str()
-    .ok_or_else(|| anyhow::anyhow!("missing 'command' argument"))?;
-
-let timeout_secs = args
-    .get("timeout")
-    .and_then(|v| v.as_u64())
-    .unwrap_or(120);
+    .context("missing 'command' argument")?;
 ```
 
-The `command` extraction uses `ok_or_else` with `?` to return an `Err` if the argument is missing. This is one of the rare cases where we return a genuine error rather than `ToolResult::error(...)` -- a bash call without a command is a protocol violation, not a tool failure. The LLM should never produce this, and if it does, the query engine's error handling will catch it.
-
-The `timeout` extraction uses the more defensive pattern: `get` + `and_then` + `unwrap_or`. If the key is missing, if it is not a number, or if it is null, we silently default to 120. This is the right approach for optional parameters -- be permissive on input, strict on output.
+The `command` extraction uses `.context(...)` with `?` to return an `Err` if the argument is missing. A bash call without a command is a protocol violation, not a tool failure. The LLM should never produce this, and if it does, the agent's error handling will catch it.
 
 ### Running the command
 
 ```rust
+let output = tokio::process::Command::new("bash")
+    .arg("-c")
+    .arg(command)
+    .output()
+    .await?;
+```
+
+Two layers here, each doing one thing:
+
+1. **`tokio::process::Command`** spawns an async subprocess. We use `bash -c` so the command string is interpreted by bash, not executed as a raw binary. This means pipes, redirects, semicolons, and all other shell features work: `echo hello | wc -c`, `ls > out.txt`, `cd /tmp && pwd`.
+
+2. **`.output()`** collects the process's stdout, stderr, and exit status. This buffers everything in memory. For a production agent you would want streaming (pipe stdout/stderr to the TUI in real time), but buffered collection is simpler and sufficient for our purposes.
+
+If the process fails to spawn (bash not found, OS refuses to create the process),
+the `?` operator propagates the error up. The agent loop catches it and reports
+it to the LLM.
+
+## Adding a timeout (extension)
+
+Without a timeout, a single bad command can hang the agent forever. The LLM might run `sleep infinity`, start a server that listens on a port, or trigger an interactive program that waits for stdin. Any of these blocks the agent loop indefinitely -- no more tool calls, no more responses, just a frozen process burning compute.
+
+As an extension, you can wrap the command in `tokio::time::timeout`:
+
+```rust
 let output = tokio::time::timeout(
-    std::time::Duration::from_secs(timeout_secs),
+    std::time::Duration::from_secs(120),
     tokio::process::Command::new("bash")
         .arg("-c")
         .arg(command)
@@ -174,54 +167,17 @@ let output = tokio::time::timeout(
 .await;
 ```
 
-Three layers here, each doing one thing:
-
-1. **`tokio::process::Command`** spawns an async subprocess. We use `bash -c` so the command string is interpreted by bash, not executed as a raw binary. This means pipes, redirects, semicolons, and all other shell features work: `echo hello | wc -c`, `ls > out.txt`, `cd /tmp && pwd`.
-
-2. **`.output()`** collects the process's stdout, stderr, and exit status. This buffers everything in memory. For a production agent you would want streaming (pipe stdout/stderr to the TUI in real time), but buffered collection is simpler and sufficient for our purposes.
-
-3. **`tokio::time::timeout`** wraps the entire operation in a deadline. If the command does not finish within `timeout_secs` seconds, the future is cancelled and we get an `Err(Elapsed)`.
-
-## The timeout design
-
-Without a timeout, a single bad command can hang the agent forever. The LLM might run `sleep infinity`, start a server that listens on a port, or trigger an interactive program that waits for stdin. Any of these blocks the agent loop indefinitely -- no more tool calls, no more responses, just a frozen process burning compute.
-
-The timeout gives us a hard deadline. After it expires, we return an error message to the LLM and the loop continues. The model sees "command timed out after 120s" and can adjust -- run a different command, add a timeout flag, or tell the user the operation is too slow.
-
-### The two-level Result
-
-The `timeout` + `output()` combination produces a nested `Result` that deserves careful attention:
-
-```rust
-let output = match output {
-    Ok(Ok(o)) => o,
-    Ok(Err(e)) => return Ok(ToolResult::error(format!("failed to run command: {e}"))),
-    Err(_) => {
-        return Ok(ToolResult::error(format!(
-            "command timed out after {timeout_secs}s"
-        )));
-    }
-};
-```
-
-Three cases:
-
-- **`Ok(Ok(output))`** -- The command finished within the timeout and the process spawned successfully. This is the happy path. `output` is a `std::process::Output` containing stdout, stderr, and exit status.
-
-- **`Ok(Err(e))`** -- The timeout did not expire, but the process failed to spawn. This happens when `bash` itself is not found (unlikely on most systems) or when the OS refuses to create the process (too many open files, permission denied). We return a `ToolResult::error` so the LLM can see what went wrong.
-
-- **`Err(_)`** -- The timeout elapsed. The command is still running somewhere (the OS process is not automatically killed -- more on this in the Claude Code comparison below). We return a `ToolResult::error` with the timeout message.
-
-All three cases return `Ok(...)` from the function. Tool failures are values, not errors. The agent loop continues regardless.
+This produces a nested `Result`: `Ok(Ok(output))` for success, `Ok(Err(e))`
+for spawn failures, and `Err(_)` for timeouts. The reference implementation
+includes this pattern.
 
 ## Output format
 
-The output construction logic handles four concerns: stdout, stderr, exit code, and the empty case.
+The output construction logic handles three concerns: stdout, stderr, and the empty case.
 
 ```rust
 let stdout = String::from_utf8_lossy(&output.stdout);
 let stderr = String::from_utf8_lossy(&output.stderr);
-let exit_code = output.status.code().unwrap_or(-1);
 
 let mut result = String::new();
 if !stdout.is_empty() {
@@ -233,13 +189,6 @@ if !stderr.is_empty() {
     }
     result.push_str("stderr: ");
     result.push_str(&stderr);
-}
-
-if exit_code != 0 {
-    if !result.is_empty() {
-        result.push('\n');
-    }
-    result.push_str(&format!("exit code: {exit_code}"));
 }
 
 if result.is_empty() {
@@ -255,43 +204,24 @@ Walk through each decision:
 
 **Stderr is prefixed with `"stderr: "`.** This lets the LLM distinguish normal output from error output. Many commands write diagnostics to stderr even on success (compiler warnings, progress indicators, deprecation notices). The prefix prevents the model from misinterpreting warnings as failures. The newline before the prefix is only added if stdout was non-empty, keeping the output clean when stderr is the only content.
 
-**Exit code appears only on non-zero.** A zero exit code means success -- reporting it would be noise. A non-zero code is meaningful information: `exit code: 1` usually means a general error, `exit code: 2` often means misuse, `exit code: 127` means command not found, `exit code: 137` means killed by signal. The LLM can use these codes to diagnose problems. The `unwrap_or(-1)` handles the case where the process was killed by a signal and has no exit code -- we report -1 as a sentinel.
-
 **`"(no output)"` for silent commands.** Commands like `true`, `mkdir -p /tmp/foo`, or `cp a b` produce no stdout and no stderr on success. Returning an empty string would confuse the LLM -- it might think the tool failed or the result was lost. The sentinel string confirms the command ran and had nothing to say.
 
-## Safety flags
+As an extension, you could also report non-zero exit codes in the output string.
+The reference implementation appends `"exit code: N"` when the process exits
+with a non-zero status, helping the LLM diagnose failures.
 
-```rust
-fn is_destructive(&self) -> bool {
-    true
-}
-```
+## Safety considerations
 
-The bash tool is the only tool that returns `true` for `is_destructive`. This flag has concrete consequences in the permission system (Chapter 10): destructive tools require explicit user approval even when the agent is running in auto-approve mode. The reasoning is straightforward -- bash can do anything, including things that are irreversible. `rm -rf /`, `dd if=/dev/zero of=/dev/sda`, `curl ... | bash` -- these are all valid bash commands that the LLM could produce.
+The bash tool is the most dangerous tool in the agent's arsenal. It can run
+anything -- `rm -rf /`, `dd if=/dev/zero of=/dev/sda`, `curl ... | bash`.
+The starter's simplified `Tool` trait does not include safety flags like
+`is_destructive()`, but in a production agent (and in the reference
+implementation), the bash tool would be marked as destructive, requiring explicit
+user approval even in auto-approve mode.
 
-Notice that `is_read_only()` and `is_concurrent_safe()` both return their default `false`. Bash commands can write to the filesystem, so they are not read-only. Bash commands can interfere with each other (two concurrent `cargo build` invocations will race on the target directory), so they are not concurrent-safe.
-
-## The summary method
-
-```rust
-fn summary(&self, args: &Value) -> String {
-    match args.get("command").and_then(|v| v.as_str()) {
-        Some(cmd) => {
-            let short = if cmd.len() > 60 {
-                format!("{}...", &cmd[..57])
-            } else {
-                cmd.to_string()
-            };
-            format!("[bash: {short}]")
-        }
-        None => "[bash]".into(),
-    }
-}
-```
-
-The summary is displayed in the TUI when the agent invokes a tool. It needs to be short -- a single line that tells the user what is happening. Long commands like `find /usr -name '*.so' -exec readelf -d {} \; | grep NEEDED | sort -u` get truncated to 60 characters with an ellipsis. The truncation point is 57 characters plus `"..."` to stay within the 60-character budget.
-
-If the command argument is missing (which should not happen in practice), the fallback is just `"[bash]"`.
+The starter `Tool` trait has only `definition()` and `call()`. Adding safety
+metadata (read-only, destructive, concurrent-safe flags) is an extension topic
+covered in later chapters.
 
 ## Safety warning
 
@@ -331,14 +261,12 @@ Our version is the core protocol without the safety wrapping -- the minimal viab
 Run the chapter 7 tests:
 
 ```bash
-cargo test -p claw-code test_ch7
+cargo test -p mini-claw-code-starter test_ch7
 ```
 
 Here is what each test verifies:
 
 **`test_ch7_bash_echo`** -- The simplest case. Runs `echo hello` and checks that the output contains "hello". Verifies that basic command execution works and stdout is captured.
-
-**`test_ch7_bash_exit_code`** -- Runs `exit 42` and checks that the output contains "exit code: 42". Verifies that non-zero exit codes are reported in the output.
 
 **`test_ch7_bash_stderr`** -- Runs `echo oops >&2` (redirects to stderr) and checks that the output contains the "stderr:" prefix and the message. Verifies that stderr is captured and labeled.
 
@@ -346,13 +274,7 @@ Here is what each test verifies:
 
 **`test_ch7_bash_no_output`** -- Runs `true` (a command that succeeds silently) and checks that the output is exactly `"(no output)"`. Verifies the sentinel string for commands with no output.
 
-**`test_ch7_bash_timeout`** -- Runs `sleep 10` with a 1-second timeout and checks that the output contains "timed out". Verifies that the timeout mechanism works and returns an error message rather than hanging.
-
-**`test_ch7_bash_is_destructive`** -- Checks that `is_destructive()` returns `true`, `is_read_only()` returns `false`, and `is_concurrent_safe()` returns `false`. Verifies the safety flags.
-
 **`test_ch7_bash_definition`** -- Checks that the tool name is "bash" and the description mentions "bash". Verifies the tool definition.
-
-**`test_ch7_bash_summary`** -- Checks that `summary({"command": "ls -la"})` returns `"[bash: ls -la]"`. Verifies the TUI display string.
 
 **`test_ch7_bash_multiline`** -- Runs `echo one; echo two; echo three` and checks that all three lines appear. Verifies that multi-command pipelines work through `bash -c`.
 
@@ -362,14 +284,15 @@ Here is what each test verifies:
 
 You have built the bash tool -- the most important and most dangerous tool in the agent's toolkit:
 
-- **`command` + `timeout`** are the two parameters. The command is required; the timeout defaults to 120 seconds.
+- **`command`** is the one required parameter.
 - **`tokio::process::Command`** with `bash -c` gives the LLM full shell access -- pipes, redirects, variables, and everything else bash supports.
-- **`tokio::time::timeout`** prevents hung commands from blocking the agent forever. The two-level `Result` cleanly separates timeouts from spawn failures from successful execution.
-- **Output format** combines stdout, labeled stderr, and non-zero exit codes into a single string. Silent commands return `"(no output)"` so the LLM knows the command ran.
-- **`is_destructive: true`** marks this as the one tool that requires explicit approval in the permission system.
+- **Output format** combines stdout and labeled stderr into a single string. Silent commands return `"(no output)"` so the LLM knows the command ran.
 - **No safety rails** -- this chapter builds the raw capability. The permission engine, safety classifier, hooks, and plan mode come in later chapters.
 
-The bash tool completes the core tool set. Your agent can now read files, write files, edit files, and run arbitrary commands. With the query engine from Chapter 4 driving the loop, you have a functioning coding agent -- one that can understand a codebase, make changes, run tests, and iterate until the job is done.
+As extensions, you could add a `timeout` parameter (to prevent hung commands),
+exit code reporting, and safety flags like `is_destructive()`.
+
+The bash tool completes the core tool set. Your agent can now read files, write files, edit files, and run arbitrary commands. With the `SimpleAgent` from the earlier chapters driving the loop, you have a functioning coding agent -- one that can understand a codebase, make changes, run tests, and iterate until the job is done.
 
 ## What's next
 

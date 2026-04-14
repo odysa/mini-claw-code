@@ -32,29 +32,18 @@ coordinate system for the file. This becomes critical in the Edit tool, where
 the model needs to provide an exact string match -- line numbers help it locate
 and copy the right chunk.
 
-### The full implementation
+### The starter stub
 
-Create `src/tools/read.rs`:
+Open `src/tools/read.rs`:
 
 ```rust
-use async_trait::async_trait;
+use anyhow::Context;
 use serde_json::Value;
 
 use crate::types::*;
 
 pub struct ReadTool {
-    def: ToolDefinition,
-}
-
-impl ReadTool {
-    pub fn new() -> Self {
-        Self {
-            def: ToolDefinition::new("read", "Read the contents of a file")
-                .param("path", "string", "Absolute path to the file", true)
-                .param("offset", "integer", "Line number to start reading from (1-based)", false)
-                .param("limit", "integer", "Maximum number of lines to read", false),
-        }
-    }
+    definition: ToolDefinition,
 }
 
 impl Default for ReadTool {
@@ -63,98 +52,75 @@ impl Default for ReadTool {
     }
 }
 
-#[async_trait]
+impl ReadTool {
+    /// Create a new ReadTool with its JSON schema definition.
+    ///
+    /// The schema should declare one required parameter: "path" (string).
+    pub fn new() -> Self {
+        unimplemented!(
+            "Create a ToolDefinition with name \"read\" and a required \"path\" parameter"
+        )
+    }
+}
+
+#[async_trait::async_trait]
 impl Tool for ReadTool {
     fn definition(&self) -> &ToolDefinition {
-        &self.def
+        &self.definition
     }
 
-    async fn call(&self, args: Value) -> anyhow::Result<ToolResult> {
-        let path = args["path"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("missing 'path' argument"))?;
-
-        let content = tokio::fs::read_to_string(path)
-            .await
-            .map_err(|e| anyhow::anyhow!("failed to read '{path}': {e}"))?;
-
-        let lines: Vec<&str> = content.lines().collect();
-        let total = lines.len();
-
-        let offset = args.get("offset").and_then(|v| v.as_u64()).unwrap_or(1) as usize;
-        let start = offset.saturating_sub(1).min(total);
-
-        let limit = args
-            .get("limit")
-            .and_then(|v| v.as_u64())
-            .map(|n| n as usize)
-            .unwrap_or(total);
-
-        let end = (start + limit).min(total);
-        let selected = &lines[start..end];
-
-        let numbered: Vec<String> = selected
-            .iter()
-            .enumerate()
-            .map(|(i, line)| format!("{}\t{}", start + i + 1, line))
-            .collect();
-
-        Ok(ToolResult::text(numbered.join("\n")))
-    }
-
-    fn is_read_only(&self) -> bool {
-        true
-    }
-
-    fn is_concurrent_safe(&self) -> bool {
-        true
-    }
-
-    fn activity_description(&self, _args: &Value) -> Option<String> {
-        Some("Reading file...".into())
+    async fn call(&self, _args: Value) -> anyhow::Result<String> {
+        unimplemented!(
+            "Extract \"path\" from args, read file with tokio::fs::read_to_string, return contents"
+        )
     }
 }
 ```
 
-### Walking through the code
+You need to fill in two methods:
 
-**The definition.** Three parameters: `path` (required), `offset` (optional),
-and `limit` (optional). The LLM sees these as a JSON Schema and knows it must
-provide `path` but can omit the others. The parameter types are `"string"` for
-the path and `"integer"` for the numeric parameters.
+1. **`new()`** -- build a `ToolDefinition` with name `"read"` and a required `"path"` parameter.
+2. **`call()`** -- extract the path, read the file, and return its contents.
 
-**Reading the file.** We use `tokio::fs::read_to_string` for async file I/O.
-If the file does not exist or cannot be read, we return an `Err` -- this is one
-of the few cases where we use `Err` rather than `ToolResult::error`, because a
-missing file in this context signals a genuine argument error (the LLM provided
-a bad path), not a recoverable tool-level issue. The query engine will convert
-this to a `ToolResult::error` before the model sees it, so the agent loop still
-continues.
+### Implementing the ReadTool
 
-**Line slicing.** The `offset` parameter is 1-based (matching `cat -n`
-convention and how humans think about line numbers). We convert to 0-based with
-`saturating_sub(1)` and clamp to `total` so out-of-range offsets do not panic.
-When `offset` is not provided, it defaults to `1` (the first line). When
-`limit` is not provided, it defaults to the total number of lines -- read
-everything.
+**The definition.** One required parameter: `path`. The LLM sees this as a JSON
+Schema and knows it must provide `path`.
 
-**Formatting.** Each line is prefixed with its 1-based line number and a tab
-character: `"42\tlet x = 5;"`. This matches the format of `cat -n`, which is
-well-represented in the model's training data. The tab separator is important --
-it cleanly separates the number from the content even when lines start with
-digits.
+```rust
+pub fn new() -> Self {
+    Self {
+        definition: ToolDefinition::new("read", "Read the contents of a file.")
+            .param("path", "string", "Absolute path to the file", true),
+    }
+}
+```
 
-**Safety flags.** `is_read_only: true` tells the permission system this tool
-never modifies anything. `is_concurrent_safe: true` tells the query engine it
-is safe to run multiple reads in parallel -- there is no shared mutable state.
+**The `call()` method.** Read the file and return its contents as a `String`:
 
-**No `summary()` override.** The default `summary()` from the `Tool` trait
-checks for common argument names (`command`, `path`, `question`, `pattern`) and
-formats them as `[name: detail]`. Since `ReadTool` uses `path`, the default
-produces `[read: /path/to/file]` -- exactly what we want. Only override
-`summary()` when your tool's primary argument is not one of the standard names.
+```rust
+async fn call(&self, args: Value) -> anyhow::Result<String> {
+    let path = args["path"]
+        .as_str()
+        .context("missing 'path' argument")?;
 
-**`activity_description`** returns `"Reading file..."` for the TUI spinner.
+    let content = tokio::fs::read_to_string(path)
+        .await
+        .with_context(|| format!("failed to read '{path}'"))?;
+
+    Ok(content)
+}
+```
+
+Notice that `call()` returns `anyhow::Result<String>`, not `ToolResult`. The
+starter's `Tool` trait is simplified -- tools return plain strings on success.
+If the tool encounters an error (missing argument, I/O failure), it returns
+`Err(...)`. The agent loop converts errors to error messages that the LLM sees.
+
+**Possible extensions.** The reference implementation adds `offset` and `limit`
+parameters for partial reads, and formats output with tab-separated line numbers
+(like `cat -n`). These are useful for large files but not required for the
+starter. You could add them later as optional parameters.
 
 ### What the output looks like
 
@@ -166,24 +132,17 @@ beta
 gamma
 ```
 
-The tool returns:
+The tool returns the raw file contents:
 
 ```
-1	alpha
-2	beta
-3	gamma
+alpha
+beta
+gamma
 ```
 
-With `offset: 2, limit: 1`:
-
-```
-2	beta
-```
-
-The line numbers in the output always reflect the actual position in the file,
-not the position in the sliced result. This is essential -- when the LLM sees
-`2\tbeta`, it knows that `beta` is on line 2 of the file, not "the first line
-of what I requested."
+This is the simplest approach. The reference implementation adds line numbers
+and partial-read support, which are useful for large files and for giving the
+LLM precise line references for later edits.
 
 ---
 
@@ -199,28 +158,18 @@ directory." The agent would then need to call `bash("mkdir -p ...")` and retry.
 This wastes a tool-use round and confuses the model. Better to handle it
 silently.
 
-### The full implementation
+### The starter stub
 
-Create `src/tools/write.rs`:
+Open `src/tools/write.rs`:
 
 ```rust
-use async_trait::async_trait;
+use anyhow::Context;
 use serde_json::Value;
 
 use crate::types::*;
 
 pub struct WriteTool {
-    def: ToolDefinition,
-}
-
-impl WriteTool {
-    pub fn new() -> Self {
-        Self {
-            def: ToolDefinition::new("write", "Write content to a file, creating directories as needed")
-                .param("path", "string", "Absolute path to write to", true)
-                .param("content", "string", "Content to write", true),
-        }
-    }
+    definition: ToolDefinition,
 }
 
 impl Default for WriteTool {
@@ -229,42 +178,70 @@ impl Default for WriteTool {
     }
 }
 
-#[async_trait]
+impl WriteTool {
+    /// Schema: required "path" and "content" parameters.
+    pub fn new() -> Self {
+        unimplemented!(
+            "Use ToolDefinition::new(name, description).param(...).param(...)"
+        )
+    }
+}
+
+#[async_trait::async_trait]
 impl Tool for WriteTool {
     fn definition(&self) -> &ToolDefinition {
-        &self.def
+        &self.definition
     }
 
-    async fn call(&self, args: Value) -> anyhow::Result<ToolResult> {
-        let path = args["path"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("missing 'path' argument"))?;
-        let content = args["content"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("missing 'content' argument"))?;
-
-        // Create parent directories
-        if let Some(parent) = std::path::Path::new(path).parent() {
-            if !parent.as_os_str().is_empty() {
-                tokio::fs::create_dir_all(parent)
-                    .await
-                    .map_err(|e| anyhow::anyhow!("failed to create directories for '{path}': {e}"))?;
-            }
-        }
-
-        tokio::fs::write(path, content)
-            .await
-            .map_err(|e| anyhow::anyhow!("failed to write '{path}': {e}"))?;
-
-        let bytes = content.len();
-        Ok(ToolResult::text(format!("wrote {bytes} bytes to {path}")))
-    }
-
-    fn activity_description(&self, _args: &Value) -> Option<String> {
-        Some("Writing file...".into())
+    async fn call(&self, _args: Value) -> anyhow::Result<String> {
+        unimplemented!(
+            "Extract path and content, create parent dirs, write file, return format!(\"wrote {path}\")"
+        )
     }
 }
 ```
+
+### Implementing the WriteTool
+
+**The definition.** Two required parameters: `path` and `content`.
+
+```rust
+pub fn new() -> Self {
+    Self {
+        definition: ToolDefinition::new("write", "Write content to a file, creating directories as needed")
+            .param("path", "string", "Absolute path to write to", true)
+            .param("content", "string", "Content to write", true),
+    }
+}
+```
+
+**The `call()` method.** Extract the arguments, create parent directories,
+write the file, and return a confirmation string:
+
+```rust
+async fn call(&self, args: Value) -> anyhow::Result<String> {
+    let path = args["path"]
+        .as_str()
+        .context("missing 'path' argument")?;
+    let content = args["content"]
+        .as_str()
+        .context("missing 'content' argument")?;
+
+    // Create parent directories
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        if !parent.as_os_str().is_empty() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+    }
+
+    tokio::fs::write(path, content).await?;
+
+    Ok(format!("wrote {path}"))
+}
+```
+
+The return value is `format!("wrote {path}")` -- a simple confirmation string.
+The agent sees this and knows the write succeeded.
 
 ### Walking through the code
 
@@ -283,17 +260,8 @@ exists and creates it if it does not. There is no append mode, no conflict
 detection. This is deliberate -- the tool is a clean write, not a merge. If the
 LLM wants to modify an existing file, it should use the Edit tool.
 
-**Byte count confirmation.** The result reports `"wrote 42 bytes to /path/to/file"`.
-This gives the model confirmation that the write succeeded and how much data was
-written. It is a small detail that helps the model verify its own work.
-
-**Not destructive.** `WriteTool` uses all the default safety flags: not
-read-only, not concurrent-safe, not destructive. This might seem wrong for
-a tool that overwrites files, but in practice any file the agent writes
-is either new (no data loss) or already tracked by git (recoverable with
-`git checkout`). Claude Code makes the same classification. Truly destructive
-operations are things like `rm -rf` or database drops -- irreversible even with
-version control.
+**Confirmation string.** The result reports `"wrote /path/to/file"`. This gives
+the model confirmation that the write succeeded.
 
 ---
 
@@ -313,32 +281,18 @@ strings slightly wrong (missing whitespace, wrong indentation, stale content
 from a previous edit). The tool must report these failures clearly so the model
 can correct itself.
 
-### The full implementation
+### The starter stub
 
-Create `src/tools/edit.rs`:
+Open `src/tools/edit.rs`:
 
 ```rust
-use async_trait::async_trait;
+use anyhow::{Context, bail};
 use serde_json::Value;
 
 use crate::types::*;
 
 pub struct EditTool {
-    def: ToolDefinition,
-}
-
-impl EditTool {
-    pub fn new() -> Self {
-        Self {
-            def: ToolDefinition::new(
-                "edit",
-                "Replace an exact string in a file. The old_string must appear exactly once.",
-            )
-            .param("path", "string", "Absolute path to the file to edit", true)
-            .param("old_string", "string", "The exact string to find", true)
-            .param("new_string", "string", "The replacement string", true),
-        }
-    }
+    definition: ToolDefinition,
 }
 
 impl Default for EditTool {
@@ -347,68 +301,82 @@ impl Default for EditTool {
     }
 }
 
-#[async_trait]
+impl EditTool {
+    /// Schema: required "path", "old_string", "new_string" parameters.
+    pub fn new() -> Self {
+        unimplemented!(
+            "Use ToolDefinition::new(name, description).param(...).param(...).param(...)"
+        )
+    }
+}
+
+#[async_trait::async_trait]
 impl Tool for EditTool {
     fn definition(&self) -> &ToolDefinition {
-        &self.def
+        &self.definition
     }
 
-    async fn call(&self, args: Value) -> anyhow::Result<ToolResult> {
-        let path = args["path"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("missing 'path' argument"))?;
-        let old = args["old_string"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("missing 'old_string' argument"))?;
-        let new = args["new_string"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("missing 'new_string' argument"))?;
-
-        let content = tokio::fs::read_to_string(path)
-            .await
-            .map_err(|e| anyhow::anyhow!("failed to read '{path}': {e}"))?;
-
-        let count = content.matches(old).count();
-        if count == 0 {
-            return Ok(ToolResult::error(format!(
-                "old_string not found in '{path}'"
-            )));
-        }
-        if count > 1 {
-            return Ok(ToolResult::error(format!(
-                "old_string appears {count} times in '{path}', must be unique"
-            )));
-        }
-
-        let updated = content.replacen(old, new, 1);
-        tokio::fs::write(path, &updated)
-            .await
-            .map_err(|e| anyhow::anyhow!("failed to write '{path}': {e}"))?;
-
-        Ok(ToolResult::text(format!("edited {path}")))
-    }
-
-    fn validate_input(&self, args: &Value) -> ValidationResult {
-        if args.get("old_string").and_then(|v| v.as_str()).is_none() {
-            return ValidationResult::Error {
-                message: "missing 'old_string' argument".into(),
-                code: 400,
-            };
-        }
-        if args.get("new_string").and_then(|v| v.as_str()).is_none() {
-            return ValidationResult::Error {
-                message: "missing 'new_string' argument".into(),
-                code: 400,
-            };
-        }
-        ValidationResult::Ok
-    }
-
-    fn activity_description(&self, _args: &Value) -> Option<String> {
-        Some("Editing file...".into())
+    async fn call(&self, _args: Value) -> anyhow::Result<String> {
+        unimplemented!(
+            "Extract args, read file, verify old_string appears exactly once, replace, write back"
+        )
     }
 }
 ```
+
+### Implementing the EditTool
+
+**The definition.** Three required parameters: `path`, `old_string`, and
+`new_string`.
+
+```rust
+pub fn new() -> Self {
+    Self {
+        definition: ToolDefinition::new(
+            "edit",
+            "Replace an exact string in a file. The old_string must appear exactly once.",
+        )
+        .param("path", "string", "Absolute path to the file to edit", true)
+        .param("old_string", "string", "The exact string to find", true)
+        .param("new_string", "string", "The replacement string", true),
+    }
+}
+```
+
+**The `call()` method.** Read the file, check uniqueness, replace, write back:
+
+```rust
+async fn call(&self, args: Value) -> anyhow::Result<String> {
+    let path = args["path"]
+        .as_str()
+        .context("missing 'path' argument")?;
+    let old = args["old_string"]
+        .as_str()
+        .context("missing 'old_string' argument")?;
+    let new = args["new_string"]
+        .as_str()
+        .context("missing 'new_string' argument")?;
+
+    let content = tokio::fs::read_to_string(path)
+        .await
+        .with_context(|| format!("failed to read '{path}'"))?;
+
+    let count = content.matches(old).count();
+    if count == 0 {
+        bail!("old_string not found in '{path}'");
+    }
+    if count > 1 {
+        bail!("old_string appears {count} times in '{path}', must be unique");
+    }
+
+    let updated = content.replacen(old, new, 1);
+    tokio::fs::write(path, &updated).await?;
+
+    Ok(format!("edited {path}"))
+}
+```
+
+The return value is `format!("edited {path}")` on success.
 
 ### Walking through the code
 
@@ -423,96 +391,40 @@ easy for the model to use correctly.
 ```rust
 let count = content.matches(old).count();
 if count == 0 {
-    return Ok(ToolResult::error(format!(
-        "old_string not found in '{path}'"
-    )));
+    bail!("old_string not found in '{path}'");
 }
 if count > 1 {
-    return Ok(ToolResult::error(format!(
-        "old_string appears {count} times in '{path}', must be unique"
-    )));
+    bail!("old_string appears {count} times in '{path}', must be unique");
 }
 ```
 
-Two branches, both returning `Ok(ToolResult::error(...))`. Not `Err(...)`. This
-is the most important pattern in the entire tool system. Let me explain why.
+Two branches, both returning errors via `bail!`. In the starter's simplified
+`Tool` trait, tools return `anyhow::Result<String>`. When the tool returns an
+`Err`, the agent loop converts it to an error message that the LLM sees. The
+model can then retry with a corrected string.
 
-### Errors are values: the key design lesson
+### Error handling in the simplified trait
 
-When the model asks to edit a file and the old string is not found, what should
-happen? There are three possible designs:
+The starter's `Tool` trait returns `anyhow::Result<String>` from `call()`. This
+means error handling is straightforward -- use `bail!()` or `?` for any failure,
+and the agent loop takes care of converting errors to messages the LLM can read.
 
-1. **Panic** -- crash the agent. Obviously wrong.
-2. **Return `Err(...)`** -- propagate an error up the call stack.
-3. **Return `Ok(ToolResult::error(...))`** -- tell the model what went wrong.
-
-Option 2 seems reasonable, but look at what happens in the query engine from
-Chapter 4. The `execute_tools` method calls `t.call(...)`:
+In the agent's `execute_tools` method, a tool call is handled like this:
 
 ```rust
-match t.call(call.arguments.clone()).await {
-    Ok(mut r) => { /* truncate and use */ }
-    Err(e) => ToolResult::error(e.to_string()),
+match tool.call(call.arguments.clone()).await {
+    Ok(result) => result,
+    Err(e) => format!("error: {e}"),
 }
 ```
 
-An `Err` from `call()` gets converted to `ToolResult::error(...)` anyway. So
-both paths end up in the same place. But option 3 is better for two reasons:
+An `Err` from `call()` becomes a string like `"error: old_string not found in 'foo.rs'"`.
+The model sees this and knows to try a different string.
 
-First, it makes the tool's intent clear. A not-found error is a **normal
-outcome**, not an exceptional condition. The file exists, the tool ran, the
-string just was not there. Returning `Ok` signals "I executed successfully;
-here is what I found (which is an error condition)." Returning `Err` signals
-"something went wrong during execution" -- which is misleading.
-
-Second, it gives the tool control over the error message. `ToolResult::error`
-produces a message prefixed with `"error: "`. The model sees
-`"error: old_string not found in 'foo.rs'"` and knows to try a different
-string. If we returned `Err(anyhow!(...))`, the message would go through
-`e.to_string()` and might lose formatting or context.
-
-This pattern applies throughout the codebase. Reserve `Err` for genuinely
-unrecoverable situations: I/O failures reading the file, serialization bugs,
-permissions errors at the OS level. Tool-level "this did not work" is always
-`Ok(ToolResult::error(...))`.
-
-### Input validation
-
-The Edit tool is the first tool that overrides `validate_input`:
-
-```rust
-fn validate_input(&self, args: &Value) -> ValidationResult {
-    if args.get("old_string").and_then(|v| v.as_str()).is_none() {
-        return ValidationResult::Error {
-            message: "missing 'old_string' argument".into(),
-            code: 400,
-        };
-    }
-    if args.get("new_string").and_then(|v| v.as_str()).is_none() {
-        return ValidationResult::Error {
-            message: "missing 'new_string' argument".into(),
-            code: 400,
-        };
-    }
-    ValidationResult::Ok
-}
-```
-
-Why validate here when `call()` also checks for these fields? Because
-`validate_input` runs **before** `call`, in the query engine's `execute_tools`
-method. If validation fails, `call()` is never invoked. This matters when the
-tool has side effects -- you do not want to read the file, start processing, and
-then discover a required argument is missing.
-
-For the Read and Write tools, the `call()` method handles missing arguments
-with `ok_or_else` and the default `validate_input` (which always returns `Ok`)
-is fine. But for Edit, where the operation is more complex and the error modes
-are richer, explicit validation catches the simplest failures early.
-
-The `code: 400` is a convention borrowed from HTTP status codes. 400 means "bad
-request" -- the caller (in this case, the LLM) sent invalid input. The
-permission engine can use this code to distinguish "bad input" from "permission
-denied" (which might use 403).
+A more sophisticated design (used by Claude Code) distinguishes between
+recoverable tool-level errors (returned as success values) and genuine I/O
+failures (returned as `Err`). The starter keeps things simple by using `Err`
+for both -- the agent loop handles them the same way regardless.
 
 ---
 
@@ -530,7 +442,7 @@ Here is what that looks like as tool calls:
 ```
 Agent: I'll create the handler file.
 -> write(path: "/tmp/project/handler.rs", content: "fn main() { println!(\"hello\"); }")
-<- "wrote 35 bytes to /tmp/project/handler.rs"
+<- "wrote /tmp/project/handler.rs"
 
 Agent: Let me update the greeting.
 -> edit(path: "/tmp/project/handler.rs", old_string: "hello", new_string: "goodbye")
@@ -538,7 +450,7 @@ Agent: Let me update the greeting.
 
 Agent: Let me verify the change.
 -> read(path: "/tmp/project/handler.rs")
-<- "1	fn main() { println!(\"goodbye\"); }"
+<- "fn main() { println!(\"goodbye\"); }"
 ```
 
 Each tool does one thing and communicates its result clearly. The agent sees
@@ -584,32 +496,32 @@ tool suite.
 ## 6.6 Tool file organization
 
 All three tools live in `src/tools/`, alongside the other tools you will build
-in later chapters. The module structure:
+in later chapters. The module structure in the starter:
 
 ```
 src/tools/
   mod.rs    -- re-exports all tools
+  ask.rs    -- AskTool (Chapter 11)
+  bash.rs   -- BashTool (Chapter 7)
+  edit.rs   -- EditTool
   read.rs   -- ReadTool
   write.rs  -- WriteTool
-  edit.rs   -- EditTool
-  bash.rs   -- (Chapter 7)
-  glob.rs   -- (Chapter 8)
-  grep.rs   -- (Chapter 8)
 ```
 
 The `mod.rs` barrel re-exports everything:
 
 ```rust
+mod ask;
+mod bash;
 mod edit;
 mod read;
 mod write;
 
+pub use ask::*;
+pub use bash::BashTool;
 pub use edit::EditTool;
 pub use read::ReadTool;
 pub use write::WriteTool;
-
-// Re-export from types for convenience
-pub use crate::types::{Tool, ToolDefinition, ToolResult, ToolSet, ValidationResult};
 ```
 
 This lets consumers write `use crate::tools::{ReadTool, WriteTool, EditTool}`
@@ -622,7 +534,7 @@ without reaching into individual modules.
 Run the chapter 6 tests:
 
 ```bash
-cargo test -p claw-code test_ch6
+cargo test -p mini-claw-code-starter test_ch6
 ```
 
 Here is what each test verifies:
@@ -630,10 +542,7 @@ Here is what each test verifies:
 ### ReadTool tests
 
 - **`test_ch6_read_file`** -- Reads a three-line file and verifies all lines appear in the output.
-- **`test_ch6_read_with_line_numbers`** -- Reads a file and checks that the output contains tab-separated line numbers (`1\t`, `2\t`, `3\t`).
-- **`test_ch6_read_with_offset_and_limit`** -- Reads lines 2-3 of a five-line file using `offset: 2, limit: 2`. Verifies the correct lines are included and others are excluded.
-- **`test_ch6_read_nonexistent`** -- Attempts to read a file that does not exist. Verifies that the result is an `Err` (not a `ToolResult::error`), because a missing file is an I/O failure.
-- **`test_ch6_read_is_read_only`** -- Checks the safety flags: `is_read_only` and `is_concurrent_safe` are `true`, `is_destructive` is `false`.
+- **`test_ch6_read_nonexistent`** -- Attempts to read a file that does not exist. Verifies that the result is an `Err`.
 
 ### WriteTool tests
 
@@ -644,19 +553,17 @@ Here is what each test verifies:
 ### EditTool tests
 
 - **`test_ch6_edit_replace`** -- Edits "world" to "rust" in a file containing "hello world". Verifies the result says "edited" and the file now reads "hello rust".
-- **`test_ch6_edit_not_found`** -- Attempts to replace a string that does not exist. Verifies the result starts with `"error:"` and contains `"not found"`. Critically, this is an `Ok` result, not an `Err`.
+- **`test_ch6_edit_not_found`** -- Attempts to replace a string that does not exist. Verifies the result is an `Err` containing "not found".
 - **`test_ch6_edit_ambiguous`** -- Attempts to replace "aa" in a file containing "aa bb aa" (two occurrences). Verifies the error mentions "2 times".
-- **`test_ch6_edit_validation`** -- Tests `validate_input` directly. Missing `old_string` returns `ValidationResult::Error`. Providing all three fields returns `ValidationResult::Ok`.
 
 ### Integration tests
 
 - **`test_ch6_write_then_read`** -- Writes a two-line file, then reads it back. Verifies the round-trip preserves content.
 - **`test_ch6_write_edit_read`** -- The full workflow: writes a file containing `println!("hello")`, edits "hello" to "goodbye", reads it back, and verifies "goodbye" is present and "hello" is gone.
 
-### Definition and summary tests
+### Definition tests
 
 - **`test_ch6_tool_definitions`** -- Checks that each tool's definition returns the correct name: "read", "write", "edit".
-- **`test_ch6_tool_summaries`** -- Checks that `summary` produces the expected format: `[read: foo.rs]`, `[write: bar.rs]`, `[edit: baz.rs]`.
 
 ---
 
@@ -664,26 +571,25 @@ Here is what each test verifies:
 
 Three tools, one pattern. Every tool in this chapter follows the same structure:
 
-1. **A struct** with a `def: ToolDefinition` field.
+1. **A struct** with a `definition: ToolDefinition` field.
 2. **A `new()` constructor** that builds the definition with the parameter builder from Chapter 1.
-3. **A `Tool` impl** with `definition()`, `call()`, and optional overrides for safety flags, validation, summary, and activity description.
+3. **A `Tool` impl** with `definition()` and `call()`.
 
-The pattern scales. When you add Bash in Chapter 7 and Glob/Grep in Chapter 8,
-the shape is identical -- only the `call()` logic changes. This is the power of
-the `Tool` trait: a uniform interface that makes every tool interchangeable from
-the query engine's perspective.
+The pattern scales. When you add Bash in Chapter 7, the shape is identical --
+only the `call()` logic changes. This is the power of the `Tool` trait: a
+uniform interface that makes every tool interchangeable from the agent's
+perspective.
 
 The key lessons from this chapter:
 
-- **Line numbers matter.** The `ReadTool` formats output with tab-separated
-  line numbers so the LLM has an unambiguous coordinate system for edits.
 - **Automate the obvious.** The `WriteTool` creates parent directories
   automatically, saving the agent a wasted tool-use round.
-- **Errors are values.** The `EditTool` returns `Ok(ToolResult::error(...))`
-  for not-found and ambiguous matches. The agent loop continues. The model
-  adapts. Reserve `Err` for I/O failures and programming errors.
-- **Validate early.** The `EditTool` uses `validate_input` to catch missing
-  arguments before `call()` runs, preventing wasted work.
+- **Check uniqueness.** The `EditTool` requires the old string to appear exactly
+  once. Zero matches means the model got the string wrong. Multiple matches
+  means the replacement is ambiguous.
+- **Errors propagate cleanly.** Tools return `anyhow::Result<String>`. The agent
+  loop catches errors and converts them to messages the LLM can read and recover
+  from.
 
 In [Chapter 7: Bash Tool](./ch07-bash-tool.md), you will build the most
 powerful (and most dangerous) tool in the agent's arsenal -- one that can run

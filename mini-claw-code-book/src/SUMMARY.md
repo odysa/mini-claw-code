@@ -4,7 +4,7 @@
 
 ---
 
-# Claude Code Architecture in Rust (V2)
+# Mini Claw Code (V2)
 
 - [Your First LLM Call](./architecture/intro01-first-llm-call.md)
 - [Your First Tool Call](./architecture/intro02-first-tool.md)

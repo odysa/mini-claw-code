@@ -3,9 +3,29 @@
 > **File(s) to edit:** `src/tools/read.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch2`
 
+## Goal
+
+- Understand why the `Tool` trait uses `#[async_trait]` (object safety for heterogeneous storage) while `Provider` uses RPITIT (zero-cost generics).
+- Implement a concrete `EchoTool` that demonstrates the full tool lifecycle: schema definition, trait implementation, registration, and execution.
+- Verify that `ToolSet` correctly registers tools and returns their definitions for the LLM.
+
 In the last chapter we gave our agent a voice by connecting it to an LLM provider. But a model that can only produce text is like a programmer who can only talk about code without ever touching a keyboard. In this chapter we give the agent hands.
 
 You already defined the tool types in Chapter 1 -- `ToolDefinition`, `Tool` trait, and `ToolSet`. In this chapter we will understand *why* those types are designed the way they are, explore the critical distinction between `#[async_trait]` and RPITIT, and then wire everything together by implementing your first concrete tool: an `EchoTool`.
+
+## Tool lifecycle
+
+```mermaid
+flowchart LR
+    A[Tool::new] -->|stores| B[ToolDefinition]
+    B -->|registered in| C[ToolSet]
+    C -->|definitions sent to| D[LLM]
+    D -->|responds with| E[ToolCall]
+    E -->|dispatched via| C
+    C -->|lookup by name| F[Tool::call]
+    F -->|returns| G[String result]
+    G -->|wrapped as| H[Message::ToolResult]
+```
 
 ## Design context: how Claude Code models tools
 
@@ -167,12 +187,16 @@ your type definitions are correct.
 cargo test -p mini-claw-code-starter test_ch2
 ```
 
-You should see these tests pass:
+### What the tests verify
 
-- `test_ch3_tool_definition` -- the `EchoTool` produces the correct name and description
-- `test_ch3_tool_call` -- calling with `{"text": "hello"}` returns `"hello"`
-- `test_ch3_toolset_register_and_get` -- registering and looking up a tool by name
-- `test_ch3_toolset_definitions` -- `definitions()` returns the registered tool schemas
+- **`test_ch3_tool_definition`** -- the `EchoTool` produces the correct name and description from its `ToolDefinition`
+- **`test_ch3_tool_call`** -- calling with `{"text": "hello"}` returns `"hello"`, verifying argument extraction and return value
+- **`test_ch3_toolset_register_and_get`** -- registers an `EchoTool` in a `ToolSet` and verifies `get("echo")` returns it
+- **`test_ch3_toolset_definitions`** -- verifies that `definitions()` returns the schemas of all registered tools
+
+## Key takeaway
+
+The `Tool` trait is deliberately minimal -- just `definition()` and `call()`. This simplicity means every tool, from a trivial echo to a complex bash executor, implements the same two-method interface. The agent loop does not need to know what a tool does; it only needs to look it up by name and call it.
 
 ## Summary
 

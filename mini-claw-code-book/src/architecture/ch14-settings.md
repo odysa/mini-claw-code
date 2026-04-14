@@ -14,6 +14,13 @@ cargo test -p mini-claw-code-starter test_ch16  # Config, ConfigLoader
 cargo test -p mini-claw-code-starter test_ch14  # CostTracker
 ```
 
+## Goal
+
+- Define a `Config` struct with serde defaults so that partial TOML files deserialize into complete configurations.
+- Implement the `merge()` function with three strategies: compare-against-default for scalars, `Option::or()` for optionals, and replace for collections.
+- Build `ConfigLoader` to assemble four layers (defaults, project config, user config, environment variables) in priority order.
+- Implement `CostTracker` to accumulate token counts and compute running cost estimates from per-million pricing.
+
 ---
 
 ## Why layers?
@@ -37,6 +44,17 @@ Priority (highest to lowest):
 ```
 
 Claude Code uses the same approach. Its hierarchy goes: CLI flags > environment > user settings > project settings > defaults. The merge logic is more sophisticated -- it supports per-key overrides and array merging strategies -- but the architecture is identical.
+
+```mermaid
+flowchart TD
+    A["Config::default()"] -->|merge| B["Project config<br/>.claw/config.toml"]
+    B -->|merge| C["User config<br/>~/.config/mini-claw/config.toml"]
+    C -->|override| D["Environment variables<br/>MINI_CLAW_MODEL, etc."]
+    D --> E["Final Config"]
+
+    style A fill:#e8e8e8
+    style E fill:#c8e6c9
+```
 
 ---
 
@@ -100,6 +118,10 @@ Eight fields spanning three categories: provider settings, safety settings, and 
 **`preserve_recent`** controls how many recent messages the compaction engine preserves. When compacting, the engine summarizes older messages but keeps the most recent `preserve_recent` messages intact so the model has fresh context. The default of 10 keeps roughly the last 2-3 tool-use rounds.
 
 **`instructions`** injects custom text into the system prompt. This is where project-specific guidance goes -- "always use async/await", "prefer Vec over slices in public APIs", "tests must use the mock provider". Chapter 15 builds the full instruction system; this field is the config hook for it.
+
+### Key Rust concept: `#[serde(default)]` for partial deserialization
+
+Serde's `default` attribute is what makes partial config files work. When a TOML file omits a field, serde normally fails with "missing field." The `#[serde(default = "function_name")]` attribute tells serde to call the named function instead of failing. For fields that default to `None` or empty `Vec`, the simpler `#[serde(default)]` calls `Default::default()`. This pattern is idiomatic in Rust configuration: every field has a sensible default, and the user only specifies what they want to change. The alternative -- requiring every field in every config file -- would make partial configs impossible.
 
 ### Default functions and the serde trick
 
@@ -529,6 +551,33 @@ cargo test -p mini-claw-code-starter test_ch14  # CostTracker
 Note: Config and ConfigLoader tests are in `test_ch16` (following the V1
 numbering where configuration was Chapter 16). CostTracker tests are in
 `test_ch14` (V1 token tracking chapter).
+
+Key config tests (`test_ch16`):
+
+- **test_ch16_default_config** -- `Config::default()` produces the expected model, token limit, and non-empty safety defaults.
+- **test_ch16_load_from_toml** -- A TOML string with `model` and `max_context_tokens` deserializes correctly.
+- **test_ch16_default_fills_missing_fields** -- A TOML file with only `model` still gets defaults for `preserve_recent`, `instructions`, etc.
+- **test_ch16_load_nonexistent_path** -- Loading from a non-existent path returns `None` instead of panicking.
+- **test_ch16_mcp_server_config** -- MCP server configuration round-trips through TOML correctly.
+- **test_ch16_hooks_config** -- Hook configuration (command, tool_pattern, timeout) deserializes from TOML.
+- **test_ch16_env_override** -- Setting `MINI_CLAW_MODEL` environment variable overrides the model in the loaded config.
+- **test_ch16_protected_patterns_default** -- Default config includes `.env` and `.git/**` in protected patterns.
+
+Key cost tracker tests (`test_ch14`):
+
+- **test_ch14_empty_tracker** -- A new tracker starts at zero tokens, zero turns, zero cost.
+- **test_ch14_record_single_turn** -- Recording one turn increments input/output tokens and the turn counter.
+- **test_ch14_accumulates_across_turns** -- Three `record()` calls accumulate totals correctly.
+- **test_ch14_cost_calculation** -- 1M input + 1M output tokens at $3/$15 per million = $18.00.
+- **test_ch14_cost_small_numbers** -- 1000 input + 200 output tokens = $0.006.
+- **test_ch14_summary_format** -- `summary()` produces the expected `"tokens: N in + N out | cost: $X.XXXX"` format.
+- **test_ch14_reset** -- `reset()` zeroes accumulators but preserves pricing.
+
+---
+
+## Key takeaway
+
+Layered configuration lets each level (defaults, project, user, environment) contribute only what it knows. The merge function's three strategies -- compare-against-default for scalars, `or()` for optionals, and replace for collections -- handle the vast majority of real-world cases without complexity.
 
 ---
 

@@ -3,6 +3,13 @@
 > **File(s) to edit:** `src/agent.rs`
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_ch3` (single_turn), `cargo test -p mini-claw-code-starter test_ch5` (SimpleAgent)
 
+## Goal
+
+- Implement the `SimpleAgent` struct with `chat()` that loops calling the provider and executing tools until `StopReason::Stop`.
+- Implement `execute_tools()` so that tool errors become result strings (not panics), allowing the LLM to recover from mistakes.
+- Implement `run_with_events()` so that a UI can observe the agent loop in real time via an event channel.
+- Understand message ordering: why `Message::Assistant` must be pushed before `Message::ToolResult` values.
+
 This is the chapter where everything clicks.
 
 In the previous chapters you built the vocabulary (messages), the mouth (provider), and the hands (tools). Now you build the brain -- the loop that ties them all together. The `SimpleAgent` is the heart of a coding agent. It is the thing that takes a user prompt, talks to an LLM, executes tools, feeds results back, and keeps going until the job is done.
@@ -19,30 +26,16 @@ That is it. The `SimpleAgent` implements this loop. It owns three things:
 2. A **tool set** -- the registered tools (from Chapter 3)
 3. A **config** -- safety limits and behavior knobs
 
-```
-User prompt
-    |
-    v
-+-------------------+
-| SimpleAgent::chat |<---------+
-+-------------------+          |
-    |                          |
-    v                          |
-  Provider.chat()              |
-    |                          |
-    v                          |
-  StopReason?                  |
-    |         |                |
-  Stop     ToolUse             |
-    |         |                |
-    v         v                |
-  return    execute_tools()    |
-  text        |                |
-              v                |
-            push Assistant     |
-            push ToolResults   |
-              |                |
-              +----------------+
+```mermaid
+flowchart TD
+    A[User prompt] --> B[SimpleAgent::chat]
+    B --> C[Provider.chat]
+    C --> D{StopReason?}
+    D -->|Stop| E[Return final text]
+    D -->|ToolUse| F[execute_tools]
+    F --> G[Push Message::Assistant]
+    G --> H[Push Message::ToolResult for each result]
+    H --> C
 ```
 
 If you have read Claude Code's source, this maps to the query engine and the `query` function. Our version strips away streaming, permissions, hooks, and compaction -- those come in later chapters -- leaving the pure control flow.
@@ -175,7 +168,9 @@ This ordering matters. The LLM API expects tool results to follow the assistant 
 
 After pushing results, the loop continues. The next iteration sends the entire history -- including the tool calls and their results -- back to the LLM. The model sees what happened and decides what to do next.
 
-### Why &mut Vec\<Message\>?
+### Rust concept: ownership and &mut Vec\<Message\>
+
+The caller owns the message history and passes it as `&mut Vec<Message>`. This is a deliberate Rust ownership decision -- the agent borrows the history mutably for the duration of the call, but ownership stays with the caller. The alternative would be for the agent to own the `Vec`, but then the caller could not inspect the history after the call, and multi-turn conversations would require moving the `Vec` in and out of the agent. `&mut` is the cleanest solution: the agent pushes messages into the caller's vec, and the caller retains full control afterward.
 
 The caller owns the message history and passes it as `&mut Vec<Message>`. This is deliberate:
 
@@ -391,7 +386,19 @@ cargo test -p mini-claw-code-starter test_ch3  # single_turn tests
 cargo test -p mini-claw-code-starter test_ch5  # SimpleAgent tests
 ```
 
-The single-turn tests (`test_ch3`) verify the basic provider-tool cycle. The SimpleAgent tests (`test_ch5`) verify the full agent loop with `chat()`, `run()`, and event streaming.
+### What the tests verify
+
+**Single-turn tests (test_ch3):**
+
+- **`test_ch3_single_turn_text_only`** -- provider returns text with `StopReason::Stop`; verifies the agent returns that text directly
+- **`test_ch3_single_turn_with_tool`** -- provider returns a tool call then a final answer; verifies the agent executes the tool and returns the final text
+
+**SimpleAgent tests (test_ch5):**
+
+- **`test_ch5_agent_text_response`** -- `run()` with a provider that returns text; verifies the response string
+- **`test_ch5_agent_tool_loop`** -- provider scripts a tool call followed by a final answer; verifies the agent loops correctly and the message history contains the tool result
+- **`test_ch5_agent_unknown_tool`** -- provider requests a tool that is not registered; verifies the agent returns an error string (not a panic) and the loop continues
+- **`test_ch5_agent_events`** -- `run_with_events()` emits `ToolCall` and `Done` events through the channel; verifies the event sequence
 
 ## Implementation checklist
 
@@ -412,6 +419,10 @@ Open `src/agent.rs` in the starter. You will see `unimplemented!()` stubs with d
 7. **`run_with_events`** -- Create messages, delegate to `run_with_history`.
 
 Start with `new` and `tool`. Then implement `execute_tools` -- you can test it implicitly through `run`. Then `chat`, then `run`. Save the event methods for last.
+
+## Key takeaway
+
+The agentic loop is surprisingly small -- a `loop`, a `match` on `StopReason`, and a helper that dispatches tool calls. Every feature a production agent adds (permissions, streaming, compaction, hooks) plugs into this same skeleton. If you understand `chat()`, you understand the architecture of every coding agent.
 
 ## What you have now
 

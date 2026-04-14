@@ -13,6 +13,13 @@ Why two layers? Because they protect against different failure modes. The permis
 cargo test -p mini-claw-code-starter test_ch18
 ```
 
+## Goal
+
+- Implement `PathValidator` to confine file operations to a single directory tree, blocking path traversal attacks like `../../etc/passwd`.
+- Implement `CommandFilter` to block dangerous shell commands (`rm -rf /`, `sudo`, fork bombs) using glob pattern matching.
+- Implement `ProtectedFileCheck` to prevent writes and edits to sensitive files matching protected patterns (`.env`, `.git/config`).
+- Wire all checks together through `SafeToolWrapper` so that any single safety failure blocks the tool call and returns a descriptive error to the LLM.
+
 ---
 
 ## The SafetyCheck trait and implementations
@@ -28,6 +35,10 @@ pub trait SafetyCheck: Send + Sync {
 ```
 
 Each safety check implements this trait. It receives the tool name and arguments, and returns `Ok(())` to allow execution or `Err(reason)` to block it. The trait requires `Send + Sync` because safety checks are stored inside `SafeToolWrapper`, which implements `Tool` and may be shared across async tasks.
+
+### Key Rust concept: `Send + Sync` trait bounds
+
+The `Send + Sync` bounds on `SafetyCheck` are required because tools live inside `Box<dyn Tool>`, which is stored in a `HashMap` that the agent holds. In an async runtime like tokio, the agent's futures may be moved between threads. `Send` means the type can be transferred to another thread. `Sync` means `&self` references can be shared between threads. Together they guarantee that the safety check can be called from any async task without data races. Without these bounds, the compiler would refuse to store `Box<dyn SafetyCheck>` inside `SafeToolWrapper`, because `SafeToolWrapper` itself must be `Send + Sync` to satisfy the `Tool` trait.
 
 ### PathValidator
 
@@ -121,6 +132,24 @@ This design means safety checks are composable. You can wrap a tool with a `Path
 ---
 
 ## How the checks dispatch
+
+```mermaid
+flowchart LR
+    A["SafeToolWrapper.call(args)"] --> B["PathValidator"]
+    A --> C["CommandFilter"]
+    A --> D["ProtectedFileCheck"]
+    B -->|"read/write/edit"| E{"Path inside<br/>allowed_dir?"}
+    C -->|"bash"| F{"Command<br/>matches blocked<br/>pattern?"}
+    D -->|"write/edit"| G{"Filename<br/>matches protected<br/>pattern?"}
+    E -->|No| H["Err: blocked"]
+    E -->|Yes| I["Ok"]
+    F -->|Yes| H
+    F -->|No| I
+    G -->|Yes| H
+    G -->|No| I
+    I --> J["Inner tool.call(args)"]
+    H --> K["Return error string<br/>to LLM"]
+```
 
 Each `SafetyCheck` implementation decides which tools it applies to by matching on the `tool_name` parameter in its `check` method:
 
@@ -255,8 +284,28 @@ cargo test -p mini-claw-code-starter test_ch18
 Note: The safety check tests are in `test_ch18`, following the V1 chapter
 numbering where safety was Chapter 18.
 
-The tests verify each safety check implementation independently and then test
-them composed through `SafeToolWrapper`.
+Key tests:
+
+- **test_ch18_path_within_allowed** -- A file inside the allowed directory passes validation.
+- **test_ch18_path_outside_allowed** -- `/etc/passwd` is rejected when the allowed directory is a temp dir.
+- **test_ch18_path_traversal_blocked** -- A `../../etc/passwd` traversal path is resolved and rejected.
+- **test_ch18_path_new_file_in_allowed** -- A new (not-yet-existing) file in the allowed directory passes validation.
+- **test_ch18_safety_check_read_tool** -- PathValidator fires for the `read` tool and validates the path argument.
+- **test_ch18_safety_check_ignores_bash** -- PathValidator skips the `bash` tool (no `path` argument to check).
+- **test_ch18_command_filter_blocks_rm_rf** -- `rm -rf /` and `rm -rf /*` are both caught.
+- **test_ch18_command_filter_blocks_sudo** -- `sudo rm file` matches the `sudo *` pattern.
+- **test_ch18_command_filter_allows_safe** -- `ls -la`, `echo hello`, and `cargo test` pass through.
+- **test_ch18_protected_file_blocks_env** -- Writes to `.env` and `.env.local` are blocked.
+- **test_ch18_protected_file_allows_normal** -- Writes to `src/main.rs` pass through.
+- **test_ch18_wrapper_blocks_on_check_failure** -- `SafeToolWrapper` returns an `"error: safety check failed"` string when a check fails.
+- **test_ch18_wrapper_allows_valid_call** -- `SafeToolWrapper` passes through to the inner tool when all checks pass.
+- **test_ch18_custom_blocked_commands** -- Custom blocked patterns (`docker rm *`, `npm publish*`) work correctly.
+
+---
+
+## Key takeaway
+
+Safety checks inspect tool *arguments*, not tool *identity*. The permission engine asks "should this tool run at all?" while safety checks ask "is this specific invocation dangerous?" The two layers compose through defense-in-depth: even with all permissions granted, `SafeToolWrapper` still blocks writes to `.env` and commands matching `rm -rf /`.
 
 ---
 

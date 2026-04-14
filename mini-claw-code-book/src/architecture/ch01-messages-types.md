@@ -3,9 +3,32 @@
 > **File(s) to edit:** `src/types.rs` (pre-filled in starter)
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch1`
 
+## Goal
+
+- Define the `Message` enum with four variants (`System`, `User`, `Assistant`, `ToolResult`) so that every conversation participant has a typed representation.
+- Implement the `ToolDefinition` builder so that tools can describe their JSON Schema parameters without hand-writing JSON.
+- Implement `ToolSet` so that the agent can register and look up tools by name at runtime.
+- Define the `Provider` trait using RPITIT so that any LLM backend can be swapped in without changing agent code.
+
 Every coding agent is, at its core, a loop over a conversation. The user speaks, the model replies, tools produce results, and those results go back to the model. Before we can build that loop, we need a type system that represents every participant and every kind of payload in the conversation.
 
 In this chapter you will implement the foundational types that the rest of the codebase depends on. By the end, `cargo test -p mini-claw-code-starter test_ch1` should pass.
+
+## How the types connect
+
+```mermaid
+flowchart TD
+    U[Message::User] --> P[Provider::chat]
+    S[Message::System] --> P
+    P --> AT[AssistantTurn]
+    AT --> SR{StopReason}
+    SR -->|Stop| Text[Final text response]
+    SR -->|ToolUse| TC[ToolCall]
+    TC --> TS[ToolSet::get]
+    TS --> T[Tool::call]
+    T --> TR[Message::ToolResult]
+    TR --> P
+```
 
 ## Why a rich message type?
 
@@ -144,6 +167,16 @@ The agent loop uses `name` to look up the tool in the `ToolSet`, passes `argumen
 ---
 
 ## 1.5 ToolDefinition and the builder pattern
+
+### Rust concept: the builder pattern
+
+The `ToolDefinition` uses the *builder pattern* -- a common Rust idiom where
+methods take `self` by value and return `Self`, enabling method chaining like
+`.param(...).param(...)`. Each call consumes the struct and returns a modified
+version. This works because Rust's move semantics mean there is no overhead --
+no cloning, no reference counting. The compiler optimizes the chain into a
+series of in-place mutations. You will see this pattern throughout the codebase:
+`ToolSet::new().with(tool1).with(tool2)`, `SimpleAgent::new(provider).tool(bash)`.
 
 Every tool must describe itself to the LLM with a JSON Schema so the model knows what parameters are available. `ToolDefinition` holds this schema and provides a builder API for constructing it without hand-writing JSON:
 
@@ -357,6 +390,10 @@ cargo test -p mini-claw-code-starter test_ch1_token_usage_default
 
 ## 1.9 The Provider trait
 
+### Rust concept: RPITIT (return-position impl Trait in traits)
+
+The `Provider` trait uses a feature stabilized in Rust 1.75 called RPITIT. Instead of `async fn chat(...)`, we write `fn chat(...) -> impl Future<...> + Send + 'a`. This lets the compiler generate a unique, zero-cost future type for each implementation -- no heap allocation, no `Box<dyn Future>`. The trade-off is that RPITIT makes the trait *not object-safe*: you cannot write `Box<dyn Provider>`. That is fine here because providers are always used as generic parameters (`struct SimpleAgent<P: Provider>`), not as trait objects.
+
 The `Provider` trait is also defined in `src/types.rs`. It abstracts over any LLM backend:
 
 ```rust
@@ -389,6 +426,17 @@ After implementing `src/types.rs`, run the full chapter test suite:
 cargo test -p mini-claw-code-starter test_ch1
 ```
 
+### What the tests verify
+
+- **`test_ch1_message_user`** -- constructs a `Message::User` and verifies it holds the expected string
+- **`test_ch1_message_system`** -- constructs a `Message::System` and verifies it holds the expected string
+- **`test_ch1_message_tool_result`** -- constructs a `Message::ToolResult` and verifies both `id` and `content` are correct
+- **`test_ch1_assistant_turn`** -- builds an `AssistantTurn` with text and verifies `stop_reason` is `Stop`
+- **`test_ch1_tool_definition_builder`** -- uses the builder to add parameters and verifies the resulting JSON schema has the correct structure
+- **`test_ch1_tool_definition_optional_param`** -- adds an optional parameter and verifies it does not appear in the `required` array
+- **`test_ch1_toolset_empty`** -- creates an empty `ToolSet` and verifies `get()` returns `None` for any name
+- **`test_ch1_token_usage_default`** -- verifies that `TokenUsage::default()` initializes both counters to zero
+
 ## What you built
 
 This chapter established the type vocabulary for the entire agent:
@@ -402,5 +450,9 @@ This chapter established the type vocabulary for the entire agent:
 - **`ToolSet`** -- a `HashMap`-backed registry for looking up tools by name at runtime.
 - **`Provider` trait** -- the async LLM abstraction, generic over any backend.
 - **`TokenUsage`** -- per-request token tracking.
+
+## Key takeaway
+
+The entire agent -- tools, providers, the loop itself -- is built on the vocabulary defined in this chapter. Getting these types right (especially the `Message` enum and `StopReason`) determines whether the agent loop is simple or tangled. The types are the contract; everything else is implementation.
 
 None of these types do anything on their own -- they are the nouns of the system. In the next chapter, we will implement the `MockProvider` and `OpenRouterProvider`, giving these types their first verbs.

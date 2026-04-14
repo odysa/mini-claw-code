@@ -3,6 +3,13 @@
 > **File(s) to edit:** `src/tools/read.rs`, `src/tools/write.rs`, `src/tools/edit.rs`
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_ch2` (ReadTool), `cargo test -p mini-claw-code-starter test_ch4` (WriteTool, EditTool)
 
+## Goal
+
+- Implement `ReadTool` so the agent can read file contents, giving the LLM visibility into the codebase.
+- Implement `WriteTool` with automatic parent directory creation so the agent can create new files without a separate `mkdir` step.
+- Implement `EditTool` with a uniqueness check so the agent can make surgical string replacements in existing files.
+- Understand why tool errors are returned as `Err(...)` in the starter (the agent loop converts them to messages the LLM can read and recover from).
+
 A coding agent that cannot touch the filesystem is just a chatbot with delusions
 of grandeur. It can describe code changes, suggest fixes, explain algorithms --
 but it cannot do any of it. The tools you built in Chapter 3 gave your agent
@@ -15,6 +22,37 @@ operations are simple (read bytes, write bytes, search-and-replace), but the
 design choices around them determine whether the agent can reliably modify a
 codebase or whether it stumbles over its own edits. You will implement all three
 tools in this chapter: `ReadTool`, `WriteTool`, and `EditTool`.
+
+## How the file tools work together
+
+```mermaid
+flowchart LR
+    W[WriteTool] -->|creates file| FS[(Filesystem)]
+    E[EditTool] -->|search & replace| FS
+    R[ReadTool] -->|reads content| FS
+    W -.->|"auto-creates parent dirs"| FS
+    E -.->|"checks uniqueness first"| FS
+```
+
+```mermaid
+sequenceDiagram
+    participant LLM
+    participant Agent
+    participant FS as Filesystem
+
+    LLM->>Agent: write(path, content)
+    Agent->>FS: create dirs + write file
+    FS-->>Agent: ok
+    Agent-->>LLM: "wrote /path/to/file"
+    LLM->>Agent: edit(path, old, new)
+    Agent->>FS: read, check uniqueness, replace, write
+    FS-->>Agent: ok
+    Agent-->>LLM: "edited /path/to/file"
+    LLM->>Agent: read(path)
+    Agent->>FS: read file
+    FS-->>Agent: file contents
+    Agent-->>LLM: file contents
+```
 
 ---
 
@@ -114,6 +152,10 @@ async fn call(&self, args: Value) -> anyhow::Result<String> {
     Ok(content)
 }
 ```
+
+### Rust concept: anyhow::Context for rich errors
+
+The `.context("missing 'path' argument")?` and `.with_context(|| format!("failed to read '{path}'"))` calls wrap the underlying error with a human-readable message. `context()` takes a static string; `with_context()` takes a closure for dynamic messages (avoiding the allocation when the `?` path is not taken). Both return `anyhow::Error`, which chains the original error underneath -- so the full error message reads like `"failed to read 'foo.rs': No such file or directory"`. This chaining is what makes `anyhow` errors informative without custom error types.
 
 Notice that `call()` returns `anyhow::Result<String>`, not `ToolResult`. The
 starter's `Tool` trait is simplified -- tools return plain strings on success.
@@ -401,6 +443,10 @@ if count > 1 {
 }
 ```
 
+### Rust concept: bail! macro
+
+`bail!("old_string not found in '{path}'")` is shorthand for `return Err(anyhow::anyhow!("..."))`. It immediately returns an error from the function with the given message. It is part of the `anyhow` crate and works in any function that returns `anyhow::Result`. Compare with `?` (which propagates an existing error) -- `bail!` creates a new error on the spot.
+
 Two branches, both returning errors via `bail!`. In the starter's simplified
 `Tool` trait, tools return `anyhow::Result<String>`. When the tool returns an
 `Err`, the agent loop converts it to an error message that the LLM sees. The
@@ -589,6 +635,10 @@ The key lessons from this chapter:
 - **Errors propagate cleanly.** Tools return `anyhow::Result<String>`. The agent
   loop catches errors and converts them to messages the LLM can read and recover
   from.
+
+## Key takeaway
+
+File tools are the agent's hands on the codebase. The three-tool split -- read, write, edit -- gives the LLM clear verbs for distinct operations rather than one overloaded "file" tool. The `EditTool`'s uniqueness check is the single most important design decision: it forces the LLM to provide an unambiguous match, catching mistakes early and enabling reliable self-correction.
 
 In [Chapter 7: Bash Tool](./ch07-bash-tool.md), you will build the most
 powerful (and most dangerous) tool in the agent's arsenal -- one that can run

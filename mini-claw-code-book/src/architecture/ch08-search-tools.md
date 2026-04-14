@@ -3,9 +3,31 @@
 > **File(s) to edit:** (extension -- no stubs in starter)
 > **Tests:** No tests in the starter. GlobTool and GrepTool are extension tools.
 
+## Goal
+
+- Understand why file discovery (GlobTool) and content search (GrepTool) are separate tools with distinct parameter schemas.
+- Implement `GlobTool` so the agent can find files by name pattern using the `glob` crate.
+- Implement `GrepTool` with recursive directory walking, regex matching, and an optional file type filter.
+- Learn when to use async vs sync helper functions in tool implementations (I/O-bound file reads vs fast directory walking).
+
 A coding agent that can only read files it already knows about is like a developer who never uses `find` or `grep`. You can hand it a specific file path and it will read it faithfully, but drop it into an unfamiliar codebase and it is blind. It cannot discover which files exist, cannot search for where a function is defined, cannot find all the places a type is used. Without search, the LLM has to guess file paths -- and it will guess wrong.
 
 Search tools fix this. In this chapter we explore two: **GlobTool** finds files by name pattern, and **GrepTool** searches file contents by regex. Together they give the LLM the ability to navigate any codebase, no matter how large or unfamiliar. These are the eyes of the agent.
+
+## How the search tools fit into the agent workflow
+
+```mermaid
+flowchart TD
+    LLM[LLM decides what to do]
+    LLM -->|"What files exist?"| Glob[GlobTool]
+    LLM -->|"Where is this defined?"| Grep[GrepTool]
+    Glob -->|returns file paths| LLM
+    Grep -->|"returns path:line: content"| LLM
+    LLM -->|reads specific file| Read[ReadTool]
+    LLM -->|modifies file| Edit[EditTool]
+    Read -->|file contents| LLM
+    Edit -->|confirmation| LLM
+```
 
 > **Note:** The starter (`mini-claw-code-starter`) does not include stubs for
 > GlobTool or GrepTool. These are extension tools -- if you want to add them,
@@ -269,7 +291,11 @@ There is more going on here, so let's take it piece by piece.
 
 **Regex compilation.** The pattern is compiled into a `regex::Regex` upfront. If the LLM provides an invalid regex (missing closing bracket, bad escape), we return an error immediately rather than crashing partway through the search. The `regex` crate handles the full Rust regex syntax -- character classes, quantifiers, alternation, captures.
 
-**The include filter.** The `include` parameter is a glob pattern, not a regex. We compile it into a `glob::Pattern` using the same `glob` crate that powers GlobTool. The `.transpose()` call is an idiomatic Rust pattern for converting `Option<Result<T>>` into `Result<Option<T>>` -- if there is no include pattern, we get `Ok(None)`; if there is one but it is invalid, we get `Err(...)`.
+**The include filter.** The `include` parameter is a glob pattern, not a regex. We compile it into a `glob::Pattern` using the same `glob` crate that powers GlobTool.
+
+### Rust concept: Option::transpose
+
+The `.transpose()` call converts `Option<Result<T>>` into `Result<Option<T>>`. This is a common Rust idiom when you have an optional operation that might fail. Without `transpose`, you would need a `match` or `if let` to handle the `Some(Ok(...))`, `Some(Err(...))`, and `None` cases separately. With it, you can use `?` to propagate the error and end up with a clean `Option<T>`. The pattern `x.map(fallible_fn).transpose()?` reads as: "if present, try the operation; if it fails, propagate the error; if absent, produce `None`."
 
 **Three-way path dispatch.** The search path can be a file, a directory, or nonexistent:
 
@@ -283,7 +309,9 @@ There is more going on here, so let's take it piece by piece.
 
 ## Helper function design
 
-The two helper functions -- `search_file` and `collect_files` -- are deliberately designed with different signatures. Understanding why reveals practical Rust async patterns.
+### Rust concept: choosing async vs sync for helpers
+
+The two helper functions -- `search_file` and `collect_files` -- are deliberately designed with different signatures. Understanding why reveals practical Rust async patterns. The decision rule is simple: if the function does I/O that could block (reading file contents), make it async. If it does fast metadata operations (listing directory entries), keep it sync. Making everything async "just in case" adds complexity -- recursive async functions require `Pin<Box<dyn Future>>` or the `async_recursion` crate -- and provides no benefit when the operation is already fast.
 
 ### `search_file` is async
 
@@ -434,5 +462,9 @@ This chapter added two search tools that let the agent discover and navigate cod
 - **The separation is deliberate.** Glob answers "what files exist?" Grep answers "where is this content?" Two tools with clear purposes are easier for the LLM to use correctly than one tool with a mode switch.
 
 - **These are extensions.** The starter does not include stubs for GlobTool or GrepTool. If you want to add them, create the files from scratch following the patterns shown above and register them in `src/tools/mod.rs`.
+
+## Key takeaway
+
+Search tools are what turn a coding agent from a tool that edits known files into one that can explore and understand an unfamiliar codebase. The two-tool split (glob for names, grep for contents) maps directly to the two questions a developer asks when navigating code: "what files exist?" and "where is this thing?" Keeping them separate gives the LLM a clear, unambiguous interface for each question.
 
 With search tools in place, the agent can now explore an unfamiliar codebase on its own. Given a prompt like "find and fix the bug in the parser," it can glob for source files, grep for the parser code, read the relevant files, and then use the write and edit tools from Chapter 6 to make changes. The tool suite is becoming complete.

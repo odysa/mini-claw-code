@@ -17,6 +17,13 @@ This is the first chapter of Part III: Safety & Control. By the end of it, your 
 cargo test -p mini-claw-code-starter test_ch19
 ```
 
+## Goal
+
+- Implement `PermissionRule::matches()` using `glob::Pattern` so rules can match tool names with wildcards (e.g., `"mcp__*"` matches all MCP tools).
+- Build the `PermissionEngine` with its three-stage evaluation pipeline: session approvals, then ordered rules, then default permission.
+- Provide convenience constructors (`ask_by_default`, `allow_all`) for common configurations.
+- Record session approvals so that once a user approves a tool, it stays approved for the rest of the session.
+
 ---
 
 ## The problem: a spectrum of trust
@@ -145,6 +152,15 @@ impl PermissionEngine {
 
 The core of the engine is the `evaluate` method. It takes a tool name and the tool arguments, and returns a `Permission`. The pipeline has three stages, evaluated in order. The first stage that produces a definitive answer wins.
 
+```mermaid
+flowchart TD
+    A["evaluate(tool_name, args)"] --> B{"tool_name in<br/>session_allows?"}
+    B -->|Yes| C["Return Allow"]
+    B -->|No| D{"Any rule<br/>matches?"}
+    D -->|Yes| E["Return rule.permission"]
+    D -->|No| F["Return default_permission"]
+```
+
 ```rust
 pub fn evaluate(&self, tool_name: &str, _args: &Value) -> Permission {
     // 1. Check session_allows — if tool_name is in the set, return Allow
@@ -197,6 +213,14 @@ self.default_permission.clone()
 ```
 
 If no session approval matched and no rule matched, fall back to the default permission set at construction time. For `ask_by_default()`, this is `Permission::Ask`. For `allow_all()`, this is `Permission::Allow`.
+
+---
+
+### Key Rust concept: the `glob::Pattern` crate
+
+The `glob` crate provides filesystem-style pattern matching. `glob::Pattern::new("mcp__*")` compiles a pattern, and `.matches("mcp__fs__read")` tests a string against it. The key operators are `*` (match any sequence of characters), `?` (match any single character), and `[abc]` (match any character in the set). Unlike regex, glob patterns are intentionally simple -- they match whole strings, not substrings, and have no backtracking. This makes them fast and easy to reason about for tool name matching.
+
+The `Pattern::new()` call returns a `Result` because the pattern string might be syntactically invalid (e.g., an unclosed bracket). The fallback to exact string comparison handles this edge case gracefully.
 
 ---
 
@@ -345,8 +369,24 @@ cargo test -p mini-claw-code-starter test_ch19
 Note: The permission engine tests are in `test_ch19`, following the V1 chapter
 numbering where permissions were Chapter 19.
 
-The tests verify the permission engine's core behavior: rule matching, session
-approvals, default permissions, and the convenience constructors.
+Key tests:
+
+- **test_ch19_allow_all** -- `allow_all()` returns `Allow` for every tool, confirming bypass mode works.
+- **test_ch19_ask_by_default** -- `ask_by_default()` with no rules returns `Ask` for any tool.
+- **test_ch19_rule_matching** -- Three explicit rules for `read`, `bash`, and `write` return their respective permissions.
+- **test_ch19_glob_pattern** -- A glob rule `"mcp__*"` matches `"mcp__fs__read"` but not `"read"`.
+- **test_ch19_first_rule_wins** -- Two rules for `"bash"` (Allow then Deny); first match wins, so Allow is returned.
+- **test_ch19_session_allow** -- After `record_session_allow("bash")`, a tool that previously returned Ask now returns Allow.
+- **test_ch19_session_allow_per_tool** -- Approving `"read"` does not approve `"write"` -- session approvals are per-tool.
+- **test_ch19_is_allowed** / **test_ch19_needs_approval** -- Convenience methods correctly reflect the underlying `evaluate()` result.
+- **test_ch19_wildcard_rule** -- A `"*"` rule overrides the default permission for all tools.
+- **test_ch19_deny_overrides_default** -- A Deny rule for `"dangerous"` blocks it even when the default is Allow.
+
+---
+
+## Key takeaway
+
+The permission engine is a pure function from `(tool_name, rules, session_state, default)` to `Permission`. It does not execute tools or interact with the user -- it just answers the question "should this proceed?" This separation makes it trivially testable and reusable across different UI contexts.
 
 ---
 

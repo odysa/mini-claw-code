@@ -3,6 +3,13 @@
 > **File(s) to edit:** `src/mock.rs`, `src/streaming.rs`, `src/providers/openrouter.rs`
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_ch1` (MockProvider), `cargo test -p mini-claw-code-starter test_ch6` (OpenRouterProvider), `cargo test -p mini-claw-code-starter test_ch10` (streaming)
 
+## Goal
+
+- Implement `MockProvider` so that tests can script exact LLM responses without network calls.
+- Implement `parse_sse_line` and `StreamAccumulator` so that streaming HTTP responses can be parsed into `StreamEvent`s and reassembled into a complete `AssistantTurn`.
+- Implement `OpenRouterProvider` so that the agent can talk to a real LLM API (OpenAI-compatible).
+- Understand when to use `std::sync::Mutex` vs `tokio::sync::Mutex` in async code.
+
 In Chapter 1 we defined the data that flows through our agent. Now we need something to *drive* that data -- an LLM backend that takes a conversation and returns an assistant response. In this chapter you will build:
 
 1. A `Provider` trait that abstracts over any LLM backend
@@ -22,6 +29,29 @@ cargo test -p mini-claw-code-starter test_ch10
 ```
 
 ---
+
+## How streaming works
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant StreamProvider
+    participant API as LLM API
+    participant Channel as mpsc channel
+    participant UI
+
+    Agent->>StreamProvider: stream_chat(messages, tools, tx)
+    StreamProvider->>API: POST /chat/completions (stream: true)
+    loop SSE chunks
+        API-->>StreamProvider: data: {"delta": ...}
+        StreamProvider->>StreamProvider: parse_sse_line
+        StreamProvider->>Channel: send(StreamEvent)
+        StreamProvider->>StreamProvider: accumulator.feed(event)
+        Channel-->>UI: recv() and render
+    end
+    API-->>StreamProvider: data: [DONE]
+    StreamProvider->>Agent: return accumulator.finish()
+```
 
 ## Why a trait?
 
@@ -171,10 +201,16 @@ impl Provider for MockProvider {
 }
 ```
 
+### Rust concept: std::sync::Mutex vs tokio::sync::Mutex
+
+The `Provider` trait takes `&self` (not `&mut self`), because providers are shared. But we need to mutate the queue. Which `Mutex` should we use?
+
+The rule of thumb: use `std::sync::Mutex` when the critical section is trivial (no `.await` inside the lock), and `tokio::sync::Mutex` when you need to hold the lock across an `.await` point. Here the critical section is just a `pop_front` -- a single pointer operation. Using `tokio::sync::Mutex` would add unnecessary overhead (it is an async-aware lock that yields to the runtime). `std::sync::Mutex` is cheaper and perfectly safe because the lock is never held long enough to block the runtime.
+
 The design:
 
 - **`VecDeque`** -- responses are consumed in FIFO order. The first call to `chat` returns the first response, the second call returns the second, and so on.
-- **`Mutex`** -- the `Provider` trait takes `&self` (not `&mut self`), because providers are shared. But we need to mutate the queue. A `std::sync::Mutex` (not `tokio::sync::Mutex`) is fine here because the critical section is trivial -- just a `pop_front`. Holding a `std::sync::Mutex` briefly across an `.await` point is acceptable when the lock is never contended.
+- **`Mutex`** -- wraps the queue so `&self` methods can mutate it. See the Rust concept note above for why `std::sync::Mutex` is the right choice here.
 - **Error on exhaustion** -- if the test scripts three responses but the agent calls `chat` a fourth time, it gets an error instead of a silent panic. This catches agent loops that spin more times than expected.
 
 ### Testing strategy
@@ -345,6 +381,10 @@ Walk through the logic:
 3. **Parse JSON into `ChunkResponse`.** If the JSON is malformed, `.ok()?` silently skips it. This is intentional -- SSE streams occasionally include keep-alive pings or malformed chunks, and crashing would be worse than dropping a token.
 4. **Extract text deltas.** The `delta.content` field contains the text fragment. Empty strings are skipped.
 5. **Extract tool call events.** A single chunk can contain both a `ToolCallStart` (when the `id` field is present, signaling a new call) and a `ToolCallDelta` (when `arguments` is present). The `if let ... && let ...` syntax is Rust's let-chains feature, stabilized in edition 2024.
+
+### Rust concept: let-chains
+
+The `if let Some(ref func) = tc.function && let Some(ref args) = func.arguments` syntax combines two pattern matches into a single `if` expression. Before let-chains, you would need nested `if let` blocks or a `match` with a tuple. Let-chains flatten the nesting and make the condition more readable. The `ref` keyword borrows the matched value instead of moving it, which is necessary here because `tc` is used again after the `if let`.
 
 The tests verify the parser against three cases: a text delta line produces `StreamEvent::TextDelta("Hello")`, the `data: [DONE]` line produces `StreamEvent::Done`, and non-data lines like `event: ping` or empty strings return `None`.
 
@@ -565,7 +605,31 @@ cargo test -p mini-claw-code-starter test_ch6   # OpenRouterProvider tests
 cargo test -p mini-claw-code-starter test_ch10  # Streaming tests
 ```
 
-The MockProvider tests are in `test_ch1`, the OpenRouterProvider tests are in `test_ch6`, and the streaming tests (SSE parsing, accumulator) are in `test_ch10`.
+### What the tests verify
+
+**MockProvider tests (test_ch1):**
+
+- **`test_ch1_mock_returns_text`** -- scripts a single text response and verifies `chat()` returns it
+- **`test_ch1_mock_exhausted`** -- calls `chat()` on an empty queue and verifies it returns an error
+
+**OpenRouterProvider tests (test_ch6):**
+
+- **`test_ch6_convert_messages`** -- verifies that internal `Message` variants are converted to the correct OpenAI API format
+- **`test_ch6_convert_tools`** -- verifies that `ToolDefinition` values are wrapped in the OpenAI function-calling envelope
+
+**Streaming tests (test_ch10):**
+
+- **`test_ch10_parse_sse_text_delta`** -- feeds a `data:` line with text content and verifies a `TextDelta` event is produced
+- **`test_ch10_parse_sse_done`** -- feeds `data: [DONE]` and verifies a `Done` event is produced
+- **`test_ch10_parse_sse_non_data`** -- feeds a non-data line like `event: ping` and verifies `None` is returned
+- **`test_ch10_accumulator_text`** -- feeds two `TextDelta` events and verifies the concatenated result
+- **`test_ch10_accumulator_tool_call`** -- feeds a `ToolCallStart` and two `ToolCallDelta` fragments, verifies they reassemble into a valid `ToolCall` with parsed JSON arguments
+
+---
+
+## Key takeaway
+
+The provider layer decouples the agent from any specific LLM backend. The `MockProvider` makes tests fast and deterministic; the `StreamProvider` trait and `StreamAccumulator` handle real-time streaming without complicating the agent loop. This separation -- canned responses for tests, streaming for production -- is a pattern used by every serious agent framework.
 
 ---
 

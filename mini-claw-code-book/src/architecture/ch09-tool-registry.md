@@ -5,6 +5,13 @@
 
 You have five tools. You have a `SimpleAgent`. This chapter wires them together.
 
+## Goal
+
+- Build a `default_tools()` helper that assembles all tools into a single `ToolSet` so the agent can discover and dispatch them by name.
+- Wire the `ToolSet` to `SimpleAgent` so the LLM sees all tool schemas and the agent dispatches calls to the correct tool.
+- Handle unknown tool calls gracefully by returning an error string that lets the LLM recover.
+- Run the full integration test suite proving that real tools execute with real side effects inside the agent loop.
+
 Over the past chapters you built the individual tools that let your agent interact with the world -- file reading and writing (Chapter 6), command execution (Chapter 7), and optionally pattern search (Chapter 8). Each tool implements the `Tool` trait, has a JSON schema, and returns a `String`. But they exist in isolation. The agent has no way to discover them, expose their schemas to the LLM, or dispatch calls by name.
 
 The tool registry is the bridge. It holds every available tool in a single `ToolSet`, exposes their schemas to the LLM so it knows what it can call, and dispatches incoming tool calls to the correct implementation by name. By the end of this chapter, you will have a fully functional coding agent that can read, write, edit, and execute commands -- the complete tool loop, now with real tools instead of test doubles.
@@ -48,6 +55,14 @@ pub use write::WriteTool;
 Every tool is a separate file with a single public struct. The `mod.rs` re-exports the structs so downstream code can write `use crate::tools::{ReadTool, WriteTool}` without reaching into individual modules.
 
 The flat structure is deliberate. There is no `tools/file/mod.rs` grouping `ReadTool`, `WriteTool`, and `EditTool` together. Why? Because tools are always referenced individually -- you register `ReadTool::new()`, not `FileTools::all()`. A flat module keeps the import paths short and the mental model simple. When you have 5 tools this is obviously fine. Claude Code has 40+ tools and still uses a similar flat layout -- each tool is its own module with a single export.
+
+---
+
+### Key Rust concept: trait objects and dynamic dispatch
+
+The `ToolSet` stores tools as `Box<dyn Tool>` -- a trait object that erases the concrete type. This means `ReadTool`, `WriteTool`, `EditTool`, and `BashTool` all become the same type behind a pointer, despite having different implementations. The `HashMap<String, Box<dyn Tool>>` is the collection that makes this work: it maps tool names to trait objects, so the agent can look up any tool by its string name at runtime.
+
+This is *dynamic dispatch*. When the agent calls `tool.call(args)`, the compiler does not know at compile time which `call()` method to invoke. It uses a vtable -- a function pointer table attached to the trait object -- to find the correct implementation at runtime. The cost is one pointer indirection per call, which is negligible compared to the I/O and network operations the tools perform.
 
 ---
 
@@ -127,6 +142,26 @@ In a production agent, categories compose into a permission hierarchy:
 The starter does not implement these categories yet -- that is an extension
 topic for later chapters. For now, the `SimpleAgent` executes every tool call
 the LLM requests without question.
+
+---
+
+## Tool dispatch flow
+
+Here is the complete flow from the LLM requesting a tool to the result being sent back:
+
+```mermaid
+flowchart TD
+    A["LLM responds with<br/>StopReason::ToolUse"] --> B["For each ToolCall"]
+    B --> C{"tools.get(name)?"}
+    C -->|Some| D["tool.call(args)"]
+    C -->|None| E["Return error:<br/>unknown tool"]
+    D --> F["Push ToolResult<br/>into message history"]
+    E --> F
+    F --> G["Call provider.chat()<br/>with updated history"]
+    G --> H{"StopReason?"}
+    H -->|ToolUse| B
+    H -->|Stop| I["Return final text"]
+```
 
 ---
 
@@ -317,6 +352,26 @@ cargo test -p mini-claw-code-starter test_ch7
 
 Note: The integration tests are in `test_ch7`, following the V1 chapter
 numbering.
+
+Key tests:
+
+- **test_ch7_write_and_read_flow** -- Agent writes a file then reads it back, verifying the file exists on disk with correct content.
+- **test_ch7_edit_flow** -- Agent edits an existing file with string replacement and reads back the result.
+- **test_ch7_bash_then_report** -- Agent runs a shell command and reports the output.
+- **test_ch7_write_edit_read_flow** -- Full pipeline: write initial content, edit it, read it back. Confirms tools chain correctly.
+- **test_ch7_all_four_tools** -- Agent uses bash, write, edit, and read in a single session, exercising the full tool set.
+- **test_ch7_multiple_writes** -- Agent writes two separate files in sequence.
+- **test_ch7_read_multiple_files** -- Agent reads two files in a single turn using parallel tool calls.
+- **test_ch7_five_step_conversation** -- A five-step flow (bash, write, read, edit, read) verifying long multi-tool sessions.
+- **test_ch7_chat_basic** -- Verifies the `chat()` method for simple text-only responses.
+- **test_ch7_chat_with_tool_call** -- Verifies `chat()` with tool dispatch and message history growth.
+- **test_ch7_chat_multi_turn** -- Two-turn conversation using `chat()` with accumulating message history.
+
+---
+
+## Key takeaway
+
+The tool registry is a `HashMap` lookup: the LLM produces a tool name, the agent finds the matching implementation, and calls it. This indirection -- name-based dispatch through trait objects -- is what lets you add or remove tools without changing the agent loop.
 
 ---
 

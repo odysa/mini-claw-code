@@ -27,6 +27,13 @@ flag you set on tools back in Chapter 9 has been waiting for exactly this moment
 cargo test -p mini-claw-code-starter test_ch12
 ```
 
+## Goal
+
+- Build a `PlanAgent` with two distinct phases: `plan()` (read-only tools only) and `execute()` (all tools available).
+- Implement the `exit_plan` virtual tool that lets the LLM explicitly signal "I am done planning" without requiring a `StopReason::Stop`.
+- Enforce two layers of write protection during planning: filter tool definitions so the LLM does not see write tools, and block write tool calls at execution time as a fallback.
+- Maintain message continuity between phases so the execution phase has full context from the planning phase.
+
 ---
 
 ## Why a separate agent?
@@ -121,18 +128,16 @@ the same loop structure as the SimpleAgent's `chat()`, but with different tool
 sets and different termination conditions. Both methods also take an
 `mpsc::UnboundedSender<AgentEvent>` for streaming events back to the caller.
 
-```
-User prompt
-    |
-    v
-+-------------+       +------------------+       +--------------+
-| plan()      |------>| Caller inspects  |------>| execute()    |
-| read-only   |       | plan, approves   |       | all tools    |
-| + exit_plan |       | or revises       |       |              |
-+-------------+       +------------------+       +--------------+
-    |                                                  |
-    v                                                  v
-  Plan text                                        Final result
+```mermaid
+flowchart LR
+    A["User prompt"] --> B["plan()<br/>read-only tools<br/>+ exit_plan"]
+    B --> C["Plan text"]
+    C --> D{"Caller<br/>approves?"}
+    D -->|Yes| E["Push approval<br/>message"]
+    D -->|No| F["Push feedback<br/>message"]
+    F --> B
+    E --> G["execute()<br/>all tools"]
+    G --> H["Final result"]
 ```
 
 The caller drives the transition. After `plan()` returns, the caller can:
@@ -314,6 +319,10 @@ catches it. For each tool call, three things happen:
 
 Both layers must fail for a write operation to slip through during planning.
 
+### Key Rust concept: `HashSet<&'static str>` for zero-cost string sets
+
+The `read_only` field uses `&'static str` rather than `String`. This means the set contains references to string literals that live for the entire program -- no heap allocation, no cloning. The `'static` lifetime tells the compiler these strings never become invalid, which is always true for string literals like `"read"` or `"bash"`. The trade-off is that you can only put compile-time-known strings into the set, not dynamically generated ones. For tool names, which are always known at compile time, this is the ideal choice.
+
 ### The read_only set
 
 The `read_only` field is a `HashSet<&'static str>` containing the tool names
@@ -464,6 +473,30 @@ cargo test -p mini-claw-code-starter test_ch12
 
 Note: The plan mode tests are in `test_ch12`, following the V1 chapter
 numbering where plan mode was Chapter 12.
+
+Key tests:
+
+- **test_ch12_plan_text_response** -- Plan phase returns text directly when the LLM responds with `StopReason::Stop`.
+- **test_ch12_plan_with_read_tool** -- Plan phase allows `read` tool calls and returns the plan text.
+- **test_ch12_plan_blocks_write_tool** -- Plan phase blocks `write` tool calls, returns error to LLM, and verifies the file was not created on disk.
+- **test_ch12_plan_blocks_edit_tool** -- Plan phase blocks `edit` tool calls and the original file remains unchanged.
+- **test_ch12_execute_allows_write_tool** -- Execute phase permits writes and the file is created on disk.
+- **test_ch12_full_plan_then_execute** -- Complete two-phase flow: plan reads a file, execution writes to a new file.
+- **test_ch12_message_continuity** -- Message history grows correctly across plan and execute phases (system + user + assistant messages accumulate).
+- **test_ch12_read_only_override** -- Custom `read_only(&["read"])` excludes `bash` from the plan phase.
+- **test_ch12_streaming_events_during_plan** -- Plan phase emits `TextDelta` and `Done` events through the channel.
+- **test_ch12_exit_plan_tool** -- The virtual `exit_plan` tool ends planning and injects a synthetic tool result.
+- **test_ch12_system_prompt_injected** -- Plan phase inserts a `PLANNING MODE` system message at position 0.
+- **test_ch12_system_prompt_not_duplicated** -- Calling `plan()` twice does not duplicate the system prompt.
+- **test_ch12_exit_plan_not_in_execute** -- During execute, `exit_plan` is treated as an unknown tool.
+- **test_ch12_custom_plan_prompt** -- Custom plan prompt replaces the default planning instructions.
+- **test_ch12_full_flow_with_exit_plan** -- End-to-end: read during planning, exit_plan, approve, write during execution.
+
+---
+
+## Key takeaway
+
+Plan mode is caller-driven separation of concerns: the agent analyzes with read-only tools first, the caller reviews and approves, then the agent executes with the full tool set. The same message history flows through both phases, giving the execution phase complete context from the planning phase.
 
 ---
 

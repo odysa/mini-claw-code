@@ -24,6 +24,13 @@ cargo test -p mini-claw-code-starter test_ch17  # InstructionLoader
 cargo test -p mini-claw-code-starter test_ch15  # SystemPromptBuilder, context
 ```
 
+## Goal
+
+- Connect the `InstructionLoader` (from Chapter 5) to `SystemPromptBuilder` so discovered CLAUDE.md files become dynamic prompt sections.
+- Wire `Config.instructions` as a second dynamic section that gets the final word in the prompt.
+- Verify that the instruction pipeline is directory-aware -- launching from different directories produces different system prompts.
+- Ensure instructions stay below the cache boundary so the agent always uses fresh instructions while caching the stable prompt prefix.
+
 ---
 
 ## The instruction pipeline
@@ -110,6 +117,18 @@ impl InstructionLoader {
 ```
 
 ### Discovery: the upward walk
+
+```mermaid
+flowchart BT
+    A["/home/user/project/backend/"] -->|check for CLAUDE.md| B["/home/user/project/"]
+    B -->|check for CLAUDE.md| C["/home/user/"]
+    C -->|check for CLAUDE.md| D["/home/"]
+    D -->|check for CLAUDE.md| E["/"]
+
+    A -.->|"found: backend/CLAUDE.md"| F["Collected paths<br/>(reversed to root-first)"]
+    B -.->|"found: project/CLAUDE.md"| F
+    C -.->|"found: user/CLAUDE.md"| F
+```
 
 `discover()` starts at the given directory and walks toward the filesystem
 root. At each directory, it checks for every file name in the list:
@@ -237,6 +256,12 @@ may not be committed) or in the user's home config directory (which is never
 committed). They represent personal preferences or temporary overrides.
 "Always explain your reasoning." "Focus on performance over readability for
 this session."
+
+---
+
+### Key Rust concept: `Option` chaining with `if let` for optional pipeline steps
+
+The wiring code uses `if let Some(instructions) = loader.load(...)` to conditionally add sections. This pattern is idiomatic Rust for optional pipeline steps: `InstructionLoader::load()` returns `Option<String>` -- `None` when no instruction files exist, `Some(text)` when they do. The `if let` binding destructures the `Option` and only executes the body when there is a value. Similarly, `Config.instructions` is `Option<String>`, and `if let Some(ref inst) = config.instructions` only adds the section when the config has instructions. This means the prompt builder never adds empty sections -- the system prompt is exactly as long as it needs to be.
 
 ---
 
@@ -396,6 +421,30 @@ cargo test -p mini-claw-code-starter test_ch15  # SystemPromptBuilder, context
 Note: InstructionLoader tests are in `test_ch17` (V1 instructions chapter).
 SystemPromptBuilder and context integration tests are in `test_ch15` (V1
 context management chapter).
+
+Key InstructionLoader tests (`test_ch17`):
+
+- **test_ch17_discover_in_current_dir** -- Finds a CLAUDE.md in the start directory.
+- **test_ch17_discover_in_parent** -- Walks upward and finds a CLAUDE.md in the parent directory.
+- **test_ch17_no_files_found** -- Returns an empty list when no instruction files exist anywhere in the path.
+- **test_ch17_load_content** -- `load()` returns `Some` with the file content included.
+- **test_ch17_load_empty_file** -- `load()` returns `None` for an empty CLAUDE.md (no wasted tokens).
+- **test_ch17_multiple_file_names** -- Discovers both `CLAUDE.md` and `.mini-claw/instructions.md` in the same directory.
+- **test_ch17_system_prompt_section** -- `system_prompt_section()` wraps content with a "project instructions" header.
+- **test_ch17_default_files** -- `default_files()` constructor does not panic.
+
+Key context tests (`test_ch15`):
+
+- **test_ch15_below_threshold_no_compact** -- Context manager does not trigger compaction when below the token threshold.
+- **test_ch15_triggers_at_threshold** -- Compaction triggers when recorded tokens exceed the threshold.
+- **test_ch15_compact_preserves_system_prompt** -- After compaction, the system prompt remains as the first message.
+- **test_ch15_compact_preserves_recent** -- The most recent N messages survive compaction intact.
+
+---
+
+## Key takeaway
+
+Instructions are always dynamic. Even though CLAUDE.md files rarely change, the *set* of files depends on the working directory. Keeping them below the cache boundary ensures the agent adapts to each project while caching the stable identity and safety prompts above.
 
 ---
 

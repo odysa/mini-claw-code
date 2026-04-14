@@ -34,6 +34,22 @@ Implement `InstructionLoader` in `src/instructions.rs` so that:
 3. `system_prompt_section()` wraps the loaded instructions for inclusion in a
    system prompt.
 
+## How instruction loading works
+
+```mermaid
+flowchart TD
+    A[InstructionLoader::discover] -->|walks upward| B[/home/user/CLAUDE.md]
+    A -->|walks upward| C[/home/user/project/CLAUDE.md]
+    A -->|starts here| D[/home/user/project/backend/CLAUDE.md]
+    B --> E[Reverse to root-first order]
+    C --> E
+    D --> E
+    E --> F[InstructionLoader::load]
+    F -->|concatenates with headers| G[Combined instructions string]
+    G --> H[system_prompt_section]
+    H --> I[Ready for system prompt]
+```
+
 ## Why system prompts matter for agents
 
 A vanilla LLM is a text completer. It has no idea it can run bash commands, read
@@ -161,6 +177,10 @@ impl InstructionLoader {
 
 The loader is parameterized by file names to search for. The default
 configuration looks for `CLAUDE.md` and `.mini-claw/instructions.md`.
+
+### Rust concept: borrowed slices to owned collections
+
+The constructor takes `&[&str]` -- a borrowed slice of borrowed string slices -- and converts it to `Vec<String>`. This is a common Rust pattern at API boundaries: accept borrowed data for flexibility (the caller can pass string literals, `&String`, or anything that derefs to `&str`), but store owned data internally so the struct has no lifetime parameter and can live independently of its creator.
 
 ### Implementing `new()`
 
@@ -323,6 +343,10 @@ You also learned the key concepts behind production system prompt architecture:
 As an extension, you could implement `PromptSection` and `SystemPromptBuilder`
 types to manage the static/dynamic split structurally. The reference
 implementation (`mini-claw-code`) shows one approach.
+
+## Key takeaway
+
+A system prompt is not a single string -- it is an assembly of modular sections, ordered so that stable content comes first (enabling prompt caching) and session-specific content comes last. The `InstructionLoader` is the simplest but most user-facing piece of this assembly: it gives every project a way to customize the agent's behavior through plain Markdown files.
 
 ## What's next
 

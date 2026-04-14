@@ -13,6 +13,13 @@ This chapter builds the hook system. Hooks are event-driven: they fire at key li
 cargo test -p mini-claw-code-starter test_ch20
 ```
 
+## Goal
+
+- Define the `HookEvent` enum with four lifecycle points (`AgentStart`, `PreToolCall`, `PostToolCall`, `AgentEnd`) that carry contextual data.
+- Implement the `Hook` trait and `HookRegistry` dispatch logic where `Block` short-circuits, `ModifyArgs` accumulates, and `Continue` is the default.
+- Build three concrete hooks: `LoggingHook` (observe all events), `BlockingHook` (deny specific tools), and `ShellHook` (delegate to external commands).
+- Ensure hooks compose correctly -- registration order determines priority, and blocking hooks prevent later hooks from running.
+
 ---
 
 ## The event model
@@ -28,6 +35,28 @@ User prompt arrives
     -> PostToolCall (for each tool)
   -> Provider returns final answer
   -> AgentEnd
+```
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant Registry as HookRegistry
+    participant Tool
+
+    Agent->>Registry: dispatch(AgentStart)
+    loop For each tool call
+        Agent->>Registry: dispatch(PreToolCall)
+        alt Block returned
+            Registry-->>Agent: Block(reason)
+            Agent->>Agent: Return error to LLM
+        else Continue/ModifyArgs
+            Registry-->>Agent: Continue or ModifyArgs
+            Agent->>Tool: tool.call(args)
+            Tool-->>Agent: result
+            Agent->>Registry: dispatch(PostToolCall)
+        end
+    end
+    Agent->>Registry: dispatch(AgentEnd)
 ```
 
 Four events, four points where external code can intervene:
@@ -199,6 +228,12 @@ impl Hook for LoggingHook {
 
 The simplest possible hook: record a short description of every event, never interfere. It always returns `Continue`, meaning it never blocks or modifies anything. The `Mutex<Vec<String>>` allows interior mutability -- the `on_event` method takes `&self` (not `&mut self`), so we need a lock to push into the vector.
 
+### Key Rust concept: `Mutex` for interior mutability in async code
+
+The `Hook` trait requires `&self` (not `&mut self`) because the registry holds hooks by shared reference. But `LoggingHook` needs to mutate its internal log. The solution is `std::sync::Mutex<Vec<String>>` -- a lock that provides mutual exclusion. When `on_event` calls `self.log.lock().unwrap()`, it gets exclusive access to the `Vec`, pushes a message, and drops the lock when the guard goes out of scope.
+
+Why `std::sync::Mutex` and not `tokio::sync::Mutex`? Because the lock is held only for a `push` operation -- microseconds, no `.await` inside the critical section. The standard library `Mutex` is faster for short, synchronous critical sections. You only need `tokio::sync::Mutex` when you must hold the lock across an `.await` point.
+
 In the starter, the `LoggingHook` records string descriptions rather than cloned events. The format is compact: `"pre:bash"`, `"post:write"`, `"agent:start"`, `"agent:end"`. This makes test assertions simpler -- you compare strings rather than matching enum variants.
 
 The `LoggingHook` is invaluable for testing. You can construct a registry with a `LoggingHook`, fire some events, and then inspect what was recorded. This is exactly what the tests do.
@@ -360,7 +395,24 @@ cargo test -p mini-claw-code-starter test_ch20
 Note: The hook tests are in `test_ch20`, following the V1 chapter numbering
 where hooks were Chapter 20.
 
-The tests verify each hook type and the registry's dispatch behavior.
+Key tests:
+
+- **test_ch20_logging_hook** -- LoggingHook records `"pre:bash"` for a PreToolCall event and returns Continue.
+- **test_ch20_logging_hook_multiple_events** -- LoggingHook records all four event types in order: `["agent:start", "pre:read", "post:read", "agent:end"]`.
+- **test_ch20_blocking_hook** -- BlockingHook returns `Block("bash is disabled")` for a bash PreToolCall.
+- **test_ch20_blocking_hook_allows_other_tools** -- BlockingHook returns Continue for tools not in the blocked list.
+- **test_ch20_registry_dispatch_continue** -- Registry with only a LoggingHook returns Continue.
+- **test_ch20_registry_dispatch_block** -- Registry with LoggingHook then BlockingHook returns Block for bash.
+- **test_ch20_registry_multiple_hooks_order** -- Both hooks in a two-hook registry are called for a non-blocked event.
+- **test_ch20_registry_block_short_circuits** -- When a BlockingHook fires, hooks registered after it are never called.
+- **test_ch20_registry_is_empty** -- Verifies `is_empty()` before and after registration.
+- **test_ch20_post_tool_event** -- LoggingHook correctly formats PostToolCall events as `"post:write"`.
+
+---
+
+## Key takeaway
+
+The hook system is an event bus with three possible responses: observe (Continue), intervene (Block), or transform (ModifyArgs). Registration order determines priority, and Block short-circuits immediately. This gives users a clean extension point for custom policies without modifying the agent's core loop.
 
 ---
 

@@ -34,6 +34,7 @@ impl ContextManager {
     /// - Summarize the middle messages by asking the provider
     /// - Replace middle with a single System message containing the summary
     /// - Reset tokens_used to tokens_used / 3
+    #[allow(clippy::ptr_arg)]
     pub async fn compact<P: Provider>(
         &mut self,
         provider: &P,

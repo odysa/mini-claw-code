@@ -238,6 +238,7 @@ impl<P: StreamProvider> StreamingAgent<P> {
     ///   3. Call provider.stream_chat(messages, &defs, stream_tx)
     ///   4. Await the forwarder
     ///   5. Match on stop_reason as usual
+    #[allow(clippy::ptr_arg)]
     pub async fn chat(
         &self,
         messages: &mut Vec<Message>,

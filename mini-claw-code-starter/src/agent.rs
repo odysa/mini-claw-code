@@ -92,6 +92,7 @@ impl<P: Provider> SimpleAgent<P> {
     }
 
     /// Push an assistant turn and its tool results into the message history.
+    #[allow(clippy::ptr_arg)]
     fn push_results(
         messages: &mut Vec<Message>,
         turn: AssistantTurn,

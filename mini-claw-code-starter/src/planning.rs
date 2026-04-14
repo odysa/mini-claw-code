@@ -52,6 +52,7 @@ impl<P: StreamProvider> PlanAgent<P> {
     /// Hints:
     /// - Inject system prompt at position 0 if not already present
     /// - Call run_loop with Some(&self.read_only)
+    #[allow(clippy::ptr_arg)]
     pub async fn plan(
         &self,
         messages: &mut Vec<Message>,
@@ -61,6 +62,7 @@ impl<P: StreamProvider> PlanAgent<P> {
     }
 
     /// Run the execution phase: all tools available.
+    #[allow(clippy::ptr_arg)]
     pub async fn execute(
         &self,
         messages: &mut Vec<Message>,
@@ -77,6 +79,7 @@ impl<P: StreamProvider> PlanAgent<P> {
     /// - Loop: stream_chat -> match stop_reason
     /// - For ToolUse: handle exit_plan specially (return plan text),
     ///   block tools not in allowed set, execute allowed tools normally
+    #[allow(clippy::ptr_arg)]
     async fn run_loop(
         &self,
         messages: &mut Vec<Message>,

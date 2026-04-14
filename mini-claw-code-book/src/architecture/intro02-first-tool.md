@@ -1,25 +1,41 @@
-# Your First Tool Call
+# Chapter 2: Your First Tool Call
 
 > **File to edit:** `src/tools/read.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch2`
 
 An LLM can't read files, run commands, or browse the web. It can only generate text. But it can *ask your code* to do those things. That's what tools are.
 
+## Goal
+
+Implement `ReadTool` so that:
+
+1. It declares its name, description, and parameter schema.
+2. When called with `{"path": "some/file.txt"}`, it reads the file and returns its contents.
+3. Missing arguments or non-existent files produce errors.
+
 ## How tool calling works
 
-```
-1. You send the LLM a prompt + a list of available tools (JSON schemas)
-2. The LLM responds with StopReason::ToolUse and a list of tool calls
-3. Your code executes each tool call
-4. You send the results back to the LLM
-5. The LLM generates a final answer using those results
+The LLM never touches the filesystem. It describes what it wants, and your code does it:
+
+```mermaid
+sequenceDiagram
+    participant A as Agent
+    participant L as LLM
+    participant T as ReadTool
+
+    A->>L: "What's in doc.txt?" + tool schemas
+    L-->>A: tool_call: read(path="doc.txt")
+    A->>T: call({"path": "doc.txt"})
+    T-->>A: "file contents here..."
+    A->>L: tool result: "file contents here..."
+    L-->>A: "The file contains..."
 ```
 
-The LLM never touches the filesystem. It describes what it wants (`{"name": "read", "arguments": {"path": "foo.txt"}}`), and your code does it.
+The LLM sees a JSON schema describing each tool. When it decides to use one, it outputs a structured request with the tool name and arguments. Your code parses this, runs the real function, and sends the result back.
 
 ## The Tool trait
 
-Every tool implements two methods:
+Open `mini-claw-code-starter/src/types.rs` and find the `Tool` trait:
 
 ```rust
 #[async_trait::async_trait]
@@ -29,12 +45,19 @@ pub trait Tool: Send + Sync {
 }
 ```
 
+Two methods:
 - **`definition()`** returns the JSON schema that tells the LLM what this tool does and what arguments it takes
-- **`call()`** executes the tool with the given arguments and returns a string result
+- **`call()`** executes the tool and returns a string result
 
-## Your task: ReadTool
+### Why `#[async_trait]` instead of plain `async fn`?
 
-Open `src/tools/read.rs`. You'll implement a tool that reads files.
+Later, tools are stored in a `ToolSet` — a `HashMap<String, Box<dyn Tool>>`. This requires dynamic dispatch, which needs a known return size. `async fn` in traits generates uniquely-sized `Future` types per implementation, breaking dynamic dispatch. `#[async_trait]` rewrites them into `Pin<Box<dyn Future>>` which has a fixed size. You write normal `async fn` code; the macro handles the boxing.
+
+The `Provider` trait avoids this with RPITIT (`-> impl Future`) because providers are used as generic parameters (`P: Provider`), never as `dyn Provider`.
+
+## The implementation
+
+Open `src/tools/read.rs`. You'll see the struct and two stubs.
 
 ### Step 1: The definition
 
@@ -51,7 +74,7 @@ pub fn new() -> Self {
 
 The `.param()` builder adds a parameter with its type, description, and whether it's required. When the LLM sees this schema, it knows it can call a tool named `"read"` with a required string argument `"path"`.
 
-### Step 2: The implementation
+### Step 2: The call
 
 Extract the path from the JSON arguments, read the file, return the contents:
 
@@ -69,6 +92,16 @@ async fn call(&self, args: Value) -> anyhow::Result<String> {
 
 Three lines of logic. `args` is a `serde_json::Value` — the parsed JSON arguments from the LLM. The `context()` and `with_context()` methods (from `anyhow`) add human-readable error messages.
 
+Here is the data flow:
+
+```mermaid
+flowchart LR
+    A["args: {\"path\": \"foo.txt\"}"] --> B["as_str()"]
+    B --> C["tokio::fs::read_to_string"]
+    C --> D["Ok(\"file contents\")"]
+    C --> E["Err(\"failed to read\")"]
+```
+
 ## Run the tests
 
 ```bash
@@ -76,10 +109,12 @@ cargo test -p mini-claw-code-starter test_ch2
 ```
 
 15 tests verify your tool:
-- `test_ch2_read_definition` — schema has the right name and required params
-- `test_ch2_read_file` — reads a real file from a temp directory
-- `test_ch2_read_missing_file` — returns an error for nonexistent files
-- `test_ch2_read_missing_arg` — returns an error when `path` is missing
+- **`test_ch2_read_definition`** — schema has the right name and required params
+- **`test_ch2_read_file`** — reads a real file from a temp directory
+- **`test_ch2_read_missing_file`** — returns an error for nonexistent files
+- **`test_ch2_read_missing_arg`** — returns an error when `path` is missing
+- **`test_ch2_read_utf8_content`** — handles multi-line content correctly
+- **`test_ch2_read_empty_file`** — reads an empty file without error
 
 ## The pattern
 
@@ -89,12 +124,12 @@ Every tool in this project follows the same three-step pattern:
 2. **Extract** — pull arguments from the JSON `Value`
 3. **Execute** — do the thing, return a `String`
 
-You'll repeat this pattern for `WriteTool`, `EditTool`, and `BashTool` in later chapters. Once you've written one tool, you've written them all.
+You'll repeat this for `WriteTool`, `EditTool`, and `BashTool` in later chapters. Once you've written one tool, you've written them all.
 
-## What just happened
+## Key takeaway
 
-You taught the LLM a new capability. By itself, the LLM can only generate text. With your `ReadTool`, it can now read any file on disk. The tool is the bridge between "the LLM wants to read a file" and "the file is actually read."
+A tool is the bridge between "the LLM wants to read a file" and "the file is actually read." The LLM describes its intent as structured JSON. Your code does the work.
 
 ---
 
-**Next:** [The Agentic Loop →](./intro03-agentic-loop.md)
+**Next:** [Chapter 3: The Agentic Loop →](./intro03-agentic-loop.md)

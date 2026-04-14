@@ -4,16 +4,11 @@
 
 ---
 
-# Getting Started
+# Claude Code Architecture in Rust (V2)
 
 - [Your First LLM Call](./architecture/intro01-first-llm-call.md)
 - [Your First Tool Call](./architecture/intro02-first-tool.md)
 - [The Agentic Loop](./architecture/intro03-agentic-loop.md)
-
----
-
-# Deep Dive: Claude Code Architecture in Rust
-
 - [Chapter 1: Messages & Types](./architecture/ch01-messages-types.md)
 - [Chapter 2: Provider & Streaming](./architecture/ch02-provider-streaming.md)
 - [Chapter 3: Tool Interface](./architecture/ch03-tool-interface.md)

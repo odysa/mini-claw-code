@@ -6,10 +6,10 @@
 
 # Your First Agent SDK
 
-- [Chapter 1: Messages & Types](./architecture/ch01-messages-types.md)
-- [Chapter 2: Your First LLM Response](./architecture/ch02-provider-streaming.md)
-- [Chapter 3: Your First Tool Call](./architecture/ch03-tool-interface.md)
-- [Chapter 4: The Agentic Loop](./architecture/ch04-query-engine.md)
+- [Chapter 1: Your First LLM Response](./architecture/ch02-provider-streaming.md)
+- [Chapter 2: Your First Tool Call](./architecture/ch03-tool-interface.md)
+- [Chapter 3: The Agentic Loop](./architecture/ch04-query-engine.md)
+- [Chapter 4: Messages & Types](./architecture/ch01-messages-types.md)
 - [Chapter 5: System Prompt](./architecture/ch05-system-prompt.md)
 
 ---

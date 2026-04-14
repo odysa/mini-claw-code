@@ -64,15 +64,15 @@ cargo test -p claw-code
 
 ## Chapter roadmap
 
-| Part | Chapters | What you build |
-|------|----------|---------------|
-| **I: Core Engine** | 1-5 | Messages, provider, tool trait, query engine, system prompt |
-| **II: Tools** | 6-9 | File tools, bash, glob/grep, tool registry |
-| **III: Safety** | 10-13 | Permissions, safety checks, hooks, plan mode |
-| **IV: Config** | 14-17 | Settings, CLAUDE.md, memory, token tracking |
-| **V: Context** | 18-20 | Compaction, session save/resume |
-| **VI: Integration** | 21-22 | MCP protocol and client |
-| **VII: Agents** | 23-25 | Subagents, multi-agent, user input |
-| **VIII: TUI** | 26 | Terminal UI with streaming |
+| Section | Chapters | What you build |
+|---------|----------|---------------|
+| **Your First Agent SDK** | 1-3 | First LLM response, first tool call, the agentic loop |
+| **Under the Hood** | 4-5 | Messages & types deep dive, system prompt |
+| **Building Your Toolbox** | 6-9 | File tools, bash, glob/grep, tool registry |
+| **Safety & Control** | 10-13 | Permissions, safety checks, hooks, plan mode |
+| **Configuration** | 14-17 | Settings, CLAUDE.md, memory, token tracking |
+| **Context Management** | 18-20 | Compaction, session save/resume |
+| **MCP Integration** | 21-22 | MCP protocol and client |
+| **Multi-Agent** | 23-26 | Subagents, coordination, user input, TUI |
 
 Let's start building.

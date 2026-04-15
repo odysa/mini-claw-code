@@ -103,7 +103,9 @@ impl OpenRouterProvider {
     ///
     /// Hint: Use `reqwest::Client::new()` and `.into()` for string conversion.
     pub fn new(api_key: impl Into<String>, model: impl Into<String>) -> Self {
-        unimplemented!("Create reqwest::Client, store api_key, model, and default base_url 'https://openrouter.ai/api/v1'")
+        unimplemented!(
+            "Create reqwest::Client, store api_key, model, and default base_url 'https://openrouter.ai/api/v1'"
+        )
     }
 
     /// Override the base URL (useful for testing with a local server).
@@ -133,14 +135,18 @@ impl OpenRouterProvider {
     ///   Set tool_calls to None (not Some(vec![])) when empty.
     /// - ToolResult -> role: "tool", content: Some(content.clone()), tool_call_id: Some(id.clone())
     pub(crate) fn convert_messages(messages: &[Message]) -> Vec<ApiMessage> {
-        unimplemented!("Map each Message variant to ApiMessage: System/User set role+content, Assistant maps tool_calls, ToolResult sets tool_call_id")
+        unimplemented!(
+            "Map each Message variant to ApiMessage: System/User set role+content, Assistant maps tool_calls, ToolResult sets tool_call_id"
+        )
     }
 
     /// Convert our ToolDefinition types to the API's tool format.
     ///
     /// Each tool becomes: { type: "function", function: { name, description, parameters } }
     pub(crate) fn convert_tools(tools: &[&ToolDefinition]) -> Vec<ApiTool> {
-        unimplemented!("Map each ToolDefinition to ApiTool with type 'function' and ApiToolDef containing name, description, parameters")
+        unimplemented!(
+            "Map each ToolDefinition to ApiTool with type 'function' and ApiToolDef containing name, description, parameters"
+        )
     }
 }
 
@@ -163,7 +169,9 @@ impl crate::streaming::StreamProvider for OpenRouterProvider {
         tools: &[&ToolDefinition],
         tx: tokio::sync::mpsc::UnboundedSender<crate::streaming::StreamEvent>,
     ) -> anyhow::Result<AssistantTurn> {
-        unimplemented!("Build ChatRequest with stream:true, POST to API, read chunks, parse SSE lines, feed StreamAccumulator, send events via tx, return acc.finish()")
+        unimplemented!(
+            "Build ChatRequest with stream:true, POST to API, read chunks, parse SSE lines, feed StreamAccumulator, send events via tx, return acc.finish()"
+        )
     }
 }
 
@@ -186,6 +194,8 @@ impl Provider for OpenRouterProvider {
         messages: &[Message],
         tools: &[&ToolDefinition],
     ) -> anyhow::Result<AssistantTurn> {
-        unimplemented!("Build ChatRequest with stream:false, POST to API, parse ChatResponse, convert tool_calls, determine stop_reason, extract usage")
+        unimplemented!(
+            "Build ChatRequest with stream:false, POST to API, parse ChatResponse, convert tool_calls, determine stop_reason, extract usage"
+        )
     }
 }

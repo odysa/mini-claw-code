@@ -28,7 +28,9 @@ pub struct PlanAgent<P: StreamProvider> {
 
 impl<P: StreamProvider> PlanAgent<P> {
     pub fn new(provider: P) -> Self {
-        unimplemented!("Initialize with provider, empty ToolSet, default read_only set, plan prompt, exit_plan def")
+        unimplemented!(
+            "Initialize with provider, empty ToolSet, default read_only set, plan prompt, exit_plan def"
+        )
     }
 
     pub fn tool(mut self, t: impl Tool + 'static) -> Self {

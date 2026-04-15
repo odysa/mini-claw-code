@@ -108,6 +108,8 @@ impl Tool for SafeToolWrapper {
     }
 
     async fn call(&self, args: Value) -> anyhow::Result<String> {
-        unimplemented!("Run checks, if all pass call inner.call(args), otherwise return error string")
+        unimplemented!(
+            "Run checks, if all pass call inner.call(args), otherwise return error string"
+        )
     }
 }

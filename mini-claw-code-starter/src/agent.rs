@@ -51,7 +51,9 @@ pub async fn single_turn<P: Provider>(
     tools: &ToolSet,
     prompt: &str,
 ) -> anyhow::Result<String> {
-    unimplemented!("Collect tool defs, send prompt to provider, match on stop_reason: Stop returns text, ToolUse executes tools and calls provider again")
+    unimplemented!(
+        "Collect tool defs, send prompt to provider, match on stop_reason: Stop returns text, ToolUse executes tools and calls provider again"
+    )
 }
 
 /// A simple AI agent that connects a provider to tools via a loop.
@@ -97,7 +99,9 @@ impl<P: Provider> SimpleAgent<P> {
         turn: AssistantTurn,
         results: Vec<(String, String)>,
     ) {
-        unimplemented!("Push Message::Assistant(turn), then Message::ToolResult for each (id, content)")
+        unimplemented!(
+            "Push Message::Assistant(turn), then Message::ToolResult for each (id, content)"
+        )
     }
 
     /// Run the agent loop with existing message history and emit events.
@@ -111,7 +115,9 @@ impl<P: Provider> SimpleAgent<P> {
         mut messages: Vec<Message>,
         events: mpsc::UnboundedSender<AgentEvent>,
     ) -> Vec<Message> {
-        unimplemented!("Loop: call provider, on Stop send Done event and return, on ToolUse send ToolCall events, execute tools, push results, continue")
+        unimplemented!(
+            "Loop: call provider, on Stop send Done event and return, on ToolUse send ToolCall events, execute tools, push results, continue"
+        )
     }
 
     /// Run the agent loop, sending events through the channel.
@@ -133,7 +139,9 @@ impl<P: Provider> SimpleAgent<P> {
     /// 5. Return the cloned text
     #[allow(clippy::ptr_arg)]
     pub async fn chat(&self, messages: &mut Vec<Message>) -> anyhow::Result<String> {
-        unimplemented!("Loop: call provider, on Stop clone text then push Assistant and return, on ToolUse execute tools and push results")
+        unimplemented!(
+            "Loop: call provider, on Stop clone text then push Assistant and return, on ToolUse execute tools and push results"
+        )
     }
 
     /// Run the agent loop with the given prompt.

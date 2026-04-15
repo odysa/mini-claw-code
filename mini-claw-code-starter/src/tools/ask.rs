@@ -35,7 +35,9 @@ impl AskTool {
     ///
     /// Hint: Use param_raw for the "options" array parameter.
     pub fn new(handler: Arc<dyn InputHandler>) -> Self {
-        unimplemented!("Create ToolDefinition with name 'ask_user', required 'question' param, optional 'options' array param via param_raw, store handler")
+        unimplemented!(
+            "Create ToolDefinition with name 'ask_user', required 'question' param, optional 'options' array param via param_raw, store handler"
+        )
     }
 }
 
@@ -47,7 +49,9 @@ impl Tool for AskTool {
 
     /// Extract question and options, call handler.ask().
     async fn call(&self, args: Value) -> anyhow::Result<String> {
-        unimplemented!("Extract 'question' from args, parse options with parse_options(), call self.handler.ask()")
+        unimplemented!(
+            "Extract 'question' from args, parse options with parse_options(), call self.handler.ask()"
+        )
     }
 }
 
@@ -73,7 +77,9 @@ pub struct CliInputHandler;
 #[async_trait::async_trait]
 impl InputHandler for CliInputHandler {
     async fn ask(&self, question: &str, options: &[String]) -> anyhow::Result<String> {
-        unimplemented!("Print question and options, read stdin line via spawn_blocking, resolve numeric choice to option text")
+        unimplemented!(
+            "Print question and options, read stdin line via spawn_blocking, resolve numeric choice to option text"
+        )
     }
 }
 
@@ -99,7 +105,9 @@ impl ChannelInputHandler {
 impl InputHandler for ChannelInputHandler {
     /// Send a UserInputRequest and await the oneshot response.
     async fn ask(&self, question: &str, options: &[String]) -> anyhow::Result<String> {
-        unimplemented!("Create oneshot channel, send UserInputRequest through self.tx, await and return the response")
+        unimplemented!(
+            "Create oneshot channel, send UserInputRequest through self.tx, await and return the response"
+        )
     }
 }
 

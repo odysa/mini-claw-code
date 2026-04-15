@@ -23,7 +23,9 @@ impl<P: Provider> SubagentTool<P> {
         provider: Arc<P>,
         tools_factory: impl Fn() -> ToolSet + Send + Sync + 'static,
     ) -> Self {
-        unimplemented!("Initialize with provider, factory, None system_prompt, max_turns=10, ToolDefinition")
+        unimplemented!(
+            "Initialize with provider, factory, None system_prompt, max_turns=10, ToolDefinition"
+        )
     }
 
     pub fn system_prompt(mut self, prompt: impl Into<String>) -> Self {

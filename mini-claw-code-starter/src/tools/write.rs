@@ -19,7 +19,9 @@ impl Default for WriteTool {
 impl WriteTool {
     /// Create a new WriteTool. Schema: required "path" and "content" parameters.
     pub fn new() -> Self {
-        unimplemented!("Create ToolDefinition with name 'write', description, and required 'path' and 'content' string parameters")
+        unimplemented!(
+            "Create ToolDefinition with name 'write', description, and required 'path' and 'content' string parameters"
+        )
     }
 }
 
@@ -37,6 +39,8 @@ impl Tool for WriteTool {
     /// - Write file: `tokio::fs::write(path, content).await?`
     /// - Return confirmation: `format!("wrote {path}")`
     async fn call(&self, args: Value) -> anyhow::Result<String> {
-        unimplemented!("Extract 'path' and 'content' from args, create parent dirs with tokio::fs::create_dir_all, write file, return confirmation")
+        unimplemented!(
+            "Extract 'path' and 'content' from args, create parent dirs with tokio::fs::create_dir_all, write file, return confirmation"
+        )
     }
 }

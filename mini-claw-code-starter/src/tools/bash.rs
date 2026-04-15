@@ -21,7 +21,9 @@ impl Default for BashTool {
 impl BashTool {
     /// Create a new BashTool. Schema: one required "command" parameter (string).
     pub fn new() -> Self {
-        unimplemented!("Create ToolDefinition with name 'bash', description, and a required 'command' string parameter")
+        unimplemented!(
+            "Create ToolDefinition with name 'bash', description, and a required 'command' string parameter"
+        )
     }
 }
 
@@ -40,6 +42,8 @@ impl Tool for BashTool {
     /// - Build result: stdout first, then stderr prefixed with `"stderr: "`
     /// - If both empty, return `"(no output)"`
     async fn call(&self, args: Value) -> anyhow::Result<String> {
-        unimplemented!("Extract 'command', run via tokio::process::Command bash -c, capture stdout/stderr, return combined output")
+        unimplemented!(
+            "Extract 'command', run via tokio::process::Command bash -c, capture stdout/stderr, return combined output"
+        )
     }
 }

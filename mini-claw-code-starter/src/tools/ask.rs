@@ -119,6 +119,6 @@ impl MockInputHandler {
 #[async_trait::async_trait]
 impl InputHandler for MockInputHandler {
     async fn ask(&self, _question: &str, _options: &[String]) -> anyhow::Result<String> {
-        unimplemented!("Lock mutex, pop_front the next answer, return Ok(answer) or Err if empty")
+        unimplemented!("Same pattern as MockProvider::chat() — lock, pop_front, ok_or_else error")
     }
 }

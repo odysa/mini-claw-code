@@ -39,13 +39,15 @@ impl CostTracker {
         unimplemented!("Lock and return turn_count")
     }
 
+    /// Hint: extract a private `compute_cost(input, output, input_price, output_price) -> f64`
+    /// helper so both `total_cost()` and `summary()` share the formula.
     pub fn total_cost(&self) -> f64 {
-        unimplemented!("Compute: (input * input_price + output * output_price) / 1_000_000")
+        unimplemented!("Lock, call compute_cost helper with totals and prices")
     }
 
     /// Format: "tokens: N in + M out | cost: $X.XXXX"
     pub fn summary(&self) -> String {
-        unimplemented!("Lock, compute cost, format string")
+        unimplemented!("Lock, call compute_cost helper, format string")
     }
 
     pub fn reset(&self) {

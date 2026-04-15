@@ -90,6 +90,7 @@ impl<P: Provider> SimpleAgent<P> {
     }
 
     /// Push an assistant turn and its tool results into the message history.
+    // Vec (not slice) because we push new elements.
     #[allow(clippy::ptr_arg)]
     fn push_results(
         messages: &mut Vec<Message>,

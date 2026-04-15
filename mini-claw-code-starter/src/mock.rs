@@ -15,7 +15,7 @@ use crate::types::*;
 /// - `pop_front()` removes from the front, giving FIFO order
 /// - When constructing `AssistantTurn` for tests, set `usage: None`
 pub struct MockProvider {
-    pub(crate) responses: Mutex<VecDeque<AssistantTurn>>,
+    responses: Mutex<VecDeque<AssistantTurn>>,
 }
 
 impl MockProvider {

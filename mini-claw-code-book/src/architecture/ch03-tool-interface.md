@@ -1,7 +1,7 @@
 # Chapter 3: Tool Interface
 
 > **File(s) to edit:** `src/tools/read.rs`
-> **Test to run:** `cargo test -p mini-claw-code-starter test_ch2`
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch2_`
 
 ## Goal
 
@@ -184,7 +184,7 @@ your type definitions are correct.
 ## Run the tests
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch2
+cargo test -p mini-claw-code-starter test_ch2_
 ```
 
 ### What the tests verify

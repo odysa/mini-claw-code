@@ -1,7 +1,7 @@
 # Chapter 1: Your First LLM Call
 
 > **File to edit:** `src/mock.rs`
-> **Test to run:** `cargo test -p mini-claw-code-starter test_ch1`
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch1_`
 
 Before building an agent, you need to talk to an LLM. In this chapter you will implement a `MockProvider` — a fake LLM that returns canned responses. No API key, no HTTP, no network. Just the protocol.
 
@@ -146,7 +146,7 @@ Three lines of logic. The mock ignores `messages` and `tools` entirely — it ju
 ## Run the tests
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch1
+cargo test -p mini-claw-code-starter test_ch1_
 ```
 
 14 tests verify your mock:

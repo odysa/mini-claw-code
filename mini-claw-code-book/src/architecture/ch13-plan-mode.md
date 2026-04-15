@@ -217,7 +217,7 @@ in its schema, so it has no reason to call them.
 ### 3. The exit_plan escape hatch
 
 When the model calls `exit_plan`, the plan phase ends immediately. The loop
-pushes the assistant message and a synthetic tool result ("Plan phase complete.")
+pushes the assistant message and a synthetic tool result ("Plan submitted for review.")
 into the history, then returns. The synthetic result is necessary because the
 API requires every tool call to have a corresponding result -- without it, the
 next provider call would fail.
@@ -249,7 +249,7 @@ schema.
 
 When the model calls `exit_plan`, the loop detects it by name, pushes the
 assistant message, finds the call's ID, and pushes a synthetic `ToolResult`
-with "Plan phase complete." The synthetic result is important -- the message
+with "Plan submitted for review." The synthetic result is important -- the message
 protocol requires every `ToolCall` to have a matching `ToolResult`. Skip it
 and the next API call fails with a malformed request.
 
@@ -349,29 +349,24 @@ mode. This is handled by `maybe_inject_plan_prompt()`:
 
 ```rust
 fn maybe_inject_plan_prompt(&self, messages: &mut Vec<Message>) {
-    let prompt = self.plan_prompt.as_deref().unwrap_or(
-        "You are in PLANNING mode. Analyze the task using read-only tools. \
-         Do NOT modify any files. When your analysis is complete, call exit_plan \
-         or provide your plan as a text response.",
-    );
+    // Don't inject if a system message already exists
+    let has_system = messages
+        .first()
+        .is_some_and(|m| matches!(m, Message::System(_)));
 
-    // Don't inject if already present
-    let already_has = messages.iter().any(|m| {
-        matches!(m, Message::System(s) if s.contains("PLANNING"))
-    });
-
-    if !already_has {
-        messages.insert(0, Message::System(prompt.to_string()));
+    if !has_system {
+        messages.insert(0, Message::System(self.plan_system_prompt.clone()));
     }
 }
 ```
 
 Three design decisions here:
 
-1. **Deduplication** -- The method checks whether a system message containing
-   "PLANNING" already exists. If `plan()` is called twice (the user asks the
-   agent to revise), the second call finds the existing message and skips
-   injection. Without this check, you would get duplicate system prompts.
+1. **Respect existing system prompts** -- The method checks whether any
+   `Message::System` is already present at position 0. If the caller already
+   set a system prompt (e.g., "You are a security auditor"), plan mode respects
+   it rather than overwriting it. If `plan()` is called twice, the second call
+   finds the existing message and skips injection.
 
 2. **Position 0** -- The planning prompt is inserted at the beginning of the
    message list, before any existing messages. System prompts at position 0

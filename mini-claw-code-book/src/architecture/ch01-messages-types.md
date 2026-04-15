@@ -1,7 +1,7 @@
 # Chapter 1: Messages & Types
 
 > **File(s) to edit:** `src/types.rs` (pre-filled in starter)
-> **Test to run:** `cargo test -p mini-claw-code-starter test_ch1`
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch1_`
 
 ## Goal
 
@@ -12,7 +12,7 @@
 
 Every coding agent is, at its core, a loop over a conversation. The user speaks, the model replies, tools produce results, and those results go back to the model. Before we can build that loop, we need a type system that represents every participant and every kind of payload in the conversation.
 
-In this chapter you will implement the foundational types that the rest of the codebase depends on. By the end, `cargo test -p mini-claw-code-starter test_ch1` should pass.
+In this chapter you will implement the foundational types that the rest of the codebase depends on. By the end, `cargo test -p mini-claw-code-starter test_ch1_` should pass.
 
 ## How the types connect
 
@@ -423,7 +423,7 @@ We will implement the `MockProvider` and `OpenRouterProvider` in Chapter 2.
 After implementing `src/types.rs`, run the full chapter test suite:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch1
+cargo test -p mini-claw-code-starter test_ch1_
 ```
 
 ### What the tests verify

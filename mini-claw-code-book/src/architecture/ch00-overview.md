@@ -40,9 +40,9 @@ mini-claw-code-starter/src/
 
 **Start with the Getting Started section.** Three short, hands-on chapters get you from zero to a working agent in under an hour:
 
-1. [**Your First LLM Call**](./intro01-first-llm-call.md) — implement `MockProvider` (`test_ch1`)
-2. [**Your First Tool Call**](./intro02-first-tool.md) — implement `ReadTool` (`test_ch2`)
-3. [**The Agentic Loop**](./intro03-agentic-loop.md) — implement `single_turn` and `SimpleAgent` (`test_ch3`, `test_ch5`)
+1. [**Your First LLM Call**](./intro01-first-llm-call.md) — implement `MockProvider` (`test_ch1_`)
+2. [**Your First Tool Call**](./intro02-first-tool.md) — implement `ReadTool` (`test_ch2_`)
+3. [**The Agentic Loop**](./intro03-agentic-loop.md) — implement `single_turn` and `SimpleAgent` (`test_ch3_`, `test_ch5_`)
 
 Then dive into the **Deep Dive** chapters (1-15) for the full architecture: streaming, permissions, hooks, plan mode, configuration, and more.
 
@@ -54,7 +54,7 @@ The `mini-claw-code-starter` crate contains stub implementations with `unimpleme
 
 ```bash
 # Run tests for a specific chapter (use the correct test name from the table below)
-cargo test -p mini-claw-code-starter test_ch1
+cargo test -p mini-claw-code-starter test_ch1_
 
 # Run all tests
 cargo test -p mini-claw-code-starter
@@ -72,20 +72,20 @@ cargo test -p mini-claw-code-starter
 
 | Chapter | Topic | File(s) to edit | Test command |
 |---------|-------|-----------------|--------------|
-| 1 | Messages & Types | `src/types.rs` (pre-filled) | `test_ch1` |
-| 2 | Provider & Streaming | `src/mock.rs`, `src/streaming.rs`, `src/providers/openrouter.rs` | `test_ch1`, `test_ch6`, `test_ch10` |
-| 3 | Tool Interface | `src/tools/read.rs` | `test_ch2` |
-| 4 | The Agentic Loop | `src/agent.rs` | `test_ch3`, `test_ch5` |
+| 1 | Messages & Types | `src/types.rs` (pre-filled) | `test_ch1_` |
+| 2 | Provider & Streaming | `src/mock.rs`, `src/streaming.rs`, `src/providers/openrouter.rs` | `test_ch1_`, `test_ch6_`, `test_ch10` |
+| 3 | Tool Interface | `src/tools/read.rs` | `test_ch2_` |
+| 4 | The Agentic Loop | `src/agent.rs` | `test_ch3_`, `test_ch5_` |
 
 ### Part II: Prompt & Tools
 
 | Chapter | Topic | File(s) to edit | Test command |
 |---------|-------|-----------------|--------------|
 | 5 | System Prompt | `src/instructions.rs` | `test_ch17` |
-| 6 | File Tools | `src/tools/read.rs`, `src/tools/write.rs`, `src/tools/edit.rs` | `test_ch2`, `test_ch4` |
-| 7 | Bash Tool | `src/tools/bash.rs` | `test_ch4` |
+| 6 | File Tools | `src/tools/read.rs`, `src/tools/write.rs`, `src/tools/edit.rs` | `test_ch2_`, `test_ch4_` |
+| 7 | Bash Tool | `src/tools/bash.rs` | `test_ch4_` |
 | 8 | Search Tools | (extension -- no stubs) | (no tests) |
-| 9 | Tool Registry | `src/types.rs` (ToolSet) | `test_ch7` |
+| 9 | Tool Registry | `src/types.rs` (ToolSet) | `test_ch7_` |
 
 ### Part III: Safety & Control
 
@@ -102,5 +102,12 @@ cargo test -p mini-claw-code-starter
 |---------|-------|-----------------|--------------|
 | 14 | Settings Hierarchy | `src/config.rs`, `src/usage.rs` | `test_ch16`, `test_ch14` |
 | 15 | Project Instructions | `src/instructions.rs`, `src/context.rs` | `test_ch17`, `test_ch15` |
+
+### Bonus (no chapter yet -- stubs + tests available)
+
+| Topic | File to edit | Test command |
+|-------|-------------|--------------|
+| AskTool (user input) | `src/tools/ask.rs` | `test_ch11` |
+| SubagentTool (child agents) | `src/subagent.rs` | `test_ch13` |
 
 Let's start building.

@@ -313,7 +313,7 @@ Run the InstructionLoader tests:
 cargo test -p mini-claw-code-starter test_ch17
 ```
 
-Note: The InstructionLoader tests are in `test_ch17`, not `test_ch5`. The test
+Note: The InstructionLoader tests are in `test_ch17`, not `test_ch5_`. The test
 file numbering follows the V1 chapter structure, not V2.
 
 ### What the tests verify

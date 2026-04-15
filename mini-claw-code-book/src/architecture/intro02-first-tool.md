@@ -1,7 +1,7 @@
 # Chapter 2: Your First Tool Call
 
 > **File to edit:** `src/tools/read.rs`
-> **Test to run:** `cargo test -p mini-claw-code-starter test_ch2`
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch2_`
 
 An LLM can't read files, run commands, or browse the web. It can only generate text. But it can *ask your code* to do those things. That's what tools are.
 
@@ -105,7 +105,7 @@ flowchart LR
 ## Run the tests
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch2
+cargo test -p mini-claw-code-starter test_ch2_
 ```
 
 15 tests verify your tool:

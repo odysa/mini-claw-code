@@ -1,7 +1,7 @@
 # Chapter 7: Bash Tool
 
 > **File(s) to edit:** `src/tools/bash.rs`
-> **Test to run:** `cargo test -p mini-claw-code-starter test_ch4` (bash tests are grouped with other tools)
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch4_` (bash tests are grouped with other tools)
 
 ## Goal
 
@@ -298,10 +298,10 @@ Our version is the core protocol without the safety wrapping -- the minimal viab
 Run the bash tool tests (grouped with other tool tests):
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch4
+cargo test -p mini-claw-code-starter test_ch4_
 ```
 
-Note: BashTool tests are in `test_ch4`, grouped alongside WriteTool and EditTool
+Note: BashTool tests are in `test_ch4_`, grouped alongside WriteTool and EditTool
 tests. The test file numbering follows the V1 chapter structure.
 
 Here is what the bash-specific tests verify:

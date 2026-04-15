@@ -1,7 +1,7 @@
 # Chapter 4: The Agentic Loop
 
 > **File(s) to edit:** `src/agent.rs`
-> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch3` (single_turn), `cargo test -p mini-claw-code-starter test_ch5` (SimpleAgent)
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch3_` (single_turn), `cargo test -p mini-claw-code-starter test_ch5_` (SimpleAgent)
 
 ## Goal
 
@@ -382,19 +382,19 @@ The good news: the architecture is the same. Every feature in the right column p
 Run the tests to verify your implementation:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch3  # single_turn tests
-cargo test -p mini-claw-code-starter test_ch5  # SimpleAgent tests
+cargo test -p mini-claw-code-starter test_ch3_  # single_turn tests
+cargo test -p mini-claw-code-starter test_ch5_  # SimpleAgent tests
 ```
 
 ### What the tests verify
 
-**Single-turn tests (test_ch3):**
+**Single-turn tests (test_ch3_):**
 
 - **`test_ch3_direct_response`** -- provider returns text with `StopReason::Stop`; verifies the agent returns that text directly
 - **`test_ch3_one_tool_call`** -- provider returns a tool call then a final answer; verifies the agent executes the tool and returns the final text
 - **`test_ch3_unknown_tool`** -- provider requests a tool that is not registered; verifies the agent returns an error string (not a panic) and the loop continues
 
-**SimpleAgent tests (test_ch5):**
+**SimpleAgent tests (test_ch5_):**
 
 - **`test_ch5_text_response`** -- `run()` with a provider that returns text; verifies the response string
 - **`test_ch5_single_tool_call`** -- provider scripts a tool call followed by a final answer; verifies the agent loops correctly and returns the final text

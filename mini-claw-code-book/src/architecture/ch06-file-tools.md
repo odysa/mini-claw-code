@@ -1,7 +1,7 @@
 # Chapter 6: File Tools
 
 > **File(s) to edit:** `src/tools/read.rs`, `src/tools/write.rs`, `src/tools/edit.rs`
-> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch2` (ReadTool), `cargo test -p mini-claw-code-starter test_ch4` (WriteTool, EditTool)
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch2_` (ReadTool), `cargo test -p mini-claw-code-starter test_ch4_` (WriteTool, EditTool)
 
 ## Goal
 
@@ -583,28 +583,28 @@ without reaching into individual modules.
 Run the file tool tests:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch2  # ReadTool tests
-cargo test -p mini-claw-code-starter test_ch4  # WriteTool, EditTool tests
+cargo test -p mini-claw-code-starter test_ch2_  # ReadTool tests
+cargo test -p mini-claw-code-starter test_ch4_  # WriteTool, EditTool tests
 ```
 
 Note: The test file numbering follows the V1 chapter structure. ReadTool tests
-are in `test_ch2`, and WriteTool/EditTool tests are in `test_ch4`.
+are in `test_ch2_`, and WriteTool/EditTool tests are in `test_ch4_`.
 
 Here is what each test verifies:
 
-### ReadTool tests (in `test_ch2`)
+### ReadTool tests (in `test_ch2_`)
 
 - **`test_ch2_read_definition`** -- Checks that the tool definition has the name "read".
 - **`test_ch2_read_file`** -- Reads a file and verifies the content appears in the output.
 - **`test_ch2_read_missing_file`** -- Attempts to read a file that does not exist. Verifies that the result is an `Err`.
 
-### WriteTool tests (in `test_ch4`)
+### WriteTool tests (in `test_ch4_`)
 
 - **`test_ch4_write_creates_file`** -- Writes content to a new file, verifies the result contains a confirmation, and reads back the file to confirm the content.
 - **`test_ch4_write_creates_dirs`** -- Writes to a file inside nested directories. All intermediate directories are created automatically.
 - **`test_ch4_write_overwrites_existing`** -- Writes to a file that already has content. Verifies the old content is replaced.
 
-### EditTool tests (in `test_ch4`)
+### EditTool tests (in `test_ch4_`)
 
 - **`test_ch4_edit_replaces_string`** -- Edits a string in a file. Verifies the result says "edited" and the file is updated.
 - **`test_ch4_edit_not_found`** -- Attempts to replace a string that does not exist. Verifies the result is an `Err`.

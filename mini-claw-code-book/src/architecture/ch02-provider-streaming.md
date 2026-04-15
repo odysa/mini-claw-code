@@ -1,7 +1,7 @@
 # Chapter 2: Provider & Streaming
 
 > **File(s) to edit:** `src/mock.rs`, `src/streaming.rs`, `src/providers/openrouter.rs`
-> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch1` (MockProvider), `cargo test -p mini-claw-code-starter test_ch6` (OpenRouterProvider), `cargo test -p mini-claw-code-starter test_ch10` (streaming)
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch1_` (MockProvider), `cargo test -p mini-claw-code-starter test_ch6_` (OpenRouterProvider), `cargo test -p mini-claw-code-starter test_ch10` (streaming)
 
 ## Goal
 
@@ -20,11 +20,11 @@ In Chapter 1 we defined the data that flows through our agent. Now we need somet
 6. An SSE line parser and a `StreamAccumulator` that reassembles events into a complete message
 7. The `OpenRouterProvider` that talks to a real API
 
-By the end, the mock provider tests in `test_ch1`, the OpenRouter tests in `test_ch6`, and the streaming tests in `test_ch10` should pass.
+By the end, the mock provider tests in `test_ch1_`, the OpenRouter tests in `test_ch6_`, and the streaming tests in `test_ch10` should pass.
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch1
-cargo test -p mini-claw-code-starter test_ch6
+cargo test -p mini-claw-code-starter test_ch1_
+cargo test -p mini-claw-code-starter test_ch6_
 cargo test -p mini-claw-code-starter test_ch10
 ```
 
@@ -599,19 +599,19 @@ The provider-related code lives across three files in the starter:
 ## Run the tests
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch1   # MockProvider tests
-cargo test -p mini-claw-code-starter test_ch6   # OpenRouterProvider tests
+cargo test -p mini-claw-code-starter test_ch1_   # MockProvider tests
+cargo test -p mini-claw-code-starter test_ch6_   # OpenRouterProvider tests
 cargo test -p mini-claw-code-starter test_ch10  # Streaming tests
 ```
 
 ### What the tests verify
 
-**MockProvider tests (test_ch1):**
+**MockProvider tests (test_ch1_):**
 
 - **`test_ch1_mock_returns_text`** -- scripts a single text response and verifies `chat()` returns it
 - **`test_ch1_mock_exhausted`** -- calls `chat()` on an empty queue and verifies it returns an error
 
-**OpenRouterProvider tests (test_ch6):**
+**OpenRouterProvider tests (test_ch6_):**
 
 - **`test_ch6_convert_messages`** -- verifies that internal `Message` variants are converted to the correct OpenAI API format
 - **`test_ch6_convert_tools`** -- verifies that `ToolDefinition` values are wrapped in the OpenAI function-calling envelope

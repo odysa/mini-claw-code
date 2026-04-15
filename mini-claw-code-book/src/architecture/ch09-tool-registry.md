@@ -1,7 +1,7 @@
 # Chapter 9: Tool Registry
 
 > **File(s) to edit:** `src/types.rs` (ToolSet)
-> **Test to run:** `cargo test -p mini-claw-code-starter test_ch7` (integration tests)
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch7_` (integration tests)
 
 You have five tools. You have a `SimpleAgent`. This chapter wires them together.
 
@@ -17,7 +17,7 @@ Over the past chapters you built the individual tools that let your agent intera
 The tool registry is the bridge. It holds every available tool in a single `ToolSet`, exposes their schemas to the LLM so it knows what it can call, and dispatches incoming tool calls to the correct implementation by name. By the end of this chapter, you will have a fully functional coding agent that can read, write, edit, and execute commands -- the complete tool loop, now with real tools instead of test doubles.
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch7
+cargo test -p mini-claw-code-starter test_ch7_
 ```
 
 ---
@@ -347,10 +347,10 @@ Despite these differences, the core protocol is identical. The LLM sees a list o
 Run the integration tests:
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch7
+cargo test -p mini-claw-code-starter test_ch7_
 ```
 
-Note: The integration tests are in `test_ch7`, following the V1 chapter
+Note: The integration tests are in `test_ch7_`, following the V1 chapter
 numbering.
 
 Key tests:

@@ -1,7 +1,7 @@
 # Chapter 3: The Agentic Loop
 
 > **File to edit:** `src/agent.rs`
-> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch3` (single_turn), `cargo test -p mini-claw-code-starter test_ch5` (SimpleAgent)
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch3_` (single_turn), `cargo test -p mini-claw-code-starter test_ch5_` (SimpleAgent)
 
 You have a provider (talks to the LLM) and a tool (reads files). Now you connect them. This is where the agent comes alive.
 
@@ -122,7 +122,7 @@ Three key details:
 ### Test it
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch3
+cargo test -p mini-claw-code-starter test_ch3_
 ```
 
 14 tests including:
@@ -208,7 +208,7 @@ The helper methods `execute_tools()` and `push_results()` factor out the tool ex
 ### Test it
 
 ```bash
-cargo test -p mini-claw-code-starter test_ch5
+cargo test -p mini-claw-code-starter test_ch5_
 ```
 
 16 tests including:

@@ -191,7 +191,7 @@ If the LLM requests a tool that does not exist in the registry, the agent return
 
 ## Integration: write, read, respond
 
-The `test_ch9_agent_with_file_tools` test demonstrates a complete three-turn interaction with real tools. Let's trace through it step by step.
+The `test_ch7_write_and_read_flow` test demonstrates a complete three-turn interaction with real tools. Let's trace through it step by step.
 
 The setup creates a temp directory and scripts a `MockProvider` with three responses:
 
@@ -283,7 +283,7 @@ assert_eq!(
 
 ## Error recovery: the hallucinated tool
 
-The `test_ch9_agent_unknown_tool_recovery` test demonstrates what happens when the LLM requests a tool that does not exist. This is not a hypothetical scenario -- models regularly hallucinate tool names, especially smaller models or when the tool list is long.
+The `test_ch5_unknown_tool` test demonstrates what happens when the LLM requests a tool that does not exist. This is not a hypothetical scenario -- models regularly hallucinate tool names, especially smaller models or when the tool list is long.
 
 The mock provider scripts two responses:
 

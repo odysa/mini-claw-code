@@ -3,14 +3,6 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 /// Agent configuration with layered overrides.
-///
-/// # Chapter 14: Settings Hierarchy
-///
-/// Priority (highest to lowest):
-/// 1. Environment variables
-/// 2. User config (~/.config/mini-claw/config.toml)
-/// 3. Project config (.mini-claw/config.toml)
-/// 4. Defaults
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -78,18 +70,10 @@ fn default_hook_timeout() -> u64 {
 }
 
 /// Loads and merges configuration from multiple sources.
-///
-/// # Chapter 14: Settings Hierarchy
 pub struct ConfigLoader;
 
 impl ConfigLoader {
     /// Load config by merging default -> project -> user -> env layers.
-    ///
-    /// Hints:
-    /// 1. Start with Config::default()
-    /// 2. Try loading .mini-claw/config.toml (project config)
-    /// 3. Try loading ~/.config/mini-claw/config.toml (user config) via dirs::config_dir()
-    /// 4. Override with env vars: MINI_CLAW_MODEL, MINI_CLAW_BASE_URL, MINI_CLAW_MAX_TOKENS
     pub fn load() -> Config {
         unimplemented!("Merge layers: defaults -> project -> user -> env")
     }

@@ -1,14 +1,15 @@
 # Chapter 15: Project Instructions
 
 > **File(s) to edit:** `src/instructions.rs`, `src/context.rs`
-> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch17` (InstructionLoader), `cargo test -p mini-claw-code-starter test_ch15` (SystemPromptBuilder, context integration)
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch17` (InstructionLoader), `cargo test -p mini-claw-code-starter test_ch15` (context integration)
 
-In Chapter 5 you built two things that did not yet know about each other. The
-`SystemPromptBuilder` assembles a prompt from static and dynamic sections. The
-`InstructionLoader` discovers CLAUDE.md files by walking up the filesystem. You
-wired a basic example together at the end of that chapter, but nothing in the
-codebase actually used that wiring. The instruction loader was a standalone
-utility, and the builder was a general-purpose assembler.
+In Chapter 5 you built the `InstructionLoader`, which discovers CLAUDE.md files
+by walking up the filesystem. This chapter discusses how a production agent
+would connect that loader to a prompt assembly pipeline using types like
+`SystemPromptBuilder` and `PromptSection`. These types are conceptual -- the
+starter does not include them. The starter's `InstructionLoader` (in
+`src/instructions.rs`) is the concrete piece you built; the builder and section
+types shown here illustrate the architecture of the reference implementation.
 
 In Chapter 14 you added `Config`, a layered settings hierarchy. One of its
 fields is `instructions: Option<String>` -- custom text that the user can put
@@ -268,7 +269,10 @@ The wiring code uses `if let Some(instructions) = loader.load(...)` to condition
 ## Wiring it together
 
 Here is how the three systems -- `InstructionLoader`, `SystemPromptBuilder`,
-and `Config` -- combine into a single prompt assembly:
+and `Config` -- would combine into a single prompt assembly. Note that
+`SystemPromptBuilder` and `PromptSection` are conceptual types from the
+reference implementation; the starter does not include them. This example
+illustrates the architecture pattern:
 
 ```rust
 fn build_prompt(cwd: &str, config: &Config) -> String {

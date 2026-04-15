@@ -357,28 +357,21 @@ fn maybe_inject_plan_prompt(&self, messages: &mut Vec<Message>) {
 
     // Don't inject if already present
     let already_has = messages.iter().any(|m| {
-        matches!(m, Message::System(s) if s.tag.as_deref() == Some("plan_mode"))
+        matches!(m, Message::System(s) if s.contains("PLANNING"))
     });
 
     if !already_has {
-        messages.insert(
-            0,
-            Message::System(SystemMessage {
-                id: crate::types::new_id(),
-                content: prompt.to_string(),
-                tag: Some("plan_mode".into()),
-            }),
-        );
+        messages.insert(0, Message::System(prompt.to_string()));
     }
 }
 ```
 
 Three design decisions here:
 
-1. **Tagged message** -- The `tag: Some("plan_mode")` identifies the message
-   for deduplication. If `plan()` is called twice (the user asks the agent to
-   revise), the second call finds the existing tagged message and skips
-   injection. Without the tag, you would get duplicate system prompts.
+1. **Deduplication** -- The method checks whether a system message containing
+   "PLANNING" already exists. If `plan()` is called twice (the user asks the
+   agent to revise), the second call finds the existing message and skips
+   injection. Without this check, you would get duplicate system prompts.
 
 2. **Position 0** -- The planning prompt is inserted at the beginning of the
    message list, before any existing messages. System prompts at position 0
@@ -398,7 +391,7 @@ The user wants to copy a source file to a new location.
 **Setup:**
 
 ```rust
-let engine = PlanEngine::new(provider)
+let engine = PlanAgent::new(provider)
     .tool(ReadTool::new())
     .tool(WriteTool::new());
 
@@ -514,11 +507,11 @@ the layers that turn a reckless agent into a disciplined one:
 - **Chapter 13: Plan Mode** -- A two-phase workflow that separates analysis from
   action. The agent reads and reasons first, then modifies only after approval.
 
-The key architectural insight is **caller-driven approval**. The `PlanEngine`
+The key architectural insight is **caller-driven approval**. The `PlanAgent`
 does not prompt the user, display a dialog, or make assumptions about the UI.
 It runs the plan, returns the text, and waits. The caller decides what to do
 next. This separation of concerns -- engine logic vs. user interaction -- is
-what makes the same `PlanEngine` work in a CLI, a TUI, a web interface, or a
+what makes the same `PlanAgent` work in a CLI, a TUI, a web interface, or a
 test harness.
 
 ---

@@ -102,27 +102,25 @@ impl OpenRouterProvider {
     /// Create a new provider with the given API key and model name.
     ///
     /// Hint: Use `reqwest::Client::new()` and `.into()` for string conversion.
-    pub fn new(_api_key: impl Into<String>, _model: impl Into<String>) -> Self {
-        unimplemented!("Initialize all four fields: client, api_key, model, base_url")
+    pub fn new(api_key: impl Into<String>, model: impl Into<String>) -> Self {
+        unimplemented!("Create reqwest::Client, store api_key, model, and default base_url 'https://openrouter.ai/api/v1'")
     }
 
     /// Override the base URL (useful for testing with a local server).
     ///
     /// Default is "https://openrouter.ai/api/v1".
-    pub fn base_url(mut self, _url: impl Into<String>) -> Self {
-        unimplemented!("Set self.base_url and return self")
+    pub fn base_url(mut self, url: impl Into<String>) -> Self {
+        unimplemented!("Set self.base_url and return self for chaining")
     }
 
     /// Create a provider from the OPENROUTER_API_KEY environment variable.
-    pub fn from_env_with_model(_model: impl Into<String>) -> anyhow::Result<Self> {
-        unimplemented!(
-            "Load .env with dotenvy::dotenv(), read OPENROUTER_API_KEY from env, call Self::new()"
-        )
+    pub fn from_env_with_model(model: impl Into<String>) -> anyhow::Result<Self> {
+        unimplemented!("Load .env with dotenvy, read OPENROUTER_API_KEY from env, call Self::new()")
     }
 
     /// Create a provider from env with the default model.
     pub fn from_env() -> anyhow::Result<Self> {
-        unimplemented!("Call from_env_with_model with \"openrouter/free\"")
+        unimplemented!("Call from_env_with_model with default model 'openrouter/free'")
     }
 
     /// Convert our Message types to the API's message format.
@@ -134,17 +132,15 @@ impl OpenRouterProvider {
     ///   tool_calls: convert each ToolCall to ApiToolCall (arguments.to_string() for Value→String)
     ///   Set tool_calls to None (not Some(vec![])) when empty.
     /// - ToolResult -> role: "tool", content: Some(content.clone()), tool_call_id: Some(id.clone())
-    pub(crate) fn convert_messages(_messages: &[Message]) -> Vec<ApiMessage> {
-        unimplemented!(
-            "Convert each Message to an ApiMessage — note: ToolCall.arguments (Value) must be serialized to String"
-        )
+    pub(crate) fn convert_messages(messages: &[Message]) -> Vec<ApiMessage> {
+        unimplemented!("Map each Message variant to ApiMessage: System/User set role+content, Assistant maps tool_calls, ToolResult sets tool_call_id")
     }
 
     /// Convert our ToolDefinition types to the API's tool format.
     ///
     /// Each tool becomes: { type: "function", function: { name, description, parameters } }
-    pub(crate) fn convert_tools(_tools: &[&ToolDefinition]) -> Vec<ApiTool> {
-        unimplemented!("Convert each ToolDefinition to an ApiTool")
+    pub(crate) fn convert_tools(tools: &[&ToolDefinition]) -> Vec<ApiTool> {
+        unimplemented!("Map each ToolDefinition to ApiTool with type 'function' and ApiToolDef containing name, description, parameters")
     }
 }
 
@@ -163,13 +159,11 @@ impl crate::streaming::StreamProvider for OpenRouterProvider {
     /// 7. Return acc.finish()
     async fn stream_chat(
         &self,
-        _messages: &[Message],
-        _tools: &[&ToolDefinition],
-        _tx: tokio::sync::mpsc::UnboundedSender<crate::streaming::StreamEvent>,
+        messages: &[Message],
+        tools: &[&ToolDefinition],
+        tx: tokio::sync::mpsc::UnboundedSender<crate::streaming::StreamEvent>,
     ) -> anyhow::Result<AssistantTurn> {
-        unimplemented!(
-            "Build request with stream:true, read SSE chunks, parse into events, accumulate into AssistantTurn"
-        )
+        unimplemented!("Build ChatRequest with stream:true, POST to API, read chunks, parse SSE lines, feed StreamAccumulator, send events via tx, return acc.finish()")
     }
 }
 
@@ -189,11 +183,9 @@ impl Provider for OpenRouterProvider {
     /// 7. Extract usage from response if present
     async fn chat(
         &self,
-        _messages: &[Message],
-        _tools: &[&ToolDefinition],
+        messages: &[Message],
+        tools: &[&ToolDefinition],
     ) -> anyhow::Result<AssistantTurn> {
-        unimplemented!(
-            "Build request, send HTTP POST, parse response into AssistantTurn with usage"
-        )
+        unimplemented!("Build ChatRequest with stream:false, POST to API, parse ChatResponse, convert tool_calls, determine stop_reason, extract usage")
     }
 }

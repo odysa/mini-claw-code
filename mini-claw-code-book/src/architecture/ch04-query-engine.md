@@ -390,15 +390,16 @@ cargo test -p mini-claw-code-starter test_ch5  # SimpleAgent tests
 
 **Single-turn tests (test_ch3):**
 
-- **`test_ch3_single_turn_text_only`** -- provider returns text with `StopReason::Stop`; verifies the agent returns that text directly
-- **`test_ch3_single_turn_with_tool`** -- provider returns a tool call then a final answer; verifies the agent executes the tool and returns the final text
+- **`test_ch3_direct_response`** -- provider returns text with `StopReason::Stop`; verifies the agent returns that text directly
+- **`test_ch3_one_tool_call`** -- provider returns a tool call then a final answer; verifies the agent executes the tool and returns the final text
+- **`test_ch3_unknown_tool`** -- provider requests a tool that is not registered; verifies the agent returns an error string (not a panic) and the loop continues
 
 **SimpleAgent tests (test_ch5):**
 
-- **`test_ch5_agent_text_response`** -- `run()` with a provider that returns text; verifies the response string
-- **`test_ch5_agent_tool_loop`** -- provider scripts a tool call followed by a final answer; verifies the agent loops correctly and the message history contains the tool result
-- **`test_ch5_agent_unknown_tool`** -- provider requests a tool that is not registered; verifies the agent returns an error string (not a panic) and the loop continues
-- **`test_ch5_agent_events`** -- `run_with_events()` emits `ToolCall` and `Done` events through the channel; verifies the event sequence
+- **`test_ch5_text_response`** -- `run()` with a provider that returns text; verifies the response string
+- **`test_ch5_single_tool_call`** -- provider scripts a tool call followed by a final answer; verifies the agent loops correctly and returns the final text
+- **`test_ch5_unknown_tool`** -- provider requests a tool that is not registered; verifies the agent returns an error string (not a panic) and the loop continues
+- **`test_ch5_multi_step_loop`** -- provider scripts two tool calls then a final answer; verifies the agent loops correctly through multiple tool rounds
 
 ## Implementation checklist
 

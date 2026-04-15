@@ -28,9 +28,7 @@ pub struct PlanAgent<P: StreamProvider> {
 
 impl<P: StreamProvider> PlanAgent<P> {
     pub fn new(provider: P) -> Self {
-        unimplemented!(
-            "Initialize with provider, empty ToolSet, default read_only set, default plan prompt, and exit_plan ToolDefinition"
-        )
+        unimplemented!("Initialize with provider, empty ToolSet, default read_only set, plan prompt, exit_plan def")
     }
 
     pub fn tool(mut self, t: impl Tool + 'static) -> Self {
@@ -48,10 +46,6 @@ impl<P: StreamProvider> PlanAgent<P> {
     }
 
     /// Run the planning phase: only read-only tools + exit_plan.
-    ///
-    /// Hints:
-    /// - Inject system prompt at position 0 if not already present
-    /// - Call run_loop with Some(&self.read_only)
     #[allow(clippy::ptr_arg)]
     pub async fn plan(
         &self,
@@ -72,13 +66,6 @@ impl<P: StreamProvider> PlanAgent<P> {
     }
 
     /// Shared agent loop. When `allowed` is Some, only those tools + exit_plan are permitted.
-    ///
-    /// Hints:
-    /// - Filter tool definitions based on allowed set
-    /// - If allowed is Some, add exit_plan_def to the definitions
-    /// - Loop: stream_chat -> match stop_reason
-    /// - For ToolUse: handle exit_plan specially (return plan text),
-    ///   block tools not in allowed set, execute allowed tools normally
     #[allow(clippy::ptr_arg)]
     async fn run_loop(
         &self,

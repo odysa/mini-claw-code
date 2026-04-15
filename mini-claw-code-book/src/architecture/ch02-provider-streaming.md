@@ -469,7 +469,6 @@ impl StreamAccumulator {
             StopReason::ToolUse
         };
         AssistantTurn {
-            id: new_id(),
             text,
             tool_calls,
             stop_reason,

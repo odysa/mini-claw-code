@@ -50,7 +50,7 @@ struct PartialToolCall {
 impl StreamAccumulator {
     /// Create a new empty accumulator.
     pub fn new() -> Self {
-        unimplemented!("Initialize with empty text and empty tool_calls vec")
+        unimplemented!("Create empty accumulator with empty text and empty tool_calls vec")
     }
 
     /// Process a single streaming event.
@@ -63,7 +63,7 @@ impl StreamAccumulator {
     ///   tool call at that index
     /// - `Done` → no-op
     pub fn feed(&mut self, event: &StreamEvent) {
-        unimplemented!("Match on event variant and accumulate data")
+        unimplemented!("Match on event: TextDelta appends to text, ToolCallStart pads and sets id/name, ToolCallDelta appends arguments, Done is no-op")
     }
 
     /// Consume the accumulator and produce a complete [`AssistantTurn`].
@@ -76,7 +76,7 @@ impl StreamAccumulator {
     /// - stop_reason: ToolUse if tool_calls is non-empty, Stop otherwise
     /// - usage: None
     pub fn finish(self) -> AssistantTurn {
-        unimplemented!("Convert accumulated data into an AssistantTurn")
+        unimplemented!("Build AssistantTurn: text is None if empty, filter/parse tool_calls, set stop_reason based on whether tool_calls is empty")
     }
 }
 
@@ -135,7 +135,7 @@ struct DeltaFunction {
 ///   - If `function.arguments` is present and non-empty → `ToolCallDelta`
 /// - Return None if no events were produced
 pub fn parse_sse_line(line: &str) -> Option<Vec<StreamEvent>> {
-    unimplemented!("Strip 'data: ' prefix, handle [DONE], parse JSON chunk into StreamEvents")
+    unimplemented!("Strip 'data: ' prefix, handle [DONE], parse JSON ChunkResponse, extract TextDelta and ToolCall events")
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +172,7 @@ pub struct MockStreamProvider {
 
 impl MockStreamProvider {
     pub fn new(responses: VecDeque<AssistantTurn>) -> Self {
-        unimplemented!("Wrap responses in a MockProvider")
+        unimplemented!("Create inner MockProvider from the responses VecDeque")
     }
 }
 
@@ -191,7 +191,7 @@ impl StreamProvider for MockStreamProvider {
         tools: &[&ToolDefinition],
         tx: mpsc::UnboundedSender<StreamEvent>,
     ) -> anyhow::Result<AssistantTurn> {
-        unimplemented!("Get turn from inner, synthesize stream events, return turn")
+        unimplemented!("Call inner.chat(), synthesize TextDelta per char, ToolCallStart/Delta per tool call, send Done, return turn")
     }
 }
 
@@ -209,11 +209,11 @@ pub struct StreamingAgent<P: StreamProvider> {
 
 impl<P: StreamProvider> StreamingAgent<P> {
     pub fn new(provider: P) -> Self {
-        unimplemented!("Initialize with provider and empty ToolSet")
+        unimplemented!("Store provider and create an empty ToolSet")
     }
 
     pub fn tool(mut self, t: impl Tool + 'static) -> Self {
-        unimplemented!("Push tool into self.tools, return self")
+        unimplemented!("Push tool into self.tools and return self for chaining")
     }
 
     /// Run the streaming agent loop with a fresh prompt.
@@ -226,7 +226,7 @@ impl<P: StreamProvider> StreamingAgent<P> {
         prompt: &str,
         events: mpsc::UnboundedSender<AgentEvent>,
     ) -> anyhow::Result<String> {
-        unimplemented!("Create messages, delegate to chat()")
+        unimplemented!("Create messages vec with User prompt, call self.chat()")
     }
 
     /// Run the streaming agent loop with existing message history.
@@ -244,8 +244,6 @@ impl<P: StreamProvider> StreamingAgent<P> {
         messages: &mut Vec<Message>,
         events: mpsc::UnboundedSender<AgentEvent>,
     ) -> anyhow::Result<String> {
-        unimplemented!(
-            "Streaming agent loop: stream_chat -> forward text deltas -> execute tools -> repeat"
-        )
+        unimplemented!("Loop: create stream channel, spawn forwarder for TextDelta events, call stream_chat, match stop_reason, execute tools on ToolUse")
     }
 }

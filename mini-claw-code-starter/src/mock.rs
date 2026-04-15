@@ -22,8 +22,8 @@ impl MockProvider {
     /// Create a new MockProvider that will return the given responses in order.
     ///
     /// Hint: Wrap the `VecDeque` in a `Mutex` and store it in `Self`.
-    pub fn new(_responses: VecDeque<AssistantTurn>) -> Self {
-        unimplemented!("Wrap responses in a Mutex and store in Self")
+    pub fn new(responses: VecDeque<AssistantTurn>) -> Self {
+        unimplemented!("Wrap responses in a Mutex<VecDeque> and store in Self")
     }
 }
 
@@ -37,6 +37,6 @@ impl Provider for MockProvider {
         _messages: &[Message],
         _tools: &[&ToolDefinition],
     ) -> anyhow::Result<AssistantTurn> {
-        unimplemented!("Lock mutex, pop_front, return Ok(response) or Err if empty")
+        unimplemented!("Lock mutex, pop_front the next response, return Ok(response) or Err if empty")
     }
 }

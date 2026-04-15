@@ -189,10 +189,10 @@ cargo test -p mini-claw-code-starter test_ch2
 
 ### What the tests verify
 
-- **`test_ch3_tool_definition`** -- the `EchoTool` produces the correct name and description from its `ToolDefinition`
-- **`test_ch3_tool_call`** -- calling with `{"text": "hello"}` returns `"hello"`, verifying argument extraction and return value
-- **`test_ch3_toolset_register_and_get`** -- registers an `EchoTool` in a `ToolSet` and verifies `get("echo")` returns it
-- **`test_ch3_toolset_definitions`** -- verifies that `definitions()` returns the schemas of all registered tools
+- **`test_ch2_read_definition`** -- the `ReadTool` produces the correct name and a non-empty description from its `ToolDefinition`, and the `"path"` parameter is required
+- **`test_ch2_read_file`** -- calling with a valid path returns the file's content, verifying argument extraction and return value
+- **`test_ch2_read_missing_file`** -- calling with a nonexistent path returns an error
+- **`test_ch2_read_missing_arg`** -- calling with no arguments returns an error
 
 ## Key takeaway
 

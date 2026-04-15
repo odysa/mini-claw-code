@@ -29,16 +29,12 @@ pub enum HookAction {
 }
 
 /// A hook that reacts to agent events.
-///
-/// # Chapter 12: Hooks
 #[async_trait::async_trait]
 pub trait Hook: Send + Sync {
     async fn on_event(&self, event: &HookEvent) -> HookAction;
 }
 
 /// A registry that stores hooks and dispatches events to them.
-///
-/// # Chapter 12: Hooks
 pub struct HookRegistry {
     hooks: Vec<Box<dyn Hook>>,
 }
@@ -57,13 +53,6 @@ impl HookRegistry {
         self
     }
 
-    /// Dispatch an event to all hooks in order.
-    ///
-    /// Hints:
-    /// - Iterate hooks in order
-    /// - If any hook returns Block, return Block immediately
-    /// - If any hook returns ModifyArgs, remember the new args
-    /// - If all hooks return Continue (and no ModifyArgs), return Continue
     pub async fn dispatch(&self, event: &HookEvent) -> HookAction {
         unimplemented!("Iterate hooks, handle Block/ModifyArgs/Continue")
     }
@@ -108,9 +97,6 @@ impl Default for LoggingHook {
 
 #[async_trait::async_trait]
 impl Hook for LoggingHook {
-    /// Log a short description of each event.
-    ///
-    /// Hint: Format as "pre:{tool_name}", "post:{tool_name}", "agent:start", "agent:end"
     async fn on_event(&self, event: &HookEvent) -> HookAction {
         unimplemented!("Format event as string, push to log, return Continue")
     }
@@ -133,11 +119,8 @@ impl BlockingHook {
 
 #[async_trait::async_trait]
 impl Hook for BlockingHook {
-    /// Block if event is PreToolCall and tool_name is in blocked_tools.
     async fn on_event(&self, event: &HookEvent) -> HookAction {
-        unimplemented!(
-            "Check if PreToolCall tool_name is in blocked_tools, return Block or Continue"
-        )
+        unimplemented!("Check if PreToolCall tool_name is in blocked_tools")
     }
 }
 
@@ -170,16 +153,7 @@ impl ShellHook {
 
 #[async_trait::async_trait]
 impl Hook for ShellHook {
-    /// Run the shell command on Pre/PostToolCall events that match the pattern.
-    ///
-    /// Hints:
-    /// - Only handle PreToolCall and PostToolCall events
-    /// - Check matches_tool() first
-    /// - Run: tokio::process::Command::new("sh").arg("-c").arg(&self.command).output()
-    /// - Exit code 0 → Continue, non-zero → Block with stderr
     async fn on_event(&self, event: &HookEvent) -> HookAction {
-        unimplemented!(
-            "Extract tool_name, check pattern, run shell command, map exit code to action"
-        )
+        unimplemented!("Extract tool_name, check pattern, run shell command")
     }
 }

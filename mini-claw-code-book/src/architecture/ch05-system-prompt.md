@@ -132,9 +132,11 @@ each request.
 
 A production agent would implement a `SystemPromptBuilder` that maintains
 separate lists of static and dynamic sections, renders each half independently,
-and supports cache-aware providers. Our starter keeps things simpler -- we
-focus on the instruction loading piece, which is the most useful component to
-build from scratch.
+and supports cache-aware providers. These types (`SystemPromptBuilder`,
+`PromptSection`) are conceptual in this chapter -- the starter does not include
+them. Instead, the starter implements `InstructionLoader` in
+`src/instructions.rs`, which is the most practically useful component to build
+from scratch.
 
 ## InstructionLoader: discovering CLAUDE.md
 

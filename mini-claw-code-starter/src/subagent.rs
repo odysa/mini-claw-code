@@ -23,9 +23,7 @@ impl<P: Provider> SubagentTool<P> {
         provider: Arc<P>,
         tools_factory: impl Fn() -> ToolSet + Send + Sync + 'static,
     ) -> Self {
-        unimplemented!(
-            "Initialize with provider, factory, None system_prompt, max_turns=10, and ToolDefinition for 'subagent'"
-        )
+        unimplemented!("Initialize with provider, factory, None system_prompt, max_turns=10, ToolDefinition")
     }
 
     pub fn system_prompt(mut self, prompt: impl Into<String>) -> Self {
@@ -43,14 +41,6 @@ impl<P: Provider + 'static> Tool for SubagentTool<P> {
         &self.definition
     }
 
-    /// Spawn a child agent loop.
-    ///
-    /// Hints:
-    /// - Extract "task" from args
-    /// - Create fresh tools from factory
-    /// - Build messages (optional system prompt + user task)
-    /// - Loop up to max_turns: provider.chat -> match stop_reason -> execute tools
-    /// - Return final text or "error: max turns exceeded"
     async fn call(&self, args: Value) -> anyhow::Result<String> {
         unimplemented!("Extract task, create child agent loop, return result")
     }

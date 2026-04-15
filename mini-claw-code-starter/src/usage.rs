@@ -40,9 +40,7 @@ impl CostTracker {
     }
 
     pub fn total_cost(&self) -> f64 {
-        unimplemented!(
-            "Lock, compute cost: (input * input_price + output * output_price) / 1_000_000"
-        )
+        unimplemented!("Compute: (input * input_price + output * output_price) / 1_000_000")
     }
 
     /// Format: "tokens: N in + M out | cost: $X.XXXX"

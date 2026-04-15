@@ -19,9 +19,7 @@ impl Default for EditTool {
 impl EditTool {
     /// Create a new EditTool. Schema: required "path", "old_string", "new_string" parameters.
     pub fn new() -> Self {
-        unimplemented!(
-            "Use ToolDefinition::new(name, description).param(...).param(...).param(...) to define required \"path\", \"old_string\", \"new_string\" parameters"
-        )
+        unimplemented!("Create ToolDefinition with name 'edit', description, and required 'path', 'old_string', 'new_string' parameters")
     }
 }
 
@@ -40,9 +38,7 @@ impl Tool for EditTool {
     /// - If >1: `bail!("old_string appears {count} times in '{path}', must be unique")`
     /// - Replace with `content.replacen(old, new, 1)`, write back
     /// - Return confirmation: `format!("edited {path}")`
-    async fn call(&self, _args: Value) -> anyhow::Result<String> {
-        unimplemented!(
-            "Extract args, read file, verify old_string appears exactly once, replace, write back, return format!(\"edited {{path}}\")"
-        )
+    async fn call(&self, args: Value) -> anyhow::Result<String> {
+        unimplemented!("Extract path/old_string/new_string, read file, count matches (bail if 0 or >1), replacen and write back")
     }
 }

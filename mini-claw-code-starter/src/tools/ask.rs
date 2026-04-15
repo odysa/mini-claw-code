@@ -35,9 +35,7 @@ impl AskTool {
     ///
     /// Hint: Use param_raw for the "options" array parameter.
     pub fn new(handler: Arc<dyn InputHandler>) -> Self {
-        unimplemented!(
-            "Create ToolDefinition with 'ask_user' name, question param, options param_raw"
-        )
+        unimplemented!("Create ToolDefinition with name 'ask_user', required 'question' param, optional 'options' array param via param_raw, store handler")
     }
 }
 
@@ -49,7 +47,7 @@ impl Tool for AskTool {
 
     /// Extract question and options, call handler.ask().
     async fn call(&self, args: Value) -> anyhow::Result<String> {
-        unimplemented!("Extract question (required), parse options array, call handler.ask()")
+        unimplemented!("Extract 'question' from args, parse options with parse_options(), call self.handler.ask()")
     }
 }
 
@@ -57,13 +55,25 @@ impl Tool for AskTool {
 // Handlers
 // ---------------------------------------------------------------------------
 
+/// Extract the optional `options` array from tool arguments.
+fn parse_options(args: &Value) -> Vec<String> {
+    args.get("options")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 /// Prints the question to stdout and reads from stdin.
 pub struct CliInputHandler;
 
 #[async_trait::async_trait]
 impl InputHandler for CliInputHandler {
     async fn ask(&self, question: &str, options: &[String]) -> anyhow::Result<String> {
-        unimplemented!("Print question and options, read line from stdin via spawn_blocking")
+        unimplemented!("Print question and options, read stdin line via spawn_blocking, resolve numeric choice to option text")
     }
 }
 
@@ -89,7 +99,7 @@ impl ChannelInputHandler {
 impl InputHandler for ChannelInputHandler {
     /// Send a UserInputRequest and await the oneshot response.
     async fn ask(&self, question: &str, options: &[String]) -> anyhow::Result<String> {
-        unimplemented!("Create oneshot channel, send request, await response")
+        unimplemented!("Create oneshot channel, send UserInputRequest through self.tx, await and return the response")
     }
 }
 
@@ -109,6 +119,6 @@ impl MockInputHandler {
 #[async_trait::async_trait]
 impl InputHandler for MockInputHandler {
     async fn ask(&self, _question: &str, _options: &[String]) -> anyhow::Result<String> {
-        unimplemented!("Lock answers, pop_front, return Ok or Err if empty")
+        unimplemented!("Lock mutex, pop_front the next answer, return Ok(answer) or Err if empty")
     }
 }

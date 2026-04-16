@@ -20,37 +20,68 @@ struct CostTrackerInner {
 impl CostTracker {
     /// Create a tracker with per-million-token pricing.
     pub fn new(input_price_per_million: f64, output_price_per_million: f64) -> Self {
-        unimplemented!("Initialize inner Mutex with zeros, store prices")
+        Self {
+            inner: Mutex::new(CostTrackerInner {
+                total_input: 0,
+                total_output: 0,
+                turn_count: 0,
+            }),
+            input_price: input_price_per_million,
+            output_price: output_price_per_million,
+        }
     }
 
     pub fn record(&self, usage: &TokenUsage) {
-        unimplemented!("Lock mutex, add tokens, increment turn_count")
+        let mut inner = self.inner.lock().unwrap();
+        inner.total_input += usage.input_tokens;
+        inner.total_output += usage.output_tokens;
+        inner.turn_count += 1;
     }
 
     pub fn total_input_tokens(&self) -> u64 {
-        unimplemented!("Lock and return total_input")
+        self.inner.lock().unwrap().total_input
     }
 
     pub fn total_output_tokens(&self) -> u64 {
-        unimplemented!("Lock and return total_output")
+        self.inner.lock().unwrap().total_output
     }
 
     pub fn turn_count(&self) -> u64 {
-        unimplemented!("Lock and return turn_count")
+        self.inner.lock().unwrap().turn_count
     }
 
-    /// Hint: extract a private `compute_cost(input, output, input_price, output_price) -> f64`
-    /// helper so both `total_cost()` and `summary()` share the formula.
     pub fn total_cost(&self) -> f64 {
-        unimplemented!("Lock, call compute_cost helper with totals and prices")
+        let inner = self.inner.lock().unwrap();
+        Self::compute_cost(
+            inner.total_input,
+            inner.total_output,
+            self.input_price,
+            self.output_price,
+        )
     }
 
-    /// Format: "tokens: N in + M out | cost: $X.XXXX"
+    fn compute_cost(input: u64, output: u64, input_price: f64, output_price: f64) -> f64 {
+        (input as f64 * input_price + output as f64 * output_price) / 1_000_000.0
+    }
+
     pub fn summary(&self) -> String {
-        unimplemented!("Lock, call compute_cost helper, format string")
+        let inner = self.inner.lock().unwrap();
+        let cost = Self::compute_cost(
+            inner.total_input,
+            inner.total_output,
+            self.input_price,
+            self.output_price,
+        );
+        format!(
+            "tokens: {} in + {} out | cost: ${:.4}",
+            inner.total_input, inner.total_output, cost
+        )
     }
 
     pub fn reset(&self) {
-        unimplemented!("Lock, zero all counters")
+        let mut inner = self.inner.lock().unwrap();
+        inner.total_input = 0;
+        inner.total_output = 0;
+        inner.turn_count = 0;
     }
 }

@@ -24,7 +24,11 @@ impl PermissionRule {
     }
 
     pub fn matches(&self, tool_name: &str) -> bool {
-        unimplemented!("Use glob::Pattern to match tool_name against self.tool_pattern")
+        if let Ok(pattern) = glob::Pattern::new(&self.tool_pattern) {
+            pattern.matches(tool_name)
+        } else {
+            self.tool_pattern == tool_name
+        }
     }
 }
 
@@ -37,7 +41,11 @@ pub struct PermissionEngine {
 
 impl PermissionEngine {
     pub fn new(rules: Vec<PermissionRule>, default_permission: Permission) -> Self {
-        unimplemented!("Store rules, default_permission, and empty session_allows HashSet")
+        Self {
+            rules,
+            default_permission,
+            session_allows: std::collections::HashSet::new(),
+        }
     }
 
     pub fn ask_by_default(rules: Vec<PermissionRule>) -> Self {
@@ -49,11 +57,21 @@ impl PermissionEngine {
     }
 
     pub fn evaluate(&self, tool_name: &str, _args: &Value) -> Permission {
-        unimplemented!("Check session_allows, then rules in order, then default")
+        if self.session_allows.contains(tool_name) {
+            return Permission::Allow;
+        }
+
+        for rule in &self.rules {
+            if rule.matches(tool_name) {
+                return rule.permission.clone();
+            }
+        }
+
+        self.default_permission.clone()
     }
 
     pub fn record_session_allow(&mut self, tool_name: &str) {
-        unimplemented!("Insert tool_name into session_allows")
+        self.session_allows.insert(tool_name.to_string());
     }
 
     pub fn is_allowed(&self, tool_name: &str, args: &Value) -> bool {

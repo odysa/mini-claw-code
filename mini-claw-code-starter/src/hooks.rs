@@ -54,7 +54,22 @@ impl HookRegistry {
     }
 
     pub async fn dispatch(&self, event: &HookEvent) -> HookAction {
-        unimplemented!("Iterate hooks, handle Block/ModifyArgs/Continue")
+        let mut modified_args: Option<Value> = None;
+
+        for hook in &self.hooks {
+            match hook.on_event(event).await {
+                HookAction::Continue => {}
+                HookAction::Block(reason) => return HookAction::Block(reason),
+                HookAction::ModifyArgs(new_args) => {
+                    modified_args = Some(new_args);
+                }
+            }
+        }
+
+        match modified_args {
+            Some(args) => HookAction::ModifyArgs(args),
+            None => HookAction::Continue,
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -98,7 +113,14 @@ impl Default for LoggingHook {
 #[async_trait::async_trait]
 impl Hook for LoggingHook {
     async fn on_event(&self, event: &HookEvent) -> HookAction {
-        unimplemented!("Format event as string, push to log, return Continue")
+        let msg = match event {
+            HookEvent::PreToolCall { tool_name, .. } => format!("pre:{tool_name}"),
+            HookEvent::PostToolCall { tool_name, .. } => format!("post:{tool_name}"),
+            HookEvent::AgentStart { .. } => "agent:start".into(),
+            HookEvent::AgentEnd { .. } => "agent:end".into(),
+        };
+        self.log.lock().unwrap().push(msg);
+        HookAction::Continue
     }
 }
 
@@ -120,7 +142,12 @@ impl BlockingHook {
 #[async_trait::async_trait]
 impl Hook for BlockingHook {
     async fn on_event(&self, event: &HookEvent) -> HookAction {
-        unimplemented!("Check if PreToolCall tool_name is in blocked_tools")
+        if let HookEvent::PreToolCall { tool_name, .. } = event
+            && self.blocked_tools.iter().any(|b| b == tool_name)
+        {
+            return HookAction::Block(self.reason.clone());
+        }
+        HookAction::Continue
     }
 }
 
@@ -154,6 +181,32 @@ impl ShellHook {
 #[async_trait::async_trait]
 impl Hook for ShellHook {
     async fn on_event(&self, event: &HookEvent) -> HookAction {
-        unimplemented!("Extract tool_name, check pattern, run shell command")
+        let tool_name = match event {
+            HookEvent::PreToolCall { tool_name, .. } => tool_name,
+            HookEvent::PostToolCall { tool_name, .. } => tool_name,
+            _ => return HookAction::Continue,
+        };
+
+        if !self.matches_tool(tool_name) {
+            return HookAction::Continue;
+        }
+
+        let result = tokio::process::Command::new("sh")
+            .arg("-c")
+            .arg(&self.command)
+            .output()
+            .await;
+
+        match result {
+            Ok(output) => {
+                if output.status.success() {
+                    HookAction::Continue
+                } else {
+                    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                    HookAction::Block(format!("hook failed: {stderr}"))
+                }
+            }
+            Err(e) => HookAction::Block(format!("hook error: {e}")),
+        }
     }
 }

@@ -50,7 +50,10 @@ struct PartialToolCall {
 impl StreamAccumulator {
     /// Create a new empty accumulator.
     pub fn new() -> Self {
-        unimplemented!("Create empty accumulator with empty text and empty tool_calls vec")
+        Self {
+            text: String::new(),
+            tool_calls: Vec::new(),
+        }
     }
 
     /// Process a single streaming event.
@@ -63,9 +66,26 @@ impl StreamAccumulator {
     ///   tool call at that index
     /// - `Done` → no-op
     pub fn feed(&mut self, event: &StreamEvent) {
-        unimplemented!(
-            "Match on event: TextDelta appends to text, ToolCallStart pads and sets id/name, ToolCallDelta appends arguments, Done is no-op"
-        )
+        match event {
+            StreamEvent::TextDelta(s) => self.text.push_str(s),
+            StreamEvent::ToolCallStart { index, id, name } => {
+                while self.tool_calls.len() <= *index {
+                    self.tool_calls.push(PartialToolCall {
+                        id: String::new(),
+                        name: String::new(),
+                        arguments: String::new(),
+                    });
+                }
+                self.tool_calls[*index].id = id.clone();
+                self.tool_calls[*index].name = name.clone();
+            }
+            StreamEvent::ToolCallDelta { index, arguments } => {
+                if let Some(tc) = self.tool_calls.get_mut(*index) {
+                    tc.arguments.push_str(arguments);
+                }
+            }
+            StreamEvent::Done => {}
+        }
     }
 
     /// Consume the accumulator and produce a complete [`AssistantTurn`].
@@ -78,9 +98,32 @@ impl StreamAccumulator {
     /// - stop_reason: ToolUse if tool_calls is non-empty, Stop otherwise
     /// - usage: None
     pub fn finish(self) -> AssistantTurn {
-        unimplemented!(
-            "Build AssistantTurn: text is None if empty, filter/parse tool_calls, set stop_reason based on whether tool_calls is empty"
-        )
+        let text = if self.text.is_empty() {
+            None
+        } else {
+            Some(self.text)
+        };
+        let tool_calls: Vec<ToolCall> = self
+            .tool_calls
+            .into_iter()
+            .filter(|tc| !tc.name.is_empty())
+            .map(|tc| ToolCall {
+                id: tc.id,
+                name: tc.name,
+                arguments: serde_json::from_str(&tc.arguments).unwrap_or(Value::Null),
+            })
+            .collect();
+        let stop_reason = if tool_calls.is_empty() {
+            StopReason::Stop
+        } else {
+            StopReason::ToolUse
+        };
+        AssistantTurn {
+            text,
+            tool_calls,
+            stop_reason,
+            usage: None,
+        }
     }
 }
 
@@ -139,9 +182,52 @@ struct DeltaFunction {
 ///   - If `function.arguments` is present and non-empty → `ToolCallDelta`
 /// - Return None if no events were produced
 pub fn parse_sse_line(line: &str) -> Option<Vec<StreamEvent>> {
-    unimplemented!(
-        "Strip 'data: ' prefix, handle [DONE], parse JSON ChunkResponse, extract TextDelta and ToolCall events"
-    )
+    let data = line.strip_prefix("data: ")?;
+    if data == "[DONE]" {
+        return Some(vec![StreamEvent::Done]);
+    }
+
+    let chunk: ChunkResponse = serde_json::from_str(data).ok()?;
+    let choice = chunk.choices.into_iter().next()?;
+    let mut events = Vec::new();
+
+    if let Some(text) = choice.delta.content
+        && !text.is_empty()
+    {
+        events.push(StreamEvent::TextDelta(text));
+    }
+
+    if let Some(tool_calls) = choice.delta.tool_calls {
+        for tc in tool_calls {
+            if let Some(id) = tc.id {
+                let name = tc
+                    .function
+                    .as_ref()
+                    .and_then(|f| f.name.clone())
+                    .unwrap_or_default();
+                events.push(StreamEvent::ToolCallStart {
+                    index: tc.index,
+                    id,
+                    name,
+                });
+            }
+            if let Some(ref func) = tc.function
+                && let Some(ref args) = func.arguments
+                && !args.is_empty()
+            {
+                events.push(StreamEvent::ToolCallDelta {
+                    index: tc.index,
+                    arguments: args.clone(),
+                });
+            }
+        }
+    }
+
+    if events.is_empty() {
+        None
+    } else {
+        Some(events)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +264,9 @@ pub struct MockStreamProvider {
 
 impl MockStreamProvider {
     pub fn new(responses: VecDeque<AssistantTurn>) -> Self {
-        unimplemented!("Create inner MockProvider from the responses VecDeque")
+        Self {
+            inner: MockProvider::new(responses),
+        }
     }
 }
 
@@ -197,9 +285,27 @@ impl StreamProvider for MockStreamProvider {
         tools: &[&ToolDefinition],
         tx: mpsc::UnboundedSender<StreamEvent>,
     ) -> anyhow::Result<AssistantTurn> {
-        unimplemented!(
-            "Call inner.chat(), synthesize TextDelta per char, ToolCallStart/Delta per tool call, send Done, return turn"
-        )
+        let turn = self.inner.chat(messages, tools).await?;
+
+        if let Some(ref text) = turn.text {
+            for ch in text.chars() {
+                let _ = tx.send(StreamEvent::TextDelta(ch.to_string()));
+            }
+        }
+        for (i, call) in turn.tool_calls.iter().enumerate() {
+            let _ = tx.send(StreamEvent::ToolCallStart {
+                index: i,
+                id: call.id.clone(),
+                name: call.name.clone(),
+            });
+            let _ = tx.send(StreamEvent::ToolCallDelta {
+                index: i,
+                arguments: call.arguments.to_string(),
+            });
+        }
+        let _ = tx.send(StreamEvent::Done);
+
+        Ok(turn)
     }
 }
 
@@ -217,11 +323,15 @@ pub struct StreamingAgent<P: StreamProvider> {
 
 impl<P: StreamProvider> StreamingAgent<P> {
     pub fn new(provider: P) -> Self {
-        unimplemented!("Store provider and create an empty ToolSet")
+        Self {
+            provider,
+            tools: ToolSet::new(),
+        }
     }
 
     pub fn tool(mut self, t: impl Tool + 'static) -> Self {
-        unimplemented!("Push tool into self.tools and return self for chaining")
+        self.tools.push(t);
+        self
     }
 
     /// Run the streaming agent loop with a fresh prompt.
@@ -234,26 +344,65 @@ impl<P: StreamProvider> StreamingAgent<P> {
         prompt: &str,
         events: mpsc::UnboundedSender<AgentEvent>,
     ) -> anyhow::Result<String> {
-        unimplemented!("Create messages vec with User prompt, call self.chat()")
+        let mut messages = vec![Message::User(prompt.to_string())];
+        self.chat(&mut messages, events).await
     }
 
-    /// Run the streaming agent loop with existing message history.
-    ///
-    /// Hints:
-    /// - Same loop as SimpleAgent::chat() but:
-    ///   1. Create (stream_tx, stream_rx) channel
-    ///   2. Spawn a forwarder task that forwards StreamEvent::TextDelta to AgentEvent::TextDelta
-    ///   3. Call provider.stream_chat(messages, &defs, stream_tx)
-    ///   4. Await the forwarder
-    ///   5. Match on stop_reason as usual
     #[allow(clippy::ptr_arg)]
     pub async fn chat(
         &self,
         messages: &mut Vec<Message>,
         events: mpsc::UnboundedSender<AgentEvent>,
     ) -> anyhow::Result<String> {
-        unimplemented!(
-            "Loop: create stream channel, spawn forwarder for TextDelta events, call stream_chat, match stop_reason, execute tools on ToolUse"
-        )
+        let defs = self.tools.definitions();
+
+        loop {
+            let (stream_tx, mut stream_rx) = mpsc::unbounded_channel();
+            let events_clone = events.clone();
+
+            let forwarder = tokio::spawn(async move {
+                while let Some(event) = stream_rx.recv().await {
+                    if let StreamEvent::TextDelta(ref text) = event {
+                        let _ = events_clone.send(AgentEvent::TextDelta(text.clone()));
+                    }
+                }
+            });
+
+            let turn = self
+                .provider
+                .stream_chat(messages, &defs, stream_tx)
+                .await?;
+            let _ = forwarder.await;
+
+            match turn.stop_reason {
+                StopReason::Stop => {
+                    let text = turn.text.clone().unwrap_or_default();
+                    let _ = events.send(AgentEvent::Done(text.clone()));
+                    messages.push(Message::Assistant(turn));
+                    return Ok(text);
+                }
+                StopReason::ToolUse => {
+                    let mut results = Vec::new();
+                    for call in &turn.tool_calls {
+                        let _ = events.send(AgentEvent::ToolCall {
+                            name: call.name.clone(),
+                            summary: tool_summary(call),
+                        });
+                        let content = match self.tools.get(&call.name) {
+                            Some(t) => t
+                                .call(call.arguments.clone())
+                                .await
+                                .unwrap_or_else(|e| format!("error: {e}")),
+                            None => format!("error: unknown tool `{}`", call.name),
+                        };
+                        results.push((call.id.clone(), content));
+                    }
+                    messages.push(Message::Assistant(turn));
+                    for (id, content) in results {
+                        messages.push(Message::ToolResult { id, content });
+                    }
+                }
+            }
+        }
     }
 }

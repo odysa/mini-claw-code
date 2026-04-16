@@ -35,9 +35,25 @@ impl AskTool {
     ///
     /// Hint: Use param_raw for the "options" array parameter.
     pub fn new(handler: Arc<dyn InputHandler>) -> Self {
-        unimplemented!(
-            "Create ToolDefinition with name 'ask_user', required 'question' param, optional 'options' array param via param_raw, store handler"
-        )
+        Self {
+            definition: ToolDefinition::new(
+                "ask_user",
+                "Ask the user a clarifying question. Use this when you need more information \
+                 before proceeding. The user will see your question and can provide a free-text \
+                 answer or choose from the options you provide.",
+            )
+            .param("question", "string", "The question to ask the user", true)
+            .param_raw(
+                "options",
+                json!({
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Optional list of choices to present to the user"
+                }),
+                false,
+            ),
+            handler,
+        }
     }
 }
 
@@ -49,9 +65,14 @@ impl Tool for AskTool {
 
     /// Extract question and options, call handler.ask().
     async fn call(&self, args: Value) -> anyhow::Result<String> {
-        unimplemented!(
-            "Extract 'question' from args, parse options with parse_options(), call self.handler.ask()"
-        )
+        let question = args
+            .get("question")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("missing required parameter: question"))?;
+
+        let options = parse_options(&args);
+
+        self.handler.ask(question, &options).await
     }
 }
 
@@ -77,9 +98,33 @@ pub struct CliInputHandler;
 #[async_trait::async_trait]
 impl InputHandler for CliInputHandler {
     async fn ask(&self, question: &str, options: &[String]) -> anyhow::Result<String> {
-        unimplemented!(
-            "Print question and options, read stdin line via spawn_blocking, resolve numeric choice to option text"
-        )
+        use std::io::{self, BufRead, Write};
+
+        let question = question.to_string();
+        let options = options.to_vec();
+
+        tokio::task::spawn_blocking(move || {
+            println!("\n  {question}");
+            for (i, opt) in options.iter().enumerate() {
+                println!("    {}) {opt}", i + 1);
+            }
+
+            print!("  > ");
+            io::stdout().flush()?;
+            let mut line = String::new();
+            io::stdin().lock().read_line(&mut line)?;
+            let answer = line.trim().to_string();
+
+            // If the user typed a valid option number, resolve it
+            if let Ok(n) = answer.parse::<usize>()
+                && n >= 1
+                && n <= options.len()
+            {
+                return Ok(options[n - 1].clone());
+            }
+            Ok(answer)
+        })
+        .await?
     }
 }
 
@@ -105,9 +150,13 @@ impl ChannelInputHandler {
 impl InputHandler for ChannelInputHandler {
     /// Send a UserInputRequest and await the oneshot response.
     async fn ask(&self, question: &str, options: &[String]) -> anyhow::Result<String> {
-        unimplemented!(
-            "Create oneshot channel, send UserInputRequest through self.tx, await and return the response"
-        )
+        let (response_tx, response_rx) = oneshot::channel();
+        self.tx.send(UserInputRequest {
+            question: question.to_string(),
+            options: options.to_vec(),
+            response_tx,
+        })?;
+        Ok(response_rx.await?)
     }
 }
 
@@ -127,6 +176,10 @@ impl MockInputHandler {
 #[async_trait::async_trait]
 impl InputHandler for MockInputHandler {
     async fn ask(&self, _question: &str, _options: &[String]) -> anyhow::Result<String> {
-        unimplemented!("Same pattern as MockProvider::chat() — lock, pop_front, ok_or_else error")
+        self.answers
+            .lock()
+            .await
+            .pop_front()
+            .ok_or_else(|| anyhow::anyhow!("MockInputHandler: no more answers"))
     }
 }

@@ -182,6 +182,8 @@ The `run_loop()` method is the shared agent loop. When `allowed` is `Some`,
 only those tools plus `exit_plan` are permitted. When `allowed` is `None`,
 all tools are available:
 
+Here is the full implementation of `run_loop`:
+
 ```rust
 async fn run_loop(
     &self,
@@ -189,12 +191,87 @@ async fn run_loop(
     allowed: Option<&HashSet<&'static str>>,
     events: mpsc::UnboundedSender<AgentEvent>,
 ) -> anyhow::Result<String> {
-    // Filter tool definitions based on allowed set
-    // If allowed is Some, add exit_plan_def to the definitions
-    // Loop: stream_chat -> match stop_reason
-    // For ToolUse: handle exit_plan specially (return plan text),
-    //   block tools not in allowed set, execute allowed tools normally
-    unimplemented!()
+    // Step 1: filter tool definitions
+    let all_defs = self.tools.definitions();
+    let defs: Vec<&ToolDefinition> = match allowed {
+        Some(names) => {
+            let mut filtered: Vec<&ToolDefinition> = all_defs
+                .into_iter()
+                .filter(|d| names.contains(d.name))
+                .collect();
+            filtered.push(&self.exit_plan_def);
+            filtered
+        }
+        None => all_defs,
+    };
+
+    loop {
+        // Step 2: stream the LLM response (forward text deltas to UI)
+        let (stream_tx, mut stream_rx) = mpsc::unbounded_channel();
+        let events_clone = events.clone();
+        let forwarder = tokio::spawn(async move {
+            while let Some(event) = stream_rx.recv().await {
+                if let StreamEvent::TextDelta(ref text) = event {
+                    let _ = events_clone.send(AgentEvent::TextDelta(text.clone()));
+                }
+            }
+        });
+
+        let turn = self.provider.stream_chat(messages, &defs, stream_tx).await?;
+        let _ = forwarder.await;
+
+        // Step 3: match on stop reason
+        match turn.stop_reason {
+            StopReason::Stop => {
+                let text = turn.text.clone().unwrap_or_default();
+                let _ = events.send(AgentEvent::Done(text.clone()));
+                messages.push(Message::Assistant(turn));
+                return Ok(text);
+            }
+            StopReason::ToolUse => {
+                let mut results = Vec::with_capacity(turn.tool_calls.len());
+
+                for call in &turn.tool_calls {
+                    // Handle exit_plan
+                    if allowed.is_some() && call.name == "exit_plan" {
+                        let text = turn.text.clone().unwrap_or_default();
+                        let _ = events.send(AgentEvent::Done(text.clone()));
+                        messages.push(Message::Assistant(turn));
+                        messages.push(Message::ToolResult {
+                            id: call.id.clone(),
+                            content: "Plan submitted for review.".into(),
+                        });
+                        return Ok(text);
+                    }
+
+                    // Block tools not in allowed set
+                    if let Some(names) = allowed {
+                        if !names.contains(call.name.as_str()) {
+                            results.push((
+                                call.id.clone(),
+                                format!("error: tool `{}` is not available in planning mode",
+                                    call.name),
+                            ));
+                            continue;
+                        }
+                    }
+
+                    // Execute allowed tools
+                    let content = match self.tools.get(&call.name) {
+                        Some(t) => t.call(call.arguments.clone()).await
+                            .unwrap_or_else(|e| format!("error: {e}")),
+                        None => format!("error: unknown tool `{}`", call.name),
+                    };
+                    results.push((call.id.clone(), content));
+                }
+
+                messages.push(Message::Assistant(turn));
+                for (id, content) in results {
+                    messages.push(Message::ToolResult { id, content });
+                }
+            }
+        }
+    }
 }
 ```
 

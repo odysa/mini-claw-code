@@ -103,26 +103,32 @@ impl OpenRouterProvider {
     ///
     /// Hint: Use `reqwest::Client::new()` and `.into()` for string conversion.
     pub fn new(api_key: impl Into<String>, model: impl Into<String>) -> Self {
-        unimplemented!(
-            "Create reqwest::Client, store api_key, model, and default base_url 'https://openrouter.ai/api/v1'"
-        )
+        Self {
+            client: reqwest::Client::new(),
+            api_key: api_key.into(),
+            model: model.into(),
+            base_url: "https://openrouter.ai/api/v1".into(),
+        }
     }
 
     /// Override the base URL (useful for testing with a local server).
     ///
     /// Default is "https://openrouter.ai/api/v1".
     pub fn base_url(mut self, url: impl Into<String>) -> Self {
-        unimplemented!("Set self.base_url and return self for chaining")
+        self.base_url = url.into();
+        self
     }
 
     /// Create a provider from the OPENROUTER_API_KEY environment variable.
     pub fn from_env_with_model(model: impl Into<String>) -> anyhow::Result<Self> {
-        unimplemented!("Load .env with dotenvy, read OPENROUTER_API_KEY from env, call Self::new()")
+        let _ = dotenvy::dotenv();
+        let api_key = std::env::var("OPENROUTER_API_KEY").context("OPENROUTER_API_KEY not set")?;
+        Ok(Self::new(api_key, model))
     }
 
     /// Create a provider from env with the default model.
     pub fn from_env() -> anyhow::Result<Self> {
-        unimplemented!("Call from_env_with_model with default model 'openrouter/free'")
+        Self::from_env_with_model("openrouter/free")
     }
 
     /// Convert our Message types to the API's message format.
@@ -135,18 +141,71 @@ impl OpenRouterProvider {
     ///   Set tool_calls to None (not Some(vec![])) when empty.
     /// - ToolResult -> role: "tool", content: Some(content.clone()), tool_call_id: Some(id.clone())
     pub(crate) fn convert_messages(messages: &[Message]) -> Vec<ApiMessage> {
-        unimplemented!(
-            "Map each Message variant to ApiMessage: System/User set role+content, Assistant maps tool_calls, ToolResult sets tool_call_id"
-        )
+        messages
+            .iter()
+            .map(|msg| match msg {
+                Message::System(text) => ApiMessage {
+                    role: "system".into(),
+                    content: Some(text.clone()),
+                    tool_calls: None,
+                    tool_call_id: None,
+                },
+                Message::User(text) => ApiMessage {
+                    role: "user".into(),
+                    content: Some(text.clone()),
+                    tool_calls: None,
+                    tool_call_id: None,
+                },
+                Message::Assistant(turn) => {
+                    let tool_calls = if turn.tool_calls.is_empty() {
+                        None
+                    } else {
+                        Some(
+                            turn.tool_calls
+                                .iter()
+                                .map(|tc| ApiToolCall {
+                                    id: tc.id.clone(),
+                                    type_: "function".into(),
+                                    function: ApiFunction {
+                                        name: tc.name.clone(),
+                                        arguments: tc.arguments.to_string(),
+                                    },
+                                })
+                                .collect(),
+                        )
+                    };
+                    ApiMessage {
+                        role: "assistant".into(),
+                        content: turn.text.clone(),
+                        tool_calls,
+                        tool_call_id: None,
+                    }
+                }
+                Message::ToolResult { id, content } => ApiMessage {
+                    role: "tool".into(),
+                    content: Some(content.clone()),
+                    tool_calls: None,
+                    tool_call_id: Some(id.clone()),
+                },
+            })
+            .collect()
     }
 
     /// Convert our ToolDefinition types to the API's tool format.
     ///
     /// Each tool becomes: { type: "function", function: { name, description, parameters } }
     pub(crate) fn convert_tools(tools: &[&ToolDefinition]) -> Vec<ApiTool> {
-        unimplemented!(
-            "Map each ToolDefinition to ApiTool with type 'function' and ApiToolDef containing name, description, parameters"
-        )
+        tools
+            .iter()
+            .map(|td| ApiTool {
+                type_: "function",
+                function: ApiToolDef {
+                    name: td.name,
+                    description: td.description,
+                    parameters: td.parameters.clone(),
+                },
+            })
+            .collect()
     }
 }
 
@@ -169,9 +228,44 @@ impl crate::streaming::StreamProvider for OpenRouterProvider {
         tools: &[&ToolDefinition],
         tx: tokio::sync::mpsc::UnboundedSender<crate::streaming::StreamEvent>,
     ) -> anyhow::Result<AssistantTurn> {
-        unimplemented!(
-            "Build ChatRequest with stream:true, POST to API, read chunks, parse SSE lines, feed StreamAccumulator, send events via tx, return acc.finish()"
-        )
+        use crate::streaming::{StreamAccumulator, StreamEvent, parse_sse_line};
+
+        let request = ChatRequest {
+            model: &self.model,
+            messages: Self::convert_messages(messages),
+            tools: Self::convert_tools(tools),
+            stream: true,
+        };
+
+        let mut resp = self
+            .client
+            .post(format!("{}/chat/completions", self.base_url))
+            .bearer_auth(&self.api_key)
+            .json(&request)
+            .send()
+            .await
+            .context("failed to send streaming request")?;
+
+        let mut acc = StreamAccumulator::new();
+        let mut buffer = String::new();
+
+        while let Some(chunk) = resp.chunk().await? {
+            buffer.push_str(&String::from_utf8_lossy(&chunk));
+            while let Some(pos) = buffer.find('\n') {
+                let line = buffer[..pos].trim_end_matches('\r').to_string();
+                buffer = buffer[pos + 1..].to_string();
+                if line.is_empty() {
+                    continue;
+                }
+                if let Some(events) = parse_sse_line(&line) {
+                    for event in events {
+                        acc.feed(&event);
+                        let _ = tx.send(event);
+                    }
+                }
+            }
+        }
+        Ok(acc.finish())
     }
 }
 
@@ -194,8 +288,60 @@ impl Provider for OpenRouterProvider {
         messages: &[Message],
         tools: &[&ToolDefinition],
     ) -> anyhow::Result<AssistantTurn> {
-        unimplemented!(
-            "Build ChatRequest with stream:false, POST to API, parse ChatResponse, convert tool_calls, determine stop_reason, extract usage"
-        )
+        let request = ChatRequest {
+            model: &self.model,
+            messages: Self::convert_messages(messages),
+            tools: Self::convert_tools(tools),
+            stream: false,
+        };
+
+        let resp = self
+            .client
+            .post(format!("{}/chat/completions", self.base_url))
+            .bearer_auth(&self.api_key)
+            .json(&request)
+            .send()
+            .await
+            .context("failed to send request")?;
+
+        let body = resp.text().await.context("failed to read response body")?;
+        let chat_resp: ChatResponse =
+            serde_json::from_str(&body).context("failed to parse response")?;
+
+        let choice = chat_resp
+            .choices
+            .into_iter()
+            .next()
+            .context("no choices in response")?;
+
+        let tool_calls = choice
+            .message
+            .tool_calls
+            .unwrap_or_default()
+            .into_iter()
+            .map(|tc| ToolCall {
+                id: tc.id,
+                name: tc.function.name,
+                arguments: serde_json::from_str(&tc.function.arguments).unwrap_or(Value::Null),
+            })
+            .collect::<Vec<_>>();
+
+        let stop_reason = if choice.finish_reason.as_deref() == Some("tool_calls") {
+            StopReason::ToolUse
+        } else {
+            StopReason::Stop
+        };
+
+        let usage = chat_resp.usage.map(|u| TokenUsage {
+            input_tokens: u.prompt_tokens.unwrap_or(0),
+            output_tokens: u.completion_tokens.unwrap_or(0),
+        });
+
+        Ok(AssistantTurn {
+            text: choice.message.content,
+            tool_calls,
+            stop_reason,
+            usage,
+        })
     }
 }

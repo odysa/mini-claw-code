@@ -18,17 +18,69 @@ pub struct PathValidator {
 
 impl PathValidator {
     pub fn new(allowed_dir: impl Into<PathBuf>) -> Self {
-        unimplemented!("Canonicalize the path and store both raw and canonical versions")
+        let raw_dir: PathBuf = allowed_dir.into();
+        let allowed_dir = raw_dir.canonicalize().unwrap_or_else(|_| raw_dir.clone());
+        Self {
+            allowed_dir,
+            raw_dir,
+        }
     }
 
     pub fn validate_path(&self, path: &str) -> Result<(), String> {
-        unimplemented!("Resolve path, canonicalize, check starts_with allowed_dir")
+        let target = Path::new(path);
+
+        let resolved = if target.is_absolute() {
+            target.to_path_buf()
+        } else {
+            self.raw_dir.join(target)
+        };
+
+        let canonical_target = if resolved.exists() {
+            resolved
+                .canonicalize()
+                .map_err(|e| format!("cannot resolve path: {e}"))?
+        } else {
+            let parent = resolved.parent().ok_or("invalid path")?;
+            if parent.exists() {
+                let mut canonical = parent
+                    .canonicalize()
+                    .map_err(|e| format!("cannot resolve parent: {e}"))?;
+                if let Some(filename) = resolved.file_name() {
+                    canonical.push(filename);
+                }
+                canonical
+            } else {
+                return Err(format!(
+                    "parent directory does not exist: {}",
+                    parent.display()
+                ));
+            }
+        };
+
+        if canonical_target.starts_with(&self.allowed_dir) {
+            Ok(())
+        } else {
+            Err(format!(
+                "path {} is outside allowed directory {}",
+                canonical_target.display(),
+                self.allowed_dir.display()
+            ))
+        }
     }
 }
 
 impl SafetyCheck for PathValidator {
     fn check(&self, tool_name: &str, args: &Value) -> Result<(), String> {
-        unimplemented!("Match on tool_name, extract path arg, call validate_path")
+        match tool_name {
+            "read" | "write" | "edit" => {
+                if let Some(path) = args.get("path").and_then(|v| v.as_str()) {
+                    self.validate_path(path)
+                } else {
+                    Ok(())
+                }
+            }
+            _ => Ok(()),
+        }
     }
 }
 
@@ -39,7 +91,12 @@ pub struct CommandFilter {
 
 impl CommandFilter {
     pub fn new(patterns: &[String]) -> Self {
-        unimplemented!("Parse each pattern string into a glob::Pattern")
+        Self {
+            blocked_patterns: patterns
+                .iter()
+                .filter_map(|p| glob::Pattern::new(p).ok())
+                .collect(),
+        }
     }
 
     pub fn default_filters() -> Self {
@@ -55,13 +112,30 @@ impl CommandFilter {
     }
 
     pub fn is_blocked(&self, command: &str) -> Option<&str> {
-        unimplemented!("Trim command, check against each pattern, return matching pattern")
+        let trimmed = command.trim();
+        for pattern in &self.blocked_patterns {
+            if pattern.matches(trimmed) {
+                return Some(pattern.as_str());
+            }
+        }
+        None
     }
 }
 
 impl SafetyCheck for CommandFilter {
     fn check(&self, tool_name: &str, args: &Value) -> Result<(), String> {
-        unimplemented!("Only check bash tool, extract command, call is_blocked")
+        if tool_name != "bash" {
+            return Ok(());
+        }
+        if let Some(command) = args.get("command").and_then(|v| v.as_str()) {
+            if let Some(pattern) = self.is_blocked(command) {
+                Err(format!("blocked command matching pattern `{pattern}`"))
+            } else {
+                Ok(())
+            }
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -72,13 +146,43 @@ pub struct ProtectedFileCheck {
 
 impl ProtectedFileCheck {
     pub fn new(patterns: &[String]) -> Self {
-        unimplemented!("Parse each pattern string into a glob::Pattern")
+        Self {
+            patterns: patterns
+                .iter()
+                .filter_map(|p| glob::Pattern::new(p).ok())
+                .collect(),
+        }
     }
 }
 
 impl SafetyCheck for ProtectedFileCheck {
     fn check(&self, tool_name: &str, args: &Value) -> Result<(), String> {
-        unimplemented!("Match on write/edit, extract path, check against patterns")
+        match tool_name {
+            "write" | "edit" => {
+                if let Some(path) = args.get("path").and_then(|v| v.as_str()) {
+                    for pattern in &self.patterns {
+                        if pattern.matches(path)
+                            || pattern.matches(
+                                Path::new(path)
+                                    .file_name()
+                                    .unwrap_or_default()
+                                    .to_str()
+                                    .unwrap_or(""),
+                            )
+                        {
+                            return Err(format!(
+                                "file `{path}` is protected (matches pattern `{}`)",
+                                pattern.as_str()
+                            ));
+                        }
+                    }
+                    Ok(())
+                } else {
+                    Ok(())
+                }
+            }
+            _ => Ok(()),
+        }
     }
 }
 
@@ -108,8 +212,12 @@ impl Tool for SafeToolWrapper {
     }
 
     async fn call(&self, args: Value) -> anyhow::Result<String> {
-        unimplemented!(
-            "Run checks, if all pass call inner.call(args), otherwise return error string"
-        )
+        let tool_name = self.inner.definition().name;
+        for check in &self.checks {
+            if let Err(reason) = check.check(tool_name, &args) {
+                return Ok(format!("error: safety check failed: {reason}"));
+            }
+        }
+        self.inner.call(args).await
     }
 }

@@ -265,6 +265,18 @@ The `system_prompt_section()` method calls `load()` and wraps the result with
 an instruction preamble. This produces a string ready to insert into a system
 prompt. If no instruction files are found, it returns `None`.
 
+The exact preamble should read:
+
+```rust
+format!(
+    "The following project instructions were loaded automatically. \
+     Follow them carefully:\n\n{content}"
+)
+```
+
+The test checks for the substring `"project instructions"` in the output, so
+your preamble text must include those words.
+
 ## Using InstructionLoader in a system prompt
 
 In a production agent, the instruction loader is wired into the prompt assembly

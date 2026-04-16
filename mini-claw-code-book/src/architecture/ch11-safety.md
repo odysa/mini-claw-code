@@ -169,10 +169,42 @@ The `PathValidator::validate_path` method implements directory containment check
 
 ```rust
 pub fn validate_path(&self, path: &str) -> Result<(), String> {
-    // Resolve relative paths against raw_dir
-    // Canonicalize the target (for existing files) or its parent (for new files)
-    // Check if the canonical path starts_with the allowed_dir
-    unimplemented!()
+    let target = Path::new(path);
+
+    // Step 1: resolve to absolute path
+    let resolved = if target.is_absolute() {
+        target.to_path_buf()
+    } else {
+        self.raw_dir.join(target)
+    };
+
+    // Step 2: canonicalize (resolves symlinks and ..)
+    let canonical = if resolved.exists() {
+        resolved.canonicalize()
+            .map_err(|e| format!("cannot resolve path: {e}"))?
+    } else {
+        // For new files, canonicalize the parent directory
+        let parent = resolved.parent().ok_or("invalid path")?;
+        if parent.exists() {
+            let mut c = parent.canonicalize()
+                .map_err(|e| format!("cannot resolve parent: {e}"))?;
+            if let Some(filename) = resolved.file_name() {
+                c.push(filename);
+            }
+            c
+        } else {
+            return Err(format!("parent directory does not exist: {}",
+                parent.display()));
+        }
+    };
+
+    // Step 3: check containment
+    if canonical.starts_with(&self.allowed_dir) {
+        Ok(())
+    } else {
+        Err(format!("path {} is outside allowed directory {}",
+            canonical.display(), self.allowed_dir.display()))
+    }
 }
 ```
 
@@ -192,9 +224,31 @@ The `ProtectedFileCheck` uses `glob::Pattern` for matching. For each `write` or 
 
 ```rust
 fn check(&self, tool_name: &str, args: &Value) -> Result<(), String> {
-    // Match on write/edit, extract path, check against patterns
-    // Check both full path and filename component
-    unimplemented!()
+    match tool_name {
+        "write" | "edit" => {
+            if let Some(path) = args.get("path").and_then(|v| v.as_str()) {
+                for pattern in &self.patterns {
+                    // Check full path and filename separately
+                    if pattern.matches(path)
+                        || pattern.matches(
+                            Path::new(path).file_name()
+                                .unwrap_or_default()
+                                .to_str().unwrap_or(""),
+                        )
+                    {
+                        return Err(format!(
+                            "file `{path}` is protected (matches pattern `{}`)",
+                            pattern.as_str()
+                        ));
+                    }
+                }
+                Ok(())
+            } else {
+                Ok(())
+            }
+        }
+        _ => Ok(()),
+    }
 }
 ```
 

@@ -163,9 +163,20 @@ flowchart TD
 
 ```rust
 pub fn evaluate(&self, tool_name: &str, _args: &Value) -> Permission {
-    // 1. Check session_allows — if tool_name is in the set, return Allow
-    // 2. Check rules in order — first matching rule wins
-    // 3. If no rule matches, return self.default_permission
+    // Stage 1: session approvals
+    if self.session_allows.contains(tool_name) {
+        return Permission::Allow;
+    }
+
+    // Stage 2: rules in order (first match wins)
+    for rule in &self.rules {
+        if rule.matches(tool_name) {
+            return rule.permission.clone();
+        }
+    }
+
+    // Stage 3: default
+    self.default_permission.clone()
 }
 ```
 

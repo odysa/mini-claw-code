@@ -1,5 +1,15 @@
 # Chapter 2: Provider & Streaming
 
+> **File(s) to edit:** `src/mock.rs`, `src/streaming.rs`, `src/providers/openrouter.rs`
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch1_` (MockProvider), `cargo test -p mini-claw-code-starter test_ch6_` (OpenRouterProvider), `cargo test -p mini-claw-code-starter test_ch10` (streaming)
+
+## Goal
+
+- Implement `MockProvider` so that tests can script exact LLM responses without network calls.
+- Implement `parse_sse_line` and `StreamAccumulator` so that streaming HTTP responses can be parsed into `StreamEvent`s and reassembled into a complete `AssistantTurn`.
+- Implement `OpenRouterProvider` so that the agent can talk to a real LLM API (OpenAI-compatible).
+- Understand when to use `std::sync::Mutex` vs `tokio::sync::Mutex` in async code.
+
 In Chapter 1 we defined the data that flows through our agent. Now we need something to *drive* that data -- an LLM backend that takes a conversation and returns an assistant response. In this chapter you will build:
 
 1. A `Provider` trait that abstracts over any LLM backend
@@ -10,13 +20,38 @@ In Chapter 1 we defined the data that flows through our agent. Now we need somet
 6. An SSE line parser and a `StreamAccumulator` that reassembles events into a complete message
 7. The `OpenRouterProvider` that talks to a real API
 
-By the end, every test prefixed with `test_ch2_` should pass.
+By the end, the mock provider tests in `test_ch1_`, the OpenRouter tests in `test_ch6_`, and the streaming tests in `test_ch10` should pass.
 
 ```bash
-cargo test -p claw-code test_ch2
+cargo test -p mini-claw-code-starter test_ch1_
+cargo test -p mini-claw-code-starter test_ch6_
+cargo test -p mini-claw-code-starter test_ch10
 ```
 
 ---
+
+## How streaming works
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant StreamProvider
+    participant API as LLM API
+    participant Channel as mpsc channel
+    participant UI
+
+    Agent->>StreamProvider: stream_chat(messages, tools, tx)
+    StreamProvider->>API: POST /chat/completions (stream: true)
+    loop SSE chunks
+        API-->>StreamProvider: data: {"delta": ...}
+        StreamProvider->>StreamProvider: parse_sse_line
+        StreamProvider->>Channel: send(StreamEvent)
+        StreamProvider->>StreamProvider: accumulator.feed(event)
+        Channel-->>UI: recv() and render
+    end
+    API-->>StreamProvider: data: [DONE]
+    StreamProvider->>Agent: return accumulator.finish()
+```
 
 ## Why a trait?
 
@@ -34,7 +69,7 @@ pub trait Provider: Send + Sync {
         &'a self,
         messages: &'a [Message],
         tools: &'a [&'a ToolDefinition],
-    ) -> impl Future<Output = anyhow::Result<AssistantMessage>> + Send + 'a;
+    ) -> impl Future<Output = anyhow::Result<AssistantTurn>> + Send + 'a;
 }
 ```
 
@@ -48,14 +83,7 @@ We use RPITIT rather than `async fn` in the trait signature because it gives us 
 
 **Lifetime `'a` everywhere.** The returned future borrows both `&self` and the input slices. Tying them to a single lifetime `'a` tells the compiler the future lives no longer than those borrows, avoiding `'static` requirements.
 
-### Your task
-
-In `src/provider/mod.rs`, define the `Provider` trait exactly as shown above. You will need these imports:
-
-```rust
-use std::future::Future;
-use crate::types::*;
-```
+The `Provider` trait is already defined in `src/types.rs` (Chapter 1). The starter puts it alongside the message types because everything lives in a flat layout.
 
 ## The Arc\<P\> blanket impl
 
@@ -67,7 +95,7 @@ impl<P: Provider> Provider for Arc<P> {
         &'a self,
         messages: &'a [Message],
         tools: &'a [&'a ToolDefinition],
-    ) -> impl Future<Output = anyhow::Result<AssistantMessage>> + Send + 'a {
+    ) -> impl Future<Output = anyhow::Result<AssistantTurn>> + Send + 'a {
         (**self).chat(messages, tools)
     }
 }
@@ -75,7 +103,9 @@ impl<P: Provider> Provider for Arc<P> {
 
 This says: "if `P` is a `Provider`, then `Arc<P>` is also a `Provider`." It just dereferences through the `Arc` and delegates to the inner value.
 
-Why does this matter? Later, when we build subagents (Chapter 23), the main agent and its subagents will share the same provider. Cloning an `Arc` is cheap, and the blanket impl means subagent code that is generic over `P: Provider` works identically whether it receives a bare provider or a shared one. Without this impl, you would need separate type plumbing to pass shared providers around.
+Why does this matter? Later, when we build subagents, the main agent and its subagents will share the same provider. Cloning an `Arc` is cheap, and the blanket impl means subagent code that is generic over `P: Provider` works identically whether it receives a bare provider or a shared one. Without this impl, you would need separate type plumbing to pass shared providers around.
+
+Both the `Provider` trait and the `Arc<P>` blanket impl are already in `src/types.rs`.
 
 ## StreamEvent
 
@@ -120,23 +150,19 @@ pub trait StreamProvider: Send + Sync {
         messages: &'a [Message],
         tools: &'a [&'a ToolDefinition],
         tx: mpsc::UnboundedSender<StreamEvent>,
-    ) -> impl Future<Output = anyhow::Result<AssistantMessage>> + Send + 'a;
+    ) -> impl Future<Output = anyhow::Result<AssistantTurn>> + Send + 'a;
 }
 ```
 
 The design uses a **channel-based** streaming model rather than returning an `AsyncIterator` or `Stream`. The caller creates a `tokio::sync::mpsc::unbounded_channel()`, passes the sender half to `stream_chat`, and reads events from the receiver half -- typically in a separate task that renders them to the terminal.
 
-The method itself still returns the fully assembled `AssistantMessage` when the stream is complete. This means the agent loop always gets a clean `AssistantMessage` to work with, regardless of whether streaming is enabled. The channel is a side-channel for the UI.
+The method itself still returns the fully assembled `AssistantTurn` when the stream is complete. This means the agent loop always gets a clean `AssistantTurn` to work with, regardless of whether streaming is enabled. The channel is a side-channel for the UI.
 
 Why `UnboundedSender` instead of a bounded channel? Streaming events are tiny and arrive at network speed, not faster. Backpressure is unnecessary because the bottleneck is the API, not the consumer. An unbounded channel keeps the API simpler.
 
 ### Your task
 
-Add the `StreamEvent` enum and `StreamProvider` trait to your `mod.rs`. You will need:
-
-```rust
-use tokio::sync::mpsc;
-```
+The `StreamEvent` enum, `StreamProvider` trait, `StreamAccumulator`, and `parse_sse_line` all live in `src/streaming.rs` in the starter. Open that file -- you will see `unimplemented!()` stubs with doc comments. Fill them in as described below.
 
 ---
 
@@ -149,11 +175,11 @@ use std::collections::VecDeque;
 use std::sync::Mutex;
 
 pub struct MockProvider {
-    responses: Mutex<VecDeque<AssistantMessage>>,
+    responses: Mutex<VecDeque<AssistantTurn>>,
 }
 
 impl MockProvider {
-    pub fn new(responses: VecDeque<AssistantMessage>) -> Self {
+    pub fn new(responses: VecDeque<AssistantTurn>) -> Self {
         Self {
             responses: Mutex::new(responses),
         }
@@ -165,7 +191,7 @@ impl Provider for MockProvider {
         &self,
         _messages: &[Message],
         _tools: &[&ToolDefinition],
-    ) -> anyhow::Result<AssistantMessage> {
+    ) -> anyhow::Result<AssistantTurn> {
         self.responses
             .lock()
             .unwrap()
@@ -175,10 +201,16 @@ impl Provider for MockProvider {
 }
 ```
 
+### Rust concept: std::sync::Mutex vs tokio::sync::Mutex
+
+The `Provider` trait takes `&self` (not `&mut self`), because providers are shared. But we need to mutate the queue. Which `Mutex` should we use?
+
+The rule of thumb: use `std::sync::Mutex` when the critical section is trivial (no `.await` inside the lock), and `tokio::sync::Mutex` when you need to hold the lock across an `.await` point. Here the critical section is just a `pop_front` -- a single pointer operation. Using `tokio::sync::Mutex` would add unnecessary overhead (it is an async-aware lock that yields to the runtime). `std::sync::Mutex` is cheaper and perfectly safe because the lock is never held long enough to block the runtime.
+
 The design:
 
 - **`VecDeque`** -- responses are consumed in FIFO order. The first call to `chat` returns the first response, the second call returns the second, and so on.
-- **`Mutex`** -- the `Provider` trait takes `&self` (not `&mut self`), because providers are shared. But we need to mutate the queue. A `std::sync::Mutex` (not `tokio::sync::Mutex`) is fine here because the critical section is trivial -- just a `pop_front`. Holding a `std::sync::Mutex` briefly across an `.await` point is acceptable when the lock is never contended.
+- **`Mutex`** -- wraps the queue so `&self` methods can mutate it. See the Rust concept note above for why `std::sync::Mutex` is the right choice here.
 - **Error on exhaustion** -- if the test scripts three responses but the agent calls `chat` a fourth time, it gets an error instead of a silent panic. This catches agent loops that spin more times than expected.
 
 ### Testing strategy
@@ -195,23 +227,22 @@ Look at the chapter 2 tests to see this in action:
 ```rust
 #[tokio::test]
 async fn test_ch2_mock_returns_text() {
-    let provider = MockProvider::new(VecDeque::from([AssistantMessage {
-        id: "1".into(),
+    let provider = MockProvider::new(VecDeque::from([AssistantTurn {
         text: Some("Hello!".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
         usage: None,
     }]));
-    let turn = provider.chat(&[Message::user("Hi")], &[]).await.unwrap();
+    let turn = provider.chat(&[Message::User("Hi".into())], &[]).await.unwrap();
     assert_eq!(turn.text.as_deref(), Some("Hello!"));
 }
 ```
 
-Notice that the test ignores the `messages` input -- the mock does not look at what the agent sends. This is intentional. You are testing the *agent's behavior* given a known provider response, not the provider's ability to understand prompts. The `test_ch2_mock_sequence` test pushes two responses into the queue and verifies FIFO ordering across two calls, simulating a multi-turn loop.
+Notice that the test ignores the `messages` input -- the mock does not look at what the agent sends. This is intentional. You are testing the *agent's behavior* given a known provider response, not the provider's ability to understand prompts.
 
 ### Your task
 
-Create `src/provider/mock.rs` with the `MockProvider` struct and its `Provider` impl. Wire it up from `mod.rs` with `pub use`.
+Open `src/mock.rs` in the starter. You will see the `MockProvider` struct with `unimplemented!()` stubs. Fill in `new()` and the `Provider` impl.
 
 ---
 
@@ -221,9 +252,9 @@ The `MockStreamProvider` wraps a `MockProvider` and synthesizes `StreamEvent`s f
 
 The struct wraps a `MockProvider` and its `stream_chat` impl works in three steps:
 
-1. Delegate to `self.inner.chat()` to get the canned `AssistantMessage`
+1. Delegate to `self.inner.chat()` to get the canned `AssistantTurn`
 2. Decompose it into events: text is sent **character-by-character** as `TextDelta` events, each tool call emits a `ToolCallStart` + single `ToolCallDelta`, and a final `Done` is sent
-3. Return the original `AssistantMessage` unchanged
+3. Return the original `AssistantTurn` unchanged
 
 Here is the full implementation:
 
@@ -233,7 +264,7 @@ pub struct MockStreamProvider {
 }
 
 impl MockStreamProvider {
-    pub fn new(responses: VecDeque<AssistantMessage>) -> Self {
+    pub fn new(responses: VecDeque<AssistantTurn>) -> Self {
         Self {
             inner: MockProvider::new(responses),
         }
@@ -246,7 +277,7 @@ impl StreamProvider for MockStreamProvider {
         messages: &[Message],
         tools: &[&ToolDefinition],
         tx: mpsc::UnboundedSender<StreamEvent>,
-    ) -> anyhow::Result<AssistantMessage> {
+    ) -> anyhow::Result<AssistantTurn> {
         let turn = self.inner.chat(messages, tools).await?;
 
         // Synthesize stream events from the complete turn
@@ -277,7 +308,7 @@ This avoids duplicating the response queue logic -- the `inner.chat()` call hand
 
 ### Your task
 
-Add `MockStreamProvider` to `mock.rs` and export it from `mod.rs`.
+The `MockStreamProvider` is in `src/streaming.rs` in the starter. Fill in its `new()` and `stream_chat()` stubs.
 
 ---
 
@@ -351,17 +382,21 @@ Walk through the logic:
 4. **Extract text deltas.** The `delta.content` field contains the text fragment. Empty strings are skipped.
 5. **Extract tool call events.** A single chunk can contain both a `ToolCallStart` (when the `id` field is present, signaling a new call) and a `ToolCallDelta` (when `arguments` is present). The `if let ... && let ...` syntax is Rust's let-chains feature, stabilized in edition 2024.
 
+### Rust concept: let-chains
+
+The `if let Some(ref func) = tc.function && let Some(ref args) = func.arguments` syntax combines two pattern matches into a single `if` expression. Before let-chains, you would need nested `if let` blocks or a `match` with a tuple. Let-chains flatten the nesting and make the condition more readable. The `ref` keyword borrows the matched value instead of moving it, which is necessary here because `tc` is used again after the `if let`.
+
 The tests verify the parser against three cases: a text delta line produces `StreamEvent::TextDelta("Hello")`, the `data: [DONE]` line produces `StreamEvent::Done`, and non-data lines like `event: ping` or empty strings return `None`.
 
 ### Your task
 
-Create `src/provider/openrouter.rs`. Start with the `parse_sse_line` function and the SSE chunk types it deserializes into (`ChunkResponse`, `ChunkChoice`, `Delta`, `DeltaToolCall`, `DeltaFunction`). You will extend this file with the full provider later.
+The `parse_sse_line` function and its SSE deserialization types (`ChunkResponse`, `ChunkChoice`, `Delta`, `DeltaToolCall`, `DeltaFunction`) are in `src/streaming.rs`. Fill in the `parse_sse_line` stub.
 
 ---
 
 ## StreamAccumulator
 
-Streaming gives the UI real-time output, but the agent loop needs a complete `AssistantMessage` to decide what to do next. The `StreamAccumulator` bridges this gap -- it collects events as they arrive and produces a finished message at the end.
+Streaming gives the UI real-time output, but the agent loop needs a complete `AssistantTurn` to decide what to do next. The `StreamAccumulator` bridges this gap -- it collects events as they arrive and produces a finished message at the end.
 
 ```rust
 pub struct StreamAccumulator {
@@ -411,7 +446,7 @@ impl StreamAccumulator {
         }
     }
 
-    pub fn finish(self) -> AssistantMessage {
+    pub fn finish(self) -> AssistantTurn {
         let text = if self.text.is_empty() {
             None
         } else {
@@ -433,8 +468,7 @@ impl StreamAccumulator {
         } else {
             StopReason::ToolUse
         };
-        AssistantMessage {
-            id: new_id(),
+        AssistantTurn {
             text,
             tool_calls,
             stop_reason,
@@ -455,7 +489,7 @@ The `test_ch2_accumulator_text` test feeds two `TextDelta` events and verifies t
 
 ### Your task
 
-Add `StreamAccumulator` and `PartialToolCall` to `openrouter.rs`.
+The `StreamAccumulator` and `PartialToolCall` are in `src/streaming.rs`. Fill in the `new()`, `feed()`, and `finish()` stubs.
 
 ---
 
@@ -505,7 +539,7 @@ The struct holds a reusable `reqwest::Client`, the API key, model name, and base
 
 ### Non-streaming impl
 
-The `Provider` impl builds a `ChatRequest` with `stream: false`, POSTs it to `/chat/completions`, and deserializes the response into `ChatResponse`. A `parse_assistant` helper converts the API's `Choice` into our `AssistantMessage`, mapping `finish_reason: "tool_calls"` to `StopReason::ToolUse` and parsing tool call arguments from JSON strings into `Value`.
+The `Provider` impl builds a `ChatRequest` with `stream: false`, POSTs it to `/chat/completions`, and deserializes the response into `ChatResponse`. A `parse_assistant` helper converts the API's `Choice` into our `AssistantTurn`, mapping `finish_reason: "tool_calls"` to `StopReason::ToolUse` and parsing tool call arguments from JSON strings into `Value`.
 
 ### Streaming impl
 
@@ -538,56 +572,63 @@ Walk through it:
 2. **Read raw byte chunks.** `resp.chunk()` returns `Option<Bytes>` -- the HTTP body arrives in arbitrary-sized pieces that do not align with SSE event boundaries.
 3. **Buffer and split on newlines.** TCP chunks can split an SSE line in the middle. The `buffer` accumulates raw text, and the inner `while` loop extracts complete lines. This is classic line-oriented protocol parsing -- you accumulate bytes and consume lines as they become available.
 4. **Parse each line.** `parse_sse_line` converts a `data:` line into `StreamEvent`s. Blank lines and non-data lines are skipped.
-5. **Feed both the accumulator and the channel.** The accumulator builds the final `AssistantMessage`; the channel delivers events to the UI in real-time.
-6. **Return the assembled message.** Once the stream ends (`resp.chunk()` returns `None`), the accumulator has collected everything, and `finish()` produces the `AssistantMessage`.
+5. **Feed both the accumulator and the channel.** The accumulator builds the final `AssistantTurn`; the channel delivers events to the UI in real-time.
+6. **Return the assembled message.** Once the stream ends (`resp.chunk()` returns `None`), the accumulator has collected everything, and `finish()` produces the `AssistantTurn`.
 
 This dual-path design (accumulator + channel) is how Claude Code handles streaming too. The UI renders tokens as they arrive, but the agent loop sees a clean, complete response.
 
 ### Your task
 
-Complete `openrouter.rs` with the full `OpenRouterProvider` struct, its constructors, the conversion helpers, the `Provider` impl, and the `StreamProvider` impl. You will need these dependencies in your `Cargo.toml`:
-
-```toml
-reqwest = { version = "0.12", features = ["json"] }
-dotenvy = "0.15"
-```
+The `OpenRouterProvider` lives in `src/providers/openrouter.rs`. Fill in the constructor, conversion helpers, the `Provider` impl, and the `StreamProvider` impl. The required dependencies (`reqwest`, `dotenvy`) are already in `Cargo.toml`.
 
 ---
 
 ## Putting it all together
 
-Your `src/provider/mod.rs` should export:
+The provider-related code lives across three files in the starter:
 
-```rust
-mod mock;
-pub mod openrouter;
-
-pub use mock::{MockProvider, MockStreamProvider};
-pub use openrouter::OpenRouterProvider;
-```
-
-And the public API of the module is:
-
-| Item | Kind | Purpose |
-|------|------|---------|
-| `Provider` | trait | Non-streaming LLM abstraction |
-| `StreamProvider` | trait | Streaming LLM abstraction (channel-based) |
-| `StreamEvent` | enum | Incremental stream events |
-| `MockProvider` | struct | Deterministic testing provider |
-| `MockStreamProvider` | struct | Mock streaming provider |
-| `OpenRouterProvider` | struct | Real HTTP provider (OpenRouter/OpenAI-compatible) |
-| `parse_sse_line` | fn | SSE line parser |
-| `StreamAccumulator` | struct | Collects events into `AssistantMessage` |
+| File | Contents |
+|------|----------|
+| `src/types.rs` | `Provider` trait, `Arc<P>` blanket impl |
+| `src/mock.rs` | `MockProvider` |
+| `src/streaming.rs` | `StreamEvent`, `StreamProvider`, `MockStreamProvider`, `parse_sse_line`, `StreamAccumulator` |
+| `src/providers/openrouter.rs` | `OpenRouterProvider` |
 
 ---
 
 ## Run the tests
 
 ```bash
-cargo test -p claw-code test_ch2
+cargo test -p mini-claw-code-starter test_ch1_   # MockProvider tests
+cargo test -p mini-claw-code-starter test_ch6_   # OpenRouterProvider tests
+cargo test -p mini-claw-code-starter test_ch10  # Streaming tests
 ```
 
-All ten tests should pass: four for `MockProvider` (text, tool calls, sequence, exhaustion), one for `MockStreamProvider`, three for SSE parsing, and two for the accumulator.
+### What the tests verify
+
+**MockProvider tests (test_ch1_):**
+
+- **`test_ch1_mock_returns_text`** -- scripts a single text response and verifies `chat()` returns it
+- **`test_ch1_mock_exhausted`** -- calls `chat()` on an empty queue and verifies it returns an error
+
+**OpenRouterProvider tests (test_ch6_):**
+
+- **`test_ch6_convert_messages`** -- verifies that internal `Message` variants are converted to the correct OpenAI API format
+- **`test_ch6_convert_tools`** -- verifies that `ToolDefinition` values are wrapped in the OpenAI function-calling envelope
+
+**Streaming tests (test_ch10):**
+
+- **`test_ch10_parse_sse_text_delta`** -- feeds a `data:` line with text content and verifies a `TextDelta` event is produced
+- **`test_ch10_parse_sse_done`** -- feeds `data: [DONE]` and verifies a `Done` event is produced
+- **`test_ch10_parse_sse_non_data`** -- feeds a non-data line like `event: ping` and verifies `None` is returned
+- **`test_ch10_accumulator_text`** -- feeds two `TextDelta` events and verifies the concatenated result
+- **`test_ch10_accumulator_tool_call`** -- feeds a `ToolCallStart` and two `ToolCallDelta` fragments, verifies they reassemble into a valid `ToolCall` with parsed JSON arguments
+
+---
+
+## Key takeaway
+
+The provider layer decouples the agent from any specific LLM backend. The `MockProvider` makes tests fast and deterministic; the `StreamProvider` trait and `StreamAccumulator` handle real-time streaming without complicating the agent loop. This separation -- canned responses for tests, streaming for production -- is a pattern used by every serious agent framework.
 
 ---
 
@@ -595,4 +636,4 @@ All ten tests should pass: four for `MockProvider` (text, tool calls, sequence, 
 
 You built the LLM abstraction layer. The `Provider` and `StreamProvider` traits decouple the agent from any specific backend. The `MockProvider` enables deterministic testing. The SSE parser and `StreamAccumulator` handle the real-time streaming protocol. And the `Arc<P>` blanket impl prepares you for provider sharing in later chapters.
 
-In Chapter 3, you will build the `Tool` trait -- the other half of the agent's interface with the outside world.
+In Chapter 3, you will explore the `Tool` trait -- the other half of the agent's interface with the outside world.

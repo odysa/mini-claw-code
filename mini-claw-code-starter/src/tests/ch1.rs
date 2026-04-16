@@ -9,6 +9,7 @@ async fn test_ch1_returns_text() {
         text: Some("Hello, world!".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let turn = provider
@@ -30,6 +31,7 @@ async fn test_ch1_returns_tool_calls() {
             arguments: serde_json::json!({"path": "test.txt"}),
         }],
         stop_reason: StopReason::ToolUse,
+        usage: None,
     }]));
 
     let turn = provider
@@ -50,16 +52,19 @@ async fn test_ch1_steps_through_sequence() {
             text: Some("First".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Second".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
         AssistantTurn {
             text: Some("Third".into()),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         },
     ]));
 
@@ -88,6 +93,7 @@ async fn test_ch1_returns_none_text() {
         text: None,
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let turn = provider.chat(&[], &[]).await.unwrap();
@@ -105,6 +111,7 @@ async fn test_ch1_text_with_tool_calls() {
             arguments: serde_json::json!({"path": "foo.txt"}),
         }],
         stop_reason: StopReason::ToolUse,
+        usage: None,
     }]));
 
     let turn = provider.chat(&[], &[]).await.unwrap();
@@ -134,6 +141,7 @@ async fn test_ch1_multiple_tool_calls_in_one_turn() {
             },
         ],
         stop_reason: StopReason::ToolUse,
+        usage: None,
     }]));
 
     let turn = provider.chat(&[], &[]).await.unwrap();
@@ -149,6 +157,7 @@ async fn test_ch1_exhausted_after_all_consumed() {
         text: Some("only one".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let _ = provider.chat(&[], &[]).await.unwrap();
@@ -164,6 +173,7 @@ async fn test_ch1_ignores_messages_and_tools() {
         text: Some("fixed response".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let messages = vec![
@@ -192,6 +202,7 @@ async fn test_ch1_tool_call_arguments_preserved() {
             arguments: args.clone(),
         }],
         stop_reason: StopReason::ToolUse,
+        usage: None,
     }]));
 
     let turn = provider.chat(&[], &[]).await.unwrap();
@@ -204,6 +215,7 @@ async fn test_ch1_stop_reason_stop() {
         text: Some("done".into()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let turn = provider.chat(&[], &[]).await.unwrap();
@@ -220,6 +232,7 @@ async fn test_ch1_stop_reason_tool_use() {
             arguments: serde_json::json!({}),
         }],
         stop_reason: StopReason::ToolUse,
+        usage: None,
     }]));
 
     let turn = provider.chat(&[], &[]).await.unwrap();
@@ -232,6 +245,7 @@ async fn test_ch1_empty_text_is_some() {
         text: Some(String::new()),
         tool_calls: vec![],
         stop_reason: StopReason::Stop,
+        usage: None,
     }]));
 
     let turn = provider.chat(&[], &[]).await.unwrap();
@@ -245,6 +259,7 @@ async fn test_ch1_long_sequence() {
             text: Some(format!("response_{i}")),
             tool_calls: vec![],
             stop_reason: StopReason::Stop,
+            usage: None,
         })
         .collect();
 

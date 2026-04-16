@@ -13,16 +13,19 @@ use crate::types::*;
 /// Hints:
 /// - Use `Mutex<VecDeque<AssistantTurn>>` to allow mutation through `&self`
 /// - `pop_front()` removes from the front, giving FIFO order
+/// - When constructing `AssistantTurn` for tests, set `usage: None`
 pub struct MockProvider {
-    pub(crate) responses: Mutex<VecDeque<AssistantTurn>>,
+    responses: Mutex<VecDeque<AssistantTurn>>,
 }
 
 impl MockProvider {
     /// Create a new MockProvider that will return the given responses in order.
     ///
     /// Hint: Wrap the `VecDeque` in a `Mutex` and store it in `Self`.
-    pub fn new(_responses: VecDeque<AssistantTurn>) -> Self {
-        unimplemented!("Wrap responses in a Mutex and store in Self")
+    pub fn new(responses: VecDeque<AssistantTurn>) -> Self {
+        Self {
+            responses: Mutex::new(responses),
+        }
     }
 }
 
@@ -36,6 +39,10 @@ impl Provider for MockProvider {
         _messages: &[Message],
         _tools: &[&ToolDefinition],
     ) -> anyhow::Result<AssistantTurn> {
-        unimplemented!("Lock mutex, pop_front, return Ok(response) or Err if empty")
+        self.responses
+            .lock()
+            .unwrap()
+            .pop_front()
+            .ok_or_else(|| anyhow::anyhow!("MockProvider: no more responses"))
     }
 }

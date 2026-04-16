@@ -1,59 +1,63 @@
 # Overview
 
-Welcome to **Building a Coding Agent in Rust** — a hands-on tutorial where you build a production-grade AI coding agent from scratch, mirroring the real architecture of [Claude Code](https://claude.ai/code).
+Welcome to **Building a Coding Agent in Rust** -- a hands-on tutorial where you build your own AI coding agent from scratch in the `mini-claw-code-starter` template, guided by the architecture of [Claude Code](https://claude.ai/code).
 
 ## What you'll build
 
 By the end of this book, you'll have built a complete coding agent that:
 
-- **Streams responses** from an LLM in real-time via Server-Sent Events
-- **Uses tools** — file read/write/edit, bash, glob, grep — with a rich Tool trait matching Claude Code's interface
-- **Validates and gates tool execution** through a multi-stage permission pipeline (allow/deny/ask)
-- **Protects the user** with path validation, command filtering, and protected file checks
-- **Extends via hooks** — pre/post tool events with shell commands, blocking, and argument modification
-- **Loads project context** by discovering and injecting CLAUDE.md files
-- **Manages configuration** through a 4-level settings hierarchy (user → project → local → env)
-- **Tracks tokens and cost** per model with cumulative session tracking
-- **Auto-compacts context** when approaching the token limit, using the LLM to summarize
-- **Saves and resumes sessions** via JSONL transcripts
-- **Connects to MCP servers** for third-party tool integration over JSON-RPC/stdio
-- **Spawns subagents** with isolated message histories and shared providers
-- **Coordinates multiple agents** with teams, workers, and shared scratchpads
-- **Renders a rich TUI** with streaming text, tool progress, spinners, and permission dialogs
+- **Connects to an LLM** via an OpenAI-compatible HTTP provider
+- **Uses tools** -- bash, file read/write/edit -- with a simple `Tool` trait
+- **Loops autonomously** -- the `SimpleAgent` drives the provider-tool cycle until done
+- **Streams events** through channels so a UI can show progress in real-time
+- **Tests deterministically** with a `MockProvider` that returns canned responses
+- **Enforces safety** with a permission engine, safety checks, and hooks
+- **Loads project instructions** from CLAUDE.md files and layered config
 
 ## Architecture
 
-The codebase mirrors Claude Code's module structure:
+The starter codebase uses a flat module layout:
 
 ```
-claw-code/src/
-  types/          — Messages, tools, permissions, usage
-  engine/         — QueryEngine (the core agent loop)
-  provider/       — LLM backends (OpenRouter, mock)
-  tools/          — Tool implementations (bash, file ops, search)
-  permission/     — Permission engine and safety checks
-  hooks/          — Event-driven extensibility
-  config/         — Layered settings hierarchy
-  context/        — Token tracking and compaction
-  session/        — Transcript persistence
-  mcp/            — Model Context Protocol client
-  prompt/         — System prompt builder with modular sections
-  agents/         — Subagents and multi-agent coordination
-  tui/            — Terminal UI with streaming
+mini-claw-code-starter/src/
+  types.rs          -- Messages, tools, ToolSet, Provider trait, TokenUsage
+  agent.rs          -- SimpleAgent (the core agent loop) and AgentEvent
+  mock.rs           -- MockProvider for deterministic testing
+  streaming.rs      -- SSE parsing, StreamAccumulator
+  instructions.rs   -- InstructionLoader (CLAUDE.md discovery)
+  permissions.rs    -- PermissionEngine
+  safety.rs         -- SafetyChecker, SafeToolWrapper
+  hooks.rs          -- Hook trait, HookRegistry
+  planning.rs       -- PlanAgent (two-phase plan/execute)
+  config.rs         -- Config, ConfigLoader, CostTracker
+  context.rs        -- SystemPromptBuilder
+  providers/
+    openrouter.rs   -- OpenRouterProvider (real HTTP backend)
+  tools/            -- Tool implementations (bash, file read/write/edit)
 ```
 
 ## How to use this book
 
-Each chapter explains the concepts, walks through the design, and provides complete code listings. The `claw-code/` crate contains the reference implementation. Read the chapter, study the code, then verify your understanding by running the tests.
+**Start with the Getting Started section.** Three short, hands-on chapters get you from zero to a working agent in under an hour:
+
+1. [**Your First LLM Call**](./intro01-first-llm-call.md) — implement `MockProvider` (`test_ch1_`)
+2. [**Your First Tool Call**](./intro02-first-tool.md) — implement `ReadTool` (`test_ch2_`)
+3. [**The Agentic Loop**](./intro03-agentic-loop.md) — implement `single_turn` and `SimpleAgent` (`test_ch3_`, `test_ch5_`)
+
+Then dive into the **Deep Dive** chapters (1-15) for the full architecture: streaming, permissions, hooks, plan mode, configuration, and more.
+
+The `mini-claw-code-starter` crate contains stub implementations with `unimplemented!()` markers and doc comments describing what to do. Read the chapter, fill in the stubs, then verify your work by running the tests.
+
+**Important: Deep dive chapter numbers do NOT match test file numbers.** The chapters were reorganized by topic, but test files kept their original numbering. Use the mapping table below to find the correct test command for each chapter.
 
 **Run tests to check your progress:**
 
 ```bash
-# Run tests for a specific chapter
-cargo test -p claw-code test_ch1
+# Run tests for a specific chapter (use the correct test name from the table below)
+cargo test -p mini-claw-code-starter test_ch1_
 
 # Run all tests
-cargo test -p claw-code
+cargo test -p mini-claw-code-starter
 ```
 
 ## Prerequisites
@@ -64,15 +68,46 @@ cargo test -p claw-code
 
 ## Chapter roadmap
 
-| Section | Chapters | What you build |
-|---------|----------|---------------|
-| **Your First Agent SDK** | 1-3 | First LLM response, first tool call, the agentic loop |
-| **Under the Hood** | 4-5 | Messages & types deep dive, system prompt |
-| **Building Your Toolbox** | 6-9 | File tools, bash, glob/grep, tool registry |
-| **Safety & Control** | 10-13 | Permissions, safety checks, hooks, plan mode |
-| **Configuration** | 14-17 | Settings, CLAUDE.md, memory, token tracking |
-| **Context Management** | 18-20 | Compaction, session save/resume |
-| **MCP Integration** | 21-22 | MCP protocol and client |
-| **Multi-Agent** | 23-26 | Subagents, coordination, user input, TUI |
+### Part I: Core Agent
+
+| Chapter | Topic | File(s) to edit | Test command |
+|---------|-------|-----------------|--------------|
+| 1 | Messages & Types | `src/types.rs` (pre-filled) | `test_ch1_` |
+| 2 | Provider & Streaming | `src/mock.rs`, `src/streaming.rs`, `src/providers/openrouter.rs` | `test_ch1_`, `test_ch6_`, `test_ch10` |
+| 3 | Tool Interface | `src/tools/read.rs` | `test_ch2_` |
+| 4 | The Agentic Loop | `src/agent.rs` | `test_ch3_`, `test_ch5_` |
+
+### Part II: Prompt & Tools
+
+| Chapter | Topic | File(s) to edit | Test command |
+|---------|-------|-----------------|--------------|
+| 5 | System Prompt | `src/instructions.rs` | `test_ch17` |
+| 6 | File Tools | `src/tools/read.rs`, `src/tools/write.rs`, `src/tools/edit.rs` | `test_ch2_`, `test_ch4_` |
+| 7 | Bash Tool | `src/tools/bash.rs` | `test_ch4_` |
+| 8 | Search Tools | (extension -- no stubs) | (no tests) |
+| 9 | Tool Registry | `src/types.rs` (ToolSet) | `test_ch7_` |
+
+### Part III: Safety & Control
+
+| Chapter | Topic | File(s) to edit | Test command |
+|---------|-------|-----------------|--------------|
+| 10 | Permission Engine | `src/permissions.rs` | `test_ch19` |
+| 11 | Safety Checks | `src/safety.rs` | `test_ch18` |
+| 12 | Hooks | `src/hooks.rs` | `test_ch20` |
+| 13 | Plan Mode | `src/planning.rs` | `test_ch12` |
+
+### Part IV: Configuration
+
+| Chapter | Topic | File(s) to edit | Test command |
+|---------|-------|-----------------|--------------|
+| 14 | Settings Hierarchy | `src/config.rs`, `src/usage.rs` | `test_ch16`, `test_ch14` |
+| 15 | Project Instructions | `src/instructions.rs`, `src/context.rs` | `test_ch17`, `test_ch15` |
+
+### Bonus (no chapter yet -- stubs + tests available)
+
+| Topic | File to edit | Test command |
+|-------|-------------|--------------|
+| AskTool (user input) | `src/tools/ask.rs` | `test_ch11` |
+| SubagentTool (child agents) | `src/subagent.rs` | `test_ch13` |
 
 Let's start building.

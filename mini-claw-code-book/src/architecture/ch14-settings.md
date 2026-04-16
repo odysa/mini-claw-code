@@ -1,14 +1,25 @@
 # Chapter 14: Settings Hierarchy
 
+> **File(s) to edit:** `src/config.rs`, `src/usage.rs`
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch16` (Config, ConfigLoader), `cargo test -p mini-claw-code-starter test_ch14` (CostTracker)
+
 Your agent works. It reads files, writes code, runs commands, checks permissions, enforces safety rules, and restricts itself in plan mode. But every one of those behaviors is hardcoded. The model name is a string literal. The blocked commands list is baked into the source. The maximum context window is a constant. If you want to change any of them, you recompile.
 
 Real tools do not work this way. A developer using Claude Code on a Rust project wants different settings than one working on a Python monorepo. A CI pipeline needs different defaults than an interactive session. A user who routes through a self-hosted proxy needs a different base URL. The agent must be configurable -- and the configuration must come from multiple sources, layered by priority, so that project settings override user settings, and environment variables override everything.
 
-This chapter builds a 4-level configuration hierarchy and a cost tracker. By the end, `cargo test -p claw-code test_ch14` should pass.
+This chapter builds a 4-level configuration hierarchy and a cost tracker. By the end, both `test_ch16` (config) and `test_ch14` (cost tracker) should pass.
 
 ```bash
-cargo test -p claw-code test_ch14
+cargo test -p mini-claw-code-starter test_ch16  # Config, ConfigLoader
+cargo test -p mini-claw-code-starter test_ch14  # CostTracker
 ```
+
+## Goal
+
+- Define a `Config` struct with serde defaults so that partial TOML files deserialize into complete configurations.
+- Implement the `merge()` function with three strategies: compare-against-default for scalars, `Option::or()` for optionals, and replace for collections.
+- Build `ConfigLoader` to assemble four layers (defaults, project config, user config, environment variables) in priority order.
+- Implement `CostTracker` to accumulate token counts and compute running cost estimates from per-million pricing.
 
 ---
 
@@ -18,7 +29,7 @@ A flat config file would be simple. One `config.toml`, one source of truth, done
 
 - **User preferences** like model choice and API base URL should follow you across every project. You should not have to set `model = "anthropic/claude-sonnet-4-20250514"` in every repository.
 - **Project settings** like blocked commands and protected file patterns are specific to one codebase. A node project might block `rm -rf node_modules` while a Rust project blocks `cargo publish --allow-dirty`.
-- **Environment overrides** let CI pipelines inject settings without touching config files. `CLAW_MODEL=anthropic/claude-haiku-3-20250414` in a GitHub Actions workflow switches to a cheaper model for automated checks.
+- **Environment overrides** let CI pipelines inject settings without touching config files. `MINI_CLAW_MODEL=anthropic/claude-haiku-3-20250414` in a GitHub Actions workflow switches to a cheaper model for automated checks.
 - **Defaults** provide sane behavior when nothing is configured at all.
 
 The solution is layered configuration. Each layer can set any field. Higher-priority layers override lower ones. Fields not set in a layer fall through to the next one down.
@@ -26,13 +37,24 @@ The solution is layered configuration. Each layer can set any field. Higher-prio
 ```
 Priority (highest to lowest):
 
-  1. Environment variables    CLAW_MODEL, CLAW_BASE_URL, CLAW_MAX_TOKENS
-  2. User config              ~/.config/claw-code/config.toml
+  1. Environment variables    MINI_CLAW_MODEL, MINI_CLAW_BASE_URL, MINI_CLAW_MAX_TOKENS
+  2. User config              ~/.config/mini-claw/config.toml
   3. Project config            .claw/config.toml
   4. Defaults                  hardcoded in code
 ```
 
 Claude Code uses the same approach. Its hierarchy goes: CLI flags > environment > user settings > project settings > defaults. The merge logic is more sophisticated -- it supports per-key overrides and array merging strategies -- but the architecture is identical.
+
+```mermaid
+flowchart TD
+    A["Config::default()"] -->|merge| B["Project config<br/>.claw/config.toml"]
+    B -->|merge| C["User config<br/>~/.config/mini-claw/config.toml"]
+    C -->|override| D["Environment variables<br/>MINI_CLAW_MODEL, etc."]
+    D --> E["Final Config"]
+
+    style A fill:#e8e8e8
+    style E fill:#c8e6c9
+```
 
 ---
 
@@ -96,6 +118,10 @@ Eight fields spanning three categories: provider settings, safety settings, and 
 **`preserve_recent`** controls how many recent messages the compaction engine preserves. When compacting, the engine summarizes older messages but keeps the most recent `preserve_recent` messages intact so the model has fresh context. The default of 10 keeps roughly the last 2-3 tool-use rounds.
 
 **`instructions`** injects custom text into the system prompt. This is where project-specific guidance goes -- "always use async/await", "prefer Vec over slices in public APIs", "tests must use the mock provider". Chapter 15 builds the full instruction system; this field is the config hook for it.
+
+### Key Rust concept: `#[serde(default)]` for partial deserialization
+
+Serde's `default` attribute is what makes partial config files work. When a TOML file omits a field, serde normally fails with "missing field." The `#[serde(default = "function_name")]` attribute tells serde to call the named function instead of failing. For fields that default to `None` or empty `Vec`, the simpler `#[serde(default)]` calls `Default::default()`. This pattern is idiomatic in Rust configuration: every field has a sensible default, and the user only specifies what they want to change. The alternative -- requiring every field in every config file -- would make partial configs impossible.
 
 ### Default functions and the serde trick
 
@@ -269,9 +295,9 @@ impl ConfigLoader {
             }
         }
 
-        // Layer 2: User config (~/.config/claw-code/config.toml)
+        // Layer 2: User config (~/.config/mini-claw/config.toml)
         if let Some(user_dir) = dirs::config_dir() {
-            let user_path = user_dir.join("claw-code").join("config.toml");
+            let user_path = user_dir.join("mini-claw").join("config.toml");
             if let Some(overlay) = Self::load_file(&user_path) {
                 config = Self::merge(config, overlay);
             }
@@ -293,7 +319,7 @@ The `load()` method applies layers from lowest to highest priority:
 
 1. Start with `Config::default()` -- the absolute baseline.
 2. Merge the project config (`.claw/config.toml`) -- project-specific overrides.
-3. Merge the user config (`~/.config/claw-code/config.toml`) -- user-wide preferences.
+3. Merge the user config (`~/.config/mini-claw/config.toml`) -- user-wide preferences.
 4. Apply environment variables -- the ultimate override.
 
 Each merge takes the current accumulated config as the base and the new layer as the overlay. Non-default overlay values replace the base. This means user config beats project config, and environment variables beat everything.
@@ -329,13 +355,13 @@ This deserializes into a `Config` with the custom model and defaults for everyth
 
 ```rust
 fn apply_env(mut config: Config) -> Config {
-    if let Ok(model) = std::env::var("CLAW_MODEL") {
+    if let Ok(model) = std::env::var("MINI_CLAW_MODEL") {
         config.model = model;
     }
-    if let Ok(url) = std::env::var("CLAW_BASE_URL") {
+    if let Ok(url) = std::env::var("MINI_CLAW_BASE_URL") {
         config.base_url = url;
     }
-    if let Ok(tokens) = std::env::var("CLAW_MAX_TOKENS") {
+    if let Ok(tokens) = std::env::var("MINI_CLAW_MAX_TOKENS") {
         if let Ok(n) = tokens.parse::<u64>() {
             config.max_context_tokens = n;
         }
@@ -348,7 +374,7 @@ Environment variables are the simplest layer -- no files, no parsing, no merge l
 
 Only three fields have environment variable support: `model`, `base_url`, and `max_context_tokens`. These are the fields most commonly overridden in CI and scripting contexts. Safety fields like `blocked_commands` and `protected_patterns` are intentionally excluded from environment overrides -- you do not want a compromised environment variable to disable your safety rules.
 
-Notice the double-parse for `CLAW_MAX_TOKENS`: first `std::env::var` to get the string, then `.parse::<u64>()` to convert it to a number. If the string is not a valid integer, the parse silently fails and the existing value is kept. No panic, no error message. This is the right behavior for environment variables -- a typo in `CLAW_MAX_TOKENS=abc` should not crash the agent.
+Notice the double-parse for `MINI_CLAW_MAX_TOKENS`: first `std::env::var` to get the string, then `.parse::<u64>()` to convert it to a number. If the string is not a valid integer, the parse silently fails and the existing value is kept. No panic, no error message. This is the right behavior for environment variables -- a typo in `MINI_CLAW_MAX_TOKENS=abc` should not crash the agent.
 
 ---
 
@@ -400,7 +426,7 @@ pub fn record(&mut self, usage: &crate::types::TokenUsage) {
 
 Called after each provider response. The `TokenUsage` struct (from Chapter 1) carries the per-request token counts. The tracker accumulates them and increments the turn counter.
 
-Note that `record` takes a reference to `TokenUsage`, not ownership. The caller typically has the usage attached to an `AssistantMessage` and should not have to give it up just to record costs.
+Note that `record` takes a reference to `TokenUsage`, not ownership. The caller typically has the usage attached to an `AssistantTurn` and should not have to give it up just to record costs.
 
 ### Computing cost
 
@@ -479,7 +505,7 @@ blocked_commands = ["rm -rf /", "git push --force"]
 instructions = "Always run cargo fmt after editing Rust files."
 ```
 
-And a user's `~/.config/claw-code/config.toml`:
+And a user's `~/.config/mini-claw/config.toml`:
 
 ```toml
 model = "anthropic/claude-sonnet-4-20250514"
@@ -491,7 +517,7 @@ When both exist, the loader merges them:
 1. **Defaults** -- all fields get their default values.
 2. **Project config** -- `model` overrides (but happens to match default), `max_context_tokens` becomes 100000, `protected_patterns` and `blocked_commands` are set, `instructions` is set.
 3. **User config** -- `model` still matches default so the project value (also default) is kept. `base_url` overrides to the proxy URL.
-4. **Environment** -- if `CLAW_MODEL` is set, it overrides everything.
+4. **Environment** -- if `MINI_CLAW_MODEL` is set, it overrides everything.
 
 The final config has the project's safety rules, the user's proxy URL, and defaults for everything else. Each layer contributes what it knows without needing to repeat what it does not care about.
 
@@ -515,61 +541,43 @@ Despite these differences, the layered architecture is the same. Settings flow f
 
 ## Tests
 
-Run the chapter 14 tests:
+Run the tests:
 
 ```bash
-cargo test -p claw-code test_ch14
+cargo test -p mini-claw-code-starter test_ch16  # Config, ConfigLoader
+cargo test -p mini-claw-code-starter test_ch14  # CostTracker
 ```
 
-There are 19 tests organized into four groups.
+Note: Config and ConfigLoader tests are in `test_ch16` (following the V1
+numbering where configuration was Chapter 16). CostTracker tests are in
+`test_ch14` (V1 token tracking chapter).
 
-### Config defaults
+Key config tests (`test_ch16`):
 
-**`test_ch14_config_defaults`** -- Constructs `Config::default()` and checks every field. The model contains `"claude"`, the base URL contains `"openrouter"`, `max_context_tokens` is 200,000, `preserve_recent` is 10, and all optional/collection fields are empty.
+- **test_ch16_default_config** -- `Config::default()` produces the expected model, token limit, and non-empty safety defaults.
+- **test_ch16_load_from_toml** -- A TOML string with `model` and `max_context_tokens` deserializes correctly.
+- **test_ch16_default_fills_missing_fields** -- A TOML file with only `model` still gets defaults for `preserve_recent`, `instructions`, etc.
+- **test_ch16_load_nonexistent_path** -- Loading from a non-existent path returns `None` instead of panicking.
+- **test_ch16_mcp_server_config** -- MCP server configuration round-trips through TOML correctly.
+- **test_ch16_hooks_config** -- Hook configuration (command, tool_pattern, timeout) deserializes from TOML.
+- **test_ch16_env_override** -- Setting `MINI_CLAW_MODEL` environment variable overrides the model in the loaded config.
+- **test_ch16_protected_patterns_default** -- Default config includes `.env` and `.git/**` in protected patterns.
 
-### Config merging
+Key cost tracker tests (`test_ch14`):
 
-**`test_ch14_merge_override_model`** -- Merges a default base with an overlay that sets a custom model. The merged config has the overlay's model.
+- **test_ch14_empty_tracker** -- A new tracker starts at zero tokens, zero turns, zero cost.
+- **test_ch14_record_single_turn** -- Recording one turn increments input/output tokens and the turn counter.
+- **test_ch14_accumulates_across_turns** -- Three `record()` calls accumulate totals correctly.
+- **test_ch14_cost_calculation** -- 1M input + 1M output tokens at $3/$15 per million = $18.00.
+- **test_ch14_cost_small_numbers** -- 1000 input + 200 output tokens = $0.006.
+- **test_ch14_summary_format** -- `summary()` produces the expected `"tokens: N in + N out | cost: $X.XXXX"` format.
+- **test_ch14_reset** -- `reset()` zeroes accumulators but preserves pricing.
 
-**`test_ch14_merge_keeps_base_when_overlay_is_default`** -- Merges a base with a custom model against a default overlay. The base's custom model survives because the overlay's model matches the default.
+---
 
-**`test_ch14_merge_optional_fields`** -- Merges a base with `allowed_directory = Some("/home/user")` against an overlay with `None`. The base's value is preserved -- `None` does not override `Some`.
+## Key takeaway
 
-**`test_ch14_merge_overlay_replaces_optional`** -- Merges a base with `allowed_directory = Some("/home/user")` against an overlay with `Some("/workspace")`. The overlay wins.
-
-**`test_ch14_merge_collections_replace`** -- Merges base `protected_patterns = [".env"]` with overlay `protected_patterns = [".secret", ".key"]`. The result is `[".secret", ".key"]` -- full replacement, not `[".env", ".secret", ".key"]`.
-
-**`test_ch14_merge_empty_collection_keeps_base`** -- Merges base `blocked_commands = ["rm -rf /"]` with a default overlay (empty `blocked_commands`). The base's commands survive because an empty overlay collection means "not set."
-
-### Config file loading
-
-**`test_ch14_load_toml_file`** -- Creates a temp TOML file with `model`, `max_context_tokens`, and `protected_patterns`. Loads it with `ConfigLoader::load_file`. Verifies all three fields parsed correctly.
-
-**`test_ch14_load_missing_file`** -- Calls `load_file` with a nonexistent path. Returns `None`.
-
-**`test_ch14_load_invalid_toml`** -- Creates a file with invalid TOML syntax. Returns `None`.
-
-### ConfigLoader integration
-
-**`test_ch14_loader_with_project_dir`** -- Creates a temp directory with `.claw/config.toml` containing a custom model and blocked commands. Loads via `ConfigLoader::new().project_dir(dir).load()`. Verifies the project settings are applied and other fields remain default.
-
-**`test_ch14_loader_no_config_files`** -- Points the loader at an empty temp directory. All fields are defaults -- no config files means no overrides.
-
-### CostTracker
-
-**`test_ch14_cost_tracker_empty`** -- A fresh tracker has zero tokens, zero turns, and zero cost.
-
-**`test_ch14_cost_tracker_single_turn`** -- Records one `TokenUsage` with 1000 input and 500 output tokens. Verifies the totals and turn count.
-
-**`test_ch14_cost_tracker_accumulation`** -- Records two usages. Verifies tokens add up across turns and the turn count reaches 2.
-
-**`test_ch14_cost_calculation`** -- Records 1 million input and 1 million output tokens at $3/$15 per million. Verifies the total cost is $18.00 (within floating-point tolerance).
-
-**`test_ch14_cost_small_numbers`** -- Records 100 input and 50 output tokens. Verifies the cost is $0.00105 -- this catches integer truncation bugs that would zero out small token counts.
-
-**`test_ch14_cost_summary_format`** -- Records usage and checks that `summary()` contains the token counts and a dollar sign. Does not check exact formatting -- just that the key information is present.
-
-**`test_ch14_cost_tracker_reset`** -- Records usage, resets, and verifies everything is back to zero. Confirms that reset clears tokens and turns but does not need to verify pricing (it is immutable).
+Layered configuration lets each level (defaults, project, user, environment) contribute only what it knows. The merge function's three strategies -- compare-against-default for scalars, `or()` for optionals, and replace for collections -- handle the vast majority of real-world cases without complexity.
 
 ---
 

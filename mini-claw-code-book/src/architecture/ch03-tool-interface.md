@@ -1,8 +1,31 @@
 # Chapter 3: Tool Interface
 
+> **File(s) to edit:** `src/tools/read.rs`
+> **Test to run:** `cargo test -p mini-claw-code-starter test_ch2_`
+
+## Goal
+
+- Understand why the `Tool` trait uses `#[async_trait]` (object safety for heterogeneous storage) while `Provider` uses RPITIT (zero-cost generics).
+- Implement a concrete `EchoTool` that demonstrates the full tool lifecycle: schema definition, trait implementation, registration, and execution.
+- Verify that `ToolSet` correctly registers tools and returns their definitions for the LLM.
+
 In the last chapter we gave our agent a voice by connecting it to an LLM provider. But a model that can only produce text is like a programmer who can only talk about code without ever touching a keyboard. In this chapter we give the agent hands.
 
-You already defined the tool types in Chapter 1 -- `ToolDefinition`, `Tool` trait, `ToolResult`, `ValidationResult`, and `ToolSet`. In this chapter we will understand *why* those types are designed the way they are, explore the critical distinction between `#[async_trait]` and RPITIT, and then wire everything together by implementing your first concrete tool: an `EchoTool`.
+You already defined the tool types in Chapter 1 -- `ToolDefinition`, `Tool` trait, and `ToolSet`. In this chapter we will understand *why* those types are designed the way they are, explore the critical distinction between `#[async_trait]` and RPITIT, and then wire everything together by implementing your first concrete tool: an `EchoTool`.
+
+## Tool lifecycle
+
+```mermaid
+flowchart LR
+    A[Tool::new] -->|stores| B[ToolDefinition]
+    B -->|registered in| C[ToolSet]
+    C -->|definitions sent to| D[LLM]
+    D -->|responds with| E[ToolCall]
+    E -->|dispatched via| C
+    C -->|lookup by name| F[Tool::call]
+    F -->|returns| G[String result]
+    G -->|wrapped as| H[Message::ToolResult]
+```
 
 ## Design context: how Claude Code models tools
 
@@ -10,22 +33,22 @@ Claude Code's TypeScript codebase defines tools with a generic `Tool<Input, Outp
 
 We are going to keep the shape but cut the ceremony. In our Rust version:
 
-| Claude Code (TypeScript)            | claw-code (Rust)                      |
-|-------------------------------------|---------------------------------------|
-| `Tool<Input, Output, Progress>`     | `trait Tool` (no generics)            |
-| Zod schema for input                | `serde_json::Value` + builder         |
-| Rich `ToolResult<T>`               | `ToolResult { content, is_truncated }`|
-| React-rendered progress             | `activity_description()` string       |
-| 40+ tools with Zod validation       | 5 tools with JSON schema              |
-| `isReadOnly`, `isDestructive`, etc. | Same flags as trait methods            |
+| Claude Code (TypeScript)            | mini-claw-code-starter (Rust)                |
+|-------------------------------------|----------------------------------------------|
+| `Tool<Input, Output, Progress>`     | `trait Tool` (no generics)                   |
+| Zod schema for input                | `serde_json::Value` + builder                |
+| Rich `ToolResult<T>`               | `anyhow::Result<String>`                     |
+| React-rendered progress             | (not implemented)                            |
+| 40+ tools with Zod validation       | 5 tools with JSON schema                     |
+| `isReadOnly`, `isDestructive`, etc. | (not implemented -- kept minimal)            |
 
-The key simplification: we drop the generic parameters. Claude Code needs `<Input, Output, Progress>` because each tool has a distinct strongly-typed input shape and renders different UI. We use `serde_json::Value` for both input and output, which lets us store heterogeneous tools in a single collection without type erasure gymnastics.
+The key simplification: we drop the generic parameters and the safety/display methods. Claude Code needs `<Input, Output, Progress>` because each tool has a distinct strongly-typed input shape and renders different UI. We use `serde_json::Value` for input and `String` for output, which lets us store heterogeneous tools in a single collection without type erasure gymnastics.
 
 ## Why `#[async_trait]` for tools but not for providers
 
 This is the most important design decision in the type system, and it is worth understanding deeply.
 
-Look at the `Provider` trait from Chapter 2:
+Look at the `Provider` trait from Chapter 1:
 
 ```rust
 pub trait Provider: Send + Sync {
@@ -33,13 +56,13 @@ pub trait Provider: Send + Sync {
         &'a self,
         messages: &'a [Message],
         tools: &'a [&'a ToolDefinition],
-    ) -> impl Future<Output = anyhow::Result<AssistantMessage>> + Send + 'a;
+    ) -> impl Future<Output = anyhow::Result<AssistantTurn>> + Send + 'a;
 }
 ```
 
 This uses **RPITIT** (return-position `impl Trait` in traits), a feature stabilized in Rust 1.75. The compiler generates a unique future type for each implementation. It is zero-cost and avoids boxing.
 
-But RPITIT has a catch: it makes the trait non-object-safe. You cannot write `Box<dyn Provider>` because the compiler needs to know the concrete future type at compile time. That is fine for providers -- we use them as generic parameters (`struct QueryEngine<P: Provider>`), so the concrete type is always known.
+But RPITIT has a catch: it makes the trait non-object-safe. You cannot write `Box<dyn Provider>` because the compiler needs to know the concrete future type at compile time. That is fine for providers -- we use them as generic parameters (`struct SimpleAgent<P: Provider>`), so the concrete type is always known.
 
 Tools are different. We need to store a heterogeneous collection of tools -- `BashTool`, `ReadTool`, `WriteTool`, all in one `HashMap`. That requires `Box<dyn Tool>`, which requires object safety. And object safety requires that async methods return a known type, not an opaque `impl Future`.
 
@@ -56,13 +79,13 @@ Note that in the `MockProvider` impl from Chapter 2, we wrote `async fn chat(...
 
 ## Why errors are values, not `Err`
 
-When a tool fails -- a file doesn't exist, a command exits non-zero, an edit can't be applied -- we do **not** return `Err(...)`. Instead, we return `Ok(ToolResult::error("..."))`.
+When a tool fails -- a file doesn't exist, a command exits non-zero, an edit can't be applied -- we do **not** return `Err(...)`. Instead, we return `Ok(format!("error: {e}"))`.
 
 Why? Because a tool failure is not an agent failure. If the LLM asks to read a file that doesn't exist, the correct behavior is to tell the LLM "error: file not found" and let it recover -- try a different path, ask the user, or move on. Returning `Err(...)` would bubble up through the agent loop and terminate the conversation.
 
-Reserve `Err(...)` for genuinely unrecoverable situations: a network failure talking to the LLM, a serialization bug, or a programming error. Tool-level "this didn't work" is always `Ok(ToolResult::error(...))`.
+Reserve `Err(...)` for genuinely unrecoverable situations: a network failure talking to the LLM, a serialization bug, or a programming error. Tool-level "this didn't work" is always `Ok("error: ...")`.
 
-This distinction will become critical in the next chapter when we build the query engine loop. The loop matches on `Ok` vs `Err` to decide whether to continue or abort -- and we want tool failures to continue, not abort.
+This distinction will become critical in the next chapter when we build the agent loop. The `SimpleAgent` catches tool errors with `.unwrap_or_else(|e| format!("error: {e}"))` so the model sees the error and can adapt.
 
 ## Hands-on: building an EchoTool
 
@@ -96,17 +119,9 @@ impl Tool for EchoTool {
         &self.def
     }
 
-    async fn call(&self, args: Value) -> anyhow::Result<ToolResult> {
+    async fn call(&self, args: Value) -> anyhow::Result<String> {
         let text = args["text"].as_str().unwrap_or("(no text)");
-        Ok(ToolResult::text(text))
-    }
-
-    fn is_read_only(&self) -> bool {
-        true
-    }
-
-    fn is_concurrent_safe(&self) -> bool {
-        true
+        Ok(text.to_string())
     }
 }
 ```
@@ -115,8 +130,8 @@ A few things to note:
 
 - `definition()` returns a reference to the stored `ToolDefinition`.
 - `call()` indexes into the JSON `args` to extract `text`. If the key is missing or not a string, we fall back to `"(no text)"` rather than panicking. Always be defensive with LLM-provided arguments.
-- We override `is_read_only` and `is_concurrent_safe` to `true` because echoing text has no side effects. We leave `is_destructive` at its default `false`.
-- We do **not** override `validate_input`, `summary`, or `activity_description`. The defaults work fine here.
+- `call()` returns `anyhow::Result<String>` -- just a plain string, not a `ToolResult` struct. The starter keeps tool output simple.
+- There are only two required methods. No safety flags, no validation, no summary -- the starter's `Tool` trait is minimal.
 
 ### Step 3: register and use
 
@@ -129,27 +144,21 @@ let defs = tools.definitions();
 
 let tool = tools.get("echo").unwrap();
 let result = tool.call(serde_json::json!({"text": "hello"})).await?;
-assert_eq!(result.content, "hello");
+assert_eq!(result, "hello");
 ```
 
 That is the full round-trip. Definition goes to the LLM, the LLM produces a `ToolCall`, we look up the tool by name, call it, and feed the result back.
 
-## Default methods: what to override and when
+## The minimal trait
 
-Here is a quick reference for the `Tool` trait methods you defined in Chapter 1:
+The starter's `Tool` trait has exactly two required methods:
 
-| Method | Default | Override when... |
-|--------|---------|-----------------|
-| `definition()` | (none -- required) | Always |
-| `call()` | (none -- required) | Always |
-| `validate_input()` | `ValidationResult::Ok` | You want to reject bad args before execution |
-| `is_read_only()` | `false` | Your tool never modifies anything |
-| `is_concurrent_safe()` | `false` | Your tool is safe to run in parallel |
-| `is_destructive()` | `false` | Your tool does hard-to-undo operations |
-| `summary()` | `[name: detail]` | Your tool's primary arg isn't `command`/`path`/`question`/`pattern` |
-| `activity_description()` | `None` | You want a custom spinner message |
+| Method | Purpose |
+|--------|---------|
+| `definition()` | Return the tool's JSON Schema description |
+| `call()` | Execute the tool and return a string result |
 
-The defaults are conservative: not read-only, not concurrent-safe, not destructive. A tool that forgets to override these flags will be treated cautiously by the permission system and query engine. That is the right failure mode -- being too cautious is better than accidentally running destructive operations in parallel.
+There are no default methods, no safety flags, no validation hooks. This is intentional -- the starter keeps things simple so you can focus on the agent loop mechanics. Claude Code's real tool system adds `is_read_only()`, `is_destructive()`, `validate_input()`, and more, but those are not needed to build a working agent.
 
 ## How this compares to Claude Code
 
@@ -168,34 +177,33 @@ Despite these differences, the core protocol is identical. An LLM sees a list of
 
 There is no new source file to create in this chapter. The `EchoTool` exists
 only in the test file (`src/tests/ch3.rs`). Your job is to verify that the types
-you built in Chapter 1 -- `Tool`, `ToolDefinition`, `ToolResult`, `ToolSet` --
+you built in Chapter 1 -- `Tool`, `ToolDefinition`, `ToolSet` --
 work correctly with a concrete tool implementation. If the chapter 3 tests pass,
 your type definitions are correct.
 
 ## Run the tests
 
 ```bash
-cargo test -p claw-code test_ch3
+cargo test -p mini-claw-code-starter test_ch2_
 ```
 
-You should see these tests pass:
+### What the tests verify
 
-- `test_ch3_tool_definition` -- the `EchoTool` produces the correct name and description
-- `test_ch3_tool_call` -- calling with `{"text": "hello"}` returns `"hello"`
-- `test_ch3_tool_is_read_only` -- the safety flags are set correctly
-- `test_ch3_tool_summary` -- the default summary includes the tool name
-- `test_ch3_tool_default_validation` -- validation returns `Ok` by default
-- `test_ch3_toolset_register_and_get` -- registering and looking up a tool by name
-- `test_ch3_toolset_definitions` -- `definitions()` returns the registered tool schemas
-- `test_ch3_toolset_names` -- `names()` lists registered tool names
-- `test_ch3_toolset_push` -- incremental registration with `push()`
+- **`test_ch2_read_definition`** -- the `ReadTool` produces the correct name and a non-empty description from its `ToolDefinition`, and the `"path"` parameter is required
+- **`test_ch2_read_file`** -- calling with a valid path returns the file's content, verifying argument extraction and return value
+- **`test_ch2_read_missing_file`** -- calling with a nonexistent path returns an error
+- **`test_ch2_read_missing_arg`** -- calling with no arguments returns an error
+
+## Key takeaway
+
+The `Tool` trait is deliberately minimal -- just `definition()` and `call()`. This simplicity means every tool, from a trivial echo to a complex bash executor, implements the same two-method interface. The agent loop does not need to know what a tool does; it only needs to look it up by name and call it.
 
 ## Summary
 
 This chapter focused on the *why* behind the tool types you defined in Chapter 1:
 
 - **`#[async_trait]` vs RPITIT** -- the critical distinction. Tools need object safety for heterogeneous storage; providers need zero-cost generics. The two-strategy approach gives you both.
-- **Errors are values** -- tool failures return `Ok(ToolResult::error(...))`, not `Err(...)`. The agent loop continues. The model adapts.
+- **Errors are values** -- tool failures return `Ok("error: ...")`, not `Err(...)`. The agent loop continues. The model adapts.
 - **EchoTool** -- your first concrete tool, demonstrating the full lifecycle: schema definition, trait implementation, registration, execution.
 
-In the next chapter we build the query engine -- the loop that ties providers and tools together into a functioning agent.
+In the next chapter we build the `SimpleAgent` -- the loop that ties providers and tools together into a functioning agent.

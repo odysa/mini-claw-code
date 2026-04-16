@@ -1,11 +1,15 @@
 # Chapter 15: Project Instructions
 
-In Chapter 5 you built two things that did not yet know about each other. The
-`SystemPromptBuilder` assembles a prompt from static and dynamic sections. The
-`InstructionLoader` discovers CLAUDE.md files by walking up the filesystem. You
-wired a basic example together at the end of that chapter, but nothing in the
-codebase actually used that wiring. The instruction loader was a standalone
-utility, and the builder was a general-purpose assembler.
+> **File(s) to edit:** `src/instructions.rs`, `src/context.rs`
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_ch17` (InstructionLoader), `cargo test -p mini-claw-code-starter test_ch15` (context integration)
+
+In Chapter 5 you built the `InstructionLoader`, which discovers CLAUDE.md files
+by walking up the filesystem. This chapter discusses how a production agent
+would connect that loader to a prompt assembly pipeline using types like
+`SystemPromptBuilder` and `PromptSection`. These types are conceptual -- the
+starter does not include them. The starter's `InstructionLoader` (in
+`src/instructions.rs`) is the concrete piece you built; the builder and section
+types shown here illustrate the architecture of the reference implementation.
 
 In Chapter 14 you added `Config`, a layered settings hierarchy. One of its
 fields is `instructions: Option<String>` -- custom text that the user can put
@@ -17,8 +21,16 @@ produces a different system prompt than launching it from `/home/user/other`.
 The pieces were already built. Now they form a pipeline.
 
 ```bash
-cargo test -p claw-code test_ch15
+cargo test -p mini-claw-code-starter test_ch17  # InstructionLoader
+cargo test -p mini-claw-code-starter test_ch15  # SystemPromptBuilder, context
 ```
+
+## Goal
+
+- Connect the `InstructionLoader` (from Chapter 5) to `SystemPromptBuilder` so discovered CLAUDE.md files become dynamic prompt sections.
+- Wire `Config.instructions` as a second dynamic section that gets the final word in the prompt.
+- Verify that the instruction pipeline is directory-aware -- launching from different directories produces different system prompts.
+- Ensure instructions stay below the cache boundary so the agent always uses fresh instructions while caching the stable prompt prefix.
 
 ---
 
@@ -106,6 +118,18 @@ impl InstructionLoader {
 ```
 
 ### Discovery: the upward walk
+
+```mermaid
+flowchart BT
+    A["/home/user/project/backend/"] -->|check for CLAUDE.md| B["/home/user/project/"]
+    B -->|check for CLAUDE.md| C["/home/user/"]
+    C -->|check for CLAUDE.md| D["/home/"]
+    D -->|check for CLAUDE.md| E["/"]
+
+    A -.->|"found: backend/CLAUDE.md"| F["Collected paths<br/>(reversed to root-first)"]
+    B -.->|"found: project/CLAUDE.md"| F
+    C -.->|"found: user/CLAUDE.md"| F
+```
 
 `discover()` starts at the given directory and walks toward the filesystem
 root. At each directory, it checks for every file name in the list:
@@ -216,7 +240,7 @@ Config.instructions                 highest     config
 File-based instructions are discovered by the `InstructionLoader` and appear
 in root-first order. Config-based instructions come from the `Config` struct's
 `instructions` field -- loaded from `.claw/config.toml` or
-`~/.config/claw-code/config.toml`.
+`~/.config/mini-claw/config.toml`.
 
 Both become dynamic sections in the system prompt. File instructions are added
 first, config instructions second. Since the LLM reads the prompt top-to-bottom,
@@ -236,10 +260,19 @@ this session."
 
 ---
 
+### Key Rust concept: `Option` chaining with `if let` for optional pipeline steps
+
+The wiring code uses `if let Some(instructions) = loader.load(...)` to conditionally add sections. This pattern is idiomatic Rust for optional pipeline steps: `InstructionLoader::load()` returns `Option<String>` -- `None` when no instruction files exist, `Some(text)` when they do. The `if let` binding destructures the `Option` and only executes the body when there is a value. Similarly, `Config.instructions` is `Option<String>`, and `if let Some(ref inst) = config.instructions` only adds the section when the config has instructions. This means the prompt builder never adds empty sections -- the system prompt is exactly as long as it needs to be.
+
+---
+
 ## Wiring it together
 
 Here is how the three systems -- `InstructionLoader`, `SystemPromptBuilder`,
-and `Config` -- combine into a single prompt assembly:
+and `Config` -- would combine into a single prompt assembly. Note that
+`SystemPromptBuilder` and `PromptSection` are conceptual types from the
+reference implementation; the starter does not include them. This example
+illustrates the architecture pattern:
 
 ```rust
 fn build_prompt(cwd: &str, config: &Config) -> String {
@@ -382,83 +415,40 @@ dynamic prompt sections. Everything else is refinement.
 
 ## Tests
 
-Run the chapter 15 tests:
+Run the tests:
 
 ```bash
-cargo test -p claw-code test_ch15
+cargo test -p mini-claw-code-starter test_ch17  # InstructionLoader
+cargo test -p mini-claw-code-starter test_ch15  # SystemPromptBuilder, context
 ```
 
-The tests are organized in three groups: discovery, loading, and integration.
+Note: InstructionLoader tests are in `test_ch17` (V1 instructions chapter).
+SystemPromptBuilder and context integration tests are in `test_ch15` (V1
+context management chapter).
 
-### Discovery tests
+Key InstructionLoader tests (`test_ch17`):
 
-- **`test_ch15_discover_single_file`** -- Creates a temp directory with a
-  single CLAUDE.md file. Calls `discover()` and verifies it finds exactly one
-  path, and that path matches the file we created.
+- **test_ch17_discover_in_current_dir** -- Finds a CLAUDE.md in the start directory.
+- **test_ch17_discover_in_parent** -- Walks upward and finds a CLAUDE.md in the parent directory.
+- **test_ch17_no_files_found** -- Returns an empty list when no instruction files exist anywhere in the path.
+- **test_ch17_load_content** -- `load()` returns `Some` with the file content included.
+- **test_ch17_load_empty_file** -- `load()` returns `None` for an empty CLAUDE.md (no wasted tokens).
+- **test_ch17_multiple_file_names** -- Discovers both `CLAUDE.md` and `.mini-claw/instructions.md` in the same directory.
+- **test_ch17_system_prompt_section** -- `system_prompt_section()` wraps content with a "project instructions" header.
+- **test_ch17_default_files** -- `default_files()` constructor does not panic.
 
-- **`test_ch15_discover_nested_hierarchy`** -- Creates a root directory with a
-  CLAUDE.md and a nested `project/backend` subdirectory with its own CLAUDE.md.
-  Calls `discover()` from the backend directory. Verifies both files are found
-  and the root-level file comes before the subdirectory file in the result
-  vector. This is the root-first ordering test.
+Key context tests (`test_ch15`):
 
-- **`test_ch15_discover_no_files`** -- Creates an empty temp directory. Calls
-  `discover()` and verifies it either finds no files or only finds files
-  outside the temp directory (from parent directories on the actual
-  filesystem). The key assertion is that it does not panic.
+- **test_ch15_below_threshold_no_compact** -- Context manager does not trigger compaction when below the token threshold.
+- **test_ch15_triggers_at_threshold** -- Compaction triggers when recorded tokens exceed the threshold.
+- **test_ch15_compact_preserves_system_prompt** -- After compaction, the system prompt remains as the first message.
+- **test_ch15_compact_preserves_recent** -- The most recent N messages survive compaction intact.
 
-- **`test_ch15_discover_custom_file_names`** -- Creates a RULES.md file and
-  constructs an `InstructionLoader` with `["RULES.md"]` instead of the default
-  file names. Verifies `discover()` finds the custom file. This tests the
-  parameterization -- the loader is not hardcoded to CLAUDE.md.
+---
 
-- **`test_ch15_discover_claw_instructions`** -- Creates a `.claw/instructions.md`
-  file in the temp directory. Uses `default_files()` and verifies `discover()`
-  finds the file. This tests the alternative instruction file location.
+## Key takeaway
 
-### Loading tests
-
-- **`test_ch15_load_single_file`** -- Creates a CLAUDE.md with content. Calls
-  `load()` and verifies the result contains the file's content and the
-  `"Instructions from"` header prefix.
-
-- **`test_ch15_load_multiple_files`** -- Creates a root CLAUDE.md and a
-  subdirectory CLAUDE.md. Calls `load()` from the subdirectory. Verifies both
-  files' content appears in the result and the `---` separator is present
-  between them.
-
-- **`test_ch15_load_empty_files_skipped`** -- Creates an empty CLAUDE.md. Calls
-  `load()` and verifies it returns `None`. Empty files should not produce empty
-  sections in the prompt.
-
-- **`test_ch15_load_no_files_returns_none`** -- Calls `load()` in a temp
-  directory with no instruction files. Verifies it does not panic. (It may
-  return `None` or `Some` depending on whether the temp directory's parent
-  chain contains any CLAUDE.md files.)
-
-### Integration tests
-
-- **`test_ch15_instructions_in_system_prompt`** -- The end-to-end test. Creates
-  a CLAUDE.md, loads it with `InstructionLoader`, and injects it as a dynamic
-  section into a `SystemPromptBuilder` alongside static identity and safety
-  sections. Calls `build()` and verifies the final prompt contains text from
-  all three sections. This proves the pipeline works from file to prompt.
-
-- **`test_ch15_static_dynamic_separation`** -- Creates a CLAUDE.md and builds
-  a prompt with one static section (identity) and one dynamic section
-  (instructions). Verifies that `static_prompt()` contains the identity text
-  but not the instructions, `dynamic_prompt()` contains the instructions but
-  not the identity text, and `build()` contains both. This is the cache
-  boundary test -- it ensures instructions are always on the dynamic side.
-
-- **`test_ch15_config_instructions_override`** -- Adds both file-based
-  instructions and config-based instructions as separate dynamic sections.
-  Verifies the final prompt contains both. The config section appears after the
-  file section, giving it higher effective priority.
-
-- **`test_ch15_section_count`** -- Builds a prompt with 2 static sections and
-  1 dynamic section. Verifies `section_count()` returns 3. A simple bookkeeping
-  check that catches off-by-one errors in the builder.
+Instructions are always dynamic. Even though CLAUDE.md files rarely change, the *set* of files depends on the working directory. Keeping them below the cache boundary ensures the agent adapts to each project while caching the stable identity and safety prompts above.
 
 ---
 

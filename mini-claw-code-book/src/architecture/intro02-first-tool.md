@@ -96,10 +96,10 @@ Here is the data flow:
 
 ```mermaid
 flowchart LR
-    A["args: {\"path\": \"foo.txt\"}"] --> B["as_str()"]
+    A["args: path = foo.txt"] --> B["as_str()"]
     B --> C["tokio::fs::read_to_string"]
-    C --> D["Ok(\"file contents\")"]
-    C --> E["Err(\"failed to read\")"]
+    C --> D["Ok: file contents"]
+    C --> E["Err: failed to read"]
 ```
 
 ## Run the tests

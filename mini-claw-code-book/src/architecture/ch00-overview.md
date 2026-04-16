@@ -6,7 +6,7 @@ Welcome to **Building a Coding Agent in Rust** -- a hands-on tutorial where you 
 
 By the end of this book, you'll have built a complete coding agent that:
 
-- **Connects to an LLM** via an OpenRouter-compatible HTTP provider
+- **Connects to an LLM** via an OpenAI-compatible HTTP provider
 - **Uses tools** -- bash, file read/write/edit -- with a simple `Tool` trait
 - **Loops autonomously** -- the `SimpleAgent` drives the provider-tool cycle until done
 - **Streams events** through channels so a UI can show progress in real-time

@@ -19,14 +19,9 @@ impl Default for WriteTool {
 impl WriteTool {
     /// Create a new WriteTool. Schema: required "path" and "content" parameters.
     pub fn new() -> Self {
-        Self {
-            definition: ToolDefinition::new(
-                "write",
-                "Write content to a file, creating directories as needed",
-            )
-            .param("path", "string", "Absolute path to write to", true)
-            .param("content", "string", "Content to write", true),
-        }
+        unimplemented!(
+            "TODO ch6: build a ToolDefinition for 'write' with required 'path' and 'content' params"
+        )
     }
 }
 
@@ -43,20 +38,7 @@ impl Tool for WriteTool {
     /// - Create parent dirs: `tokio::fs::create_dir_all(parent).await?`
     /// - Write file: `tokio::fs::write(path, content).await?`
     /// - Return confirmation: `format!("wrote {path}")`
-    async fn call(&self, args: Value) -> anyhow::Result<String> {
-        let path = args["path"].as_str().context("missing 'path' argument")?;
-        let content = args["content"]
-            .as_str()
-            .context("missing 'content' argument")?;
-
-        if let Some(parent) = std::path::Path::new(path).parent()
-            && !parent.as_os_str().is_empty()
-        {
-            tokio::fs::create_dir_all(parent).await?;
-        }
-
-        tokio::fs::write(path, content).await?;
-
-        Ok(format!("wrote {path}"))
+    async fn call(&self, _args: Value) -> anyhow::Result<String> {
+        unimplemented!("TODO ch6: extract path+content, mkdir parents, write the file")
     }
 }

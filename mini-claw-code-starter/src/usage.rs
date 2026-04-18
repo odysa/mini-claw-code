@@ -31,11 +31,9 @@ impl CostTracker {
         }
     }
 
-    pub fn record(&self, usage: &TokenUsage) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.total_input += usage.input_tokens;
-        inner.total_output += usage.output_tokens;
-        inner.turn_count += 1;
+    /// Add a single turn's `TokenUsage` to the running totals and bump turn_count.
+    pub fn record(&self, _usage: &TokenUsage) {
+        unimplemented!("TODO ch14: lock the mutex, add input/output tokens, increment turn_count")
     }
 
     pub fn total_input_tokens(&self) -> u64 {
@@ -50,38 +48,21 @@ impl CostTracker {
         self.inner.lock().unwrap().turn_count
     }
 
+    /// Return the accumulated cost in dollars.
+    ///
+    /// Hint: `(total_input * input_price + total_output * output_price) / 1_000_000.0`.
     pub fn total_cost(&self) -> f64 {
-        let inner = self.inner.lock().unwrap();
-        Self::compute_cost(
-            inner.total_input,
-            inner.total_output,
-            self.input_price,
-            self.output_price,
-        )
+        unimplemented!("TODO ch14: compute cost from tokens and per-million pricing")
     }
 
-    fn compute_cost(input: u64, output: u64, input_price: f64, output_price: f64) -> f64 {
-        (input as f64 * input_price + output as f64 * output_price) / 1_000_000.0
-    }
-
+    /// Render a one-line human-readable summary like
+    /// `"tokens: 123 in + 45 out | cost: $0.0012"`.
     pub fn summary(&self) -> String {
-        let inner = self.inner.lock().unwrap();
-        let cost = Self::compute_cost(
-            inner.total_input,
-            inner.total_output,
-            self.input_price,
-            self.output_price,
-        );
-        format!(
-            "tokens: {} in + {} out | cost: ${:.4}",
-            inner.total_input, inner.total_output, cost
-        )
+        unimplemented!("TODO ch14: format 'tokens: N in + M out | cost: $X.XXXX'")
     }
 
+    /// Reset all counters to zero.
     pub fn reset(&self) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.total_input = 0;
-        inner.total_output = 0;
-        inner.turn_count = 0;
+        unimplemented!("TODO ch14: zero out total_input, total_output, and turn_count")
     }
 }

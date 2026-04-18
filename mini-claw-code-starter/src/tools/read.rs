@@ -27,14 +27,9 @@ impl ReadTool {
     /// The schema should declare one required parameter: "path" (string).
     /// Use `ToolDefinition::new("read", "Read the contents of a file.").param(...)`.
     pub fn new() -> Self {
-        Self {
-            definition: ToolDefinition::new("read", "Read the contents of a file.").param(
-                "path",
-                "string",
-                "Absolute path to the file",
-                true,
-            ),
-        }
+        unimplemented!(
+            "TODO ch3: build a ToolDefinition for 'read' with a required 'path' string param"
+        )
     }
 }
 
@@ -49,11 +44,7 @@ impl Tool for ReadTool {
     /// Hints:
     /// - Extract path: `args["path"].as_str().context("missing 'path' argument")?`
     /// - Read file: `tokio::fs::read_to_string(path).await.with_context(|| ...)?`
-    async fn call(&self, args: Value) -> anyhow::Result<String> {
-        let path = args["path"].as_str().context("missing 'path' argument")?;
-
-        tokio::fs::read_to_string(path)
-            .await
-            .with_context(|| format!("failed to read '{path}'"))
+    async fn call(&self, _args: Value) -> anyhow::Result<String> {
+        unimplemented!("TODO ch3: extract 'path' from args and read the file via tokio::fs")
     }
 }

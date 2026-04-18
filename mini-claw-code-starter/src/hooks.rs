@@ -53,23 +53,16 @@ impl HookRegistry {
         self
     }
 
-    pub async fn dispatch(&self, event: &HookEvent) -> HookAction {
-        let mut modified_args: Option<Value> = None;
-
-        for hook in &self.hooks {
-            match hook.on_event(event).await {
-                HookAction::Continue => {}
-                HookAction::Block(reason) => return HookAction::Block(reason),
-                HookAction::ModifyArgs(new_args) => {
-                    modified_args = Some(new_args);
-                }
-            }
-        }
-
-        match modified_args {
-            Some(args) => HookAction::ModifyArgs(args),
-            None => HookAction::Continue,
-        }
+    /// Fire every hook for `event` and fold their responses into one `HookAction`.
+    ///
+    /// Hints:
+    /// - `Block(reason)` short-circuits — return it immediately.
+    /// - `ModifyArgs(new_args)` accumulates; the last modification wins.
+    /// - Return `ModifyArgs` if any hook modified args, otherwise `Continue`.
+    pub async fn dispatch(&self, _event: &HookEvent) -> HookAction {
+        unimplemented!(
+            "TODO ch12: run every hook; Block short-circuits, ModifyArgs accumulates (last wins)"
+        )
     }
 
     pub fn is_empty(&self) -> bool {
@@ -112,15 +105,11 @@ impl Default for LoggingHook {
 
 #[async_trait::async_trait]
 impl Hook for LoggingHook {
-    async fn on_event(&self, event: &HookEvent) -> HookAction {
-        let msg = match event {
-            HookEvent::PreToolCall { tool_name, .. } => format!("pre:{tool_name}"),
-            HookEvent::PostToolCall { tool_name, .. } => format!("post:{tool_name}"),
-            HookEvent::AgentStart { .. } => "agent:start".into(),
-            HookEvent::AgentEnd { .. } => "agent:end".into(),
-        };
-        self.log.lock().unwrap().push(msg);
-        HookAction::Continue
+    /// Record a short tag for each event and always continue.
+    ///
+    /// Hint: Formats are `pre:{tool}`, `post:{tool}`, `agent:start`, `agent:end`.
+    async fn on_event(&self, _event: &HookEvent) -> HookAction {
+        unimplemented!("TODO ch12: push a summary of the event into self.log, return Continue")
     }
 }
 
@@ -141,13 +130,11 @@ impl BlockingHook {
 
 #[async_trait::async_trait]
 impl Hook for BlockingHook {
-    async fn on_event(&self, event: &HookEvent) -> HookAction {
-        if let HookEvent::PreToolCall { tool_name, .. } = event
-            && self.blocked_tools.iter().any(|b| b == tool_name)
-        {
-            return HookAction::Block(self.reason.clone());
-        }
-        HookAction::Continue
+    /// Block `PreToolCall` events whose tool name is in `blocked_tools`.
+    async fn on_event(&self, _event: &HookEvent) -> HookAction {
+        unimplemented!(
+            "TODO ch12: on PreToolCall for a blocked tool, return Block(reason); else Continue"
+        )
     }
 }
 
@@ -180,33 +167,16 @@ impl ShellHook {
 
 #[async_trait::async_trait]
 impl Hook for ShellHook {
-    async fn on_event(&self, event: &HookEvent) -> HookAction {
-        let tool_name = match event {
-            HookEvent::PreToolCall { tool_name, .. } => tool_name,
-            HookEvent::PostToolCall { tool_name, .. } => tool_name,
-            _ => return HookAction::Continue,
-        };
-
-        if !self.matches_tool(tool_name) {
-            return HookAction::Continue;
-        }
-
-        let result = tokio::process::Command::new("sh")
-            .arg("-c")
-            .arg(&self.command)
-            .output()
-            .await;
-
-        match result {
-            Ok(output) => {
-                if output.status.success() {
-                    HookAction::Continue
-                } else {
-                    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                    HookAction::Block(format!("hook failed: {stderr}"))
-                }
-            }
-            Err(e) => HookAction::Block(format!("hook error: {e}")),
-        }
+    /// Run `self.command` when the event matches; block if the shell exits non-zero.
+    ///
+    /// Hints:
+    /// - Only Pre/PostToolCall fire the shell; other events return Continue.
+    /// - Skip the shell if `self.matches_tool(tool_name)` is false.
+    /// - Non-zero exit → `Block(format!("hook failed: {stderr}"))`.
+    /// - Spawn error → `Block(format!("hook error: {e}"))`.
+    async fn on_event(&self, _event: &HookEvent) -> HookAction {
+        unimplemented!(
+            "TODO ch12: for matching tool events run sh -c command; non-zero or spawn error → Block"
+        )
     }
 }

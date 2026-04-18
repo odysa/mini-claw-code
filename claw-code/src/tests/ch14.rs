@@ -1,4 +1,4 @@
-use crate::config::{Config, ConfigLoader, CostTracker};
+use crate::config::{Config, ConfigLoader, ConfigOverlay, CostTracker};
 use crate::types::TokenUsage;
 
 // ---------------------------------------------------------------------------
@@ -25,24 +25,42 @@ fn test_ch14_config_defaults() {
 #[test]
 fn test_ch14_merge_override_model() {
     let base = Config::default();
-    let overlay = Config {
-        model: "custom/model".into(),
-        ..Config::default()
+    let overlay = ConfigOverlay {
+        model: Some("custom/model".into()),
+        ..ConfigOverlay::default()
     };
     let merged = ConfigLoader::merge(base, overlay);
     assert_eq!(merged.model, "custom/model");
 }
 
 #[test]
-fn test_ch14_merge_keeps_base_when_overlay_is_default() {
+fn test_ch14_merge_unset_field_keeps_base() {
     let base = Config {
         model: "custom/model".into(),
         ..Config::default()
     };
-    let overlay = Config::default();
+    let overlay = ConfigOverlay::default();
     let merged = ConfigLoader::merge(base, overlay);
-    // Overlay model is default, so base value is kept
+    // Overlay did not set model (None), so base value is kept.
     assert_eq!(merged.model, "custom/model");
+}
+
+#[test]
+fn test_ch14_second_overlay_always_wins() {
+    // A later overlay that sets a field must override the previous
+    // layer even when the new value equals the struct default —
+    // otherwise "compare to default" ambiguity breaks last-write-wins.
+    let base = Config::default();
+    let first_overlay = ConfigOverlay {
+        model: Some("some/model".into()),
+        ..ConfigOverlay::default()
+    };
+    let second_overlay = ConfigOverlay {
+        model: Some("anthropic/claude-sonnet-4-20250514".into()),
+        ..ConfigOverlay::default()
+    };
+    let merged = ConfigLoader::merge(ConfigLoader::merge(base, first_overlay), second_overlay);
+    assert_eq!(merged.model, "anthropic/claude-sonnet-4-20250514");
 }
 
 #[test]
@@ -51,12 +69,9 @@ fn test_ch14_merge_optional_fields() {
         allowed_directory: Some("/home/user".into()),
         ..Config::default()
     };
-    let overlay = Config {
-        allowed_directory: None,
-        ..Config::default()
-    };
+    let overlay = ConfigOverlay::default();
     let merged = ConfigLoader::merge(base, overlay);
-    // None doesn't override Some
+    // Unset overlay doesn't override Some.
     assert_eq!(merged.allowed_directory, Some("/home/user".into()));
 }
 
@@ -66,9 +81,9 @@ fn test_ch14_merge_overlay_replaces_optional() {
         allowed_directory: Some("/home/user".into()),
         ..Config::default()
     };
-    let overlay = Config {
+    let overlay = ConfigOverlay {
         allowed_directory: Some("/workspace".into()),
-        ..Config::default()
+        ..ConfigOverlay::default()
     };
     let merged = ConfigLoader::merge(base, overlay);
     assert_eq!(merged.allowed_directory, Some("/workspace".into()));
@@ -80,24 +95,39 @@ fn test_ch14_merge_collections_replace() {
         protected_patterns: vec![".env".into()],
         ..Config::default()
     };
-    let overlay = Config {
-        protected_patterns: vec![".secret".into(), ".key".into()],
-        ..Config::default()
+    let overlay = ConfigOverlay {
+        protected_patterns: Some(vec![".secret".into(), ".key".into()]),
+        ..ConfigOverlay::default()
     };
     let merged = ConfigLoader::merge(base, overlay);
-    // Collections are replaced, not appended
+    // Collections are replaced, not appended.
     assert_eq!(merged.protected_patterns, vec![".secret", ".key"]);
 }
 
 #[test]
-fn test_ch14_merge_empty_collection_keeps_base() {
+fn test_ch14_merge_unset_collection_keeps_base() {
     let base = Config {
         blocked_commands: vec!["rm -rf /".into()],
         ..Config::default()
     };
-    let overlay = Config::default(); // empty blocked_commands
+    let overlay = ConfigOverlay::default();
     let merged = ConfigLoader::merge(base, overlay);
     assert_eq!(merged.blocked_commands, vec!["rm -rf /"]);
+}
+
+#[test]
+fn test_ch14_merge_explicit_empty_collection_overrides() {
+    // Some(vec![]) means "clear the base list" — distinct from None ("not set").
+    let base = Config {
+        blocked_commands: vec!["rm -rf /".into()],
+        ..Config::default()
+    };
+    let overlay = ConfigOverlay {
+        blocked_commands: Some(Vec::new()),
+        ..ConfigOverlay::default()
+    };
+    let merged = ConfigLoader::merge(base, overlay);
+    assert!(merged.blocked_commands.is_empty());
 }
 
 // ---------------------------------------------------------------------------
@@ -118,10 +148,16 @@ protected_patterns = [".env", ".secret"]
     )
     .unwrap();
 
-    let config = ConfigLoader::load_file(&path).unwrap();
-    assert_eq!(config.model, "test/model");
-    assert_eq!(config.max_context_tokens, 50000);
-    assert_eq!(config.protected_patterns, vec![".env", ".secret"]);
+    let overlay = ConfigLoader::load_file(&path).unwrap();
+    assert_eq!(overlay.model.as_deref(), Some("test/model"));
+    assert_eq!(overlay.max_context_tokens, Some(50000));
+    assert_eq!(
+        overlay.protected_patterns.as_deref(),
+        Some([".env".to_string(), ".secret".to_string()].as_slice()),
+    );
+    // Fields not present in the TOML stay None.
+    assert!(overlay.base_url.is_none());
+    assert!(overlay.blocked_commands.is_none());
 }
 
 #[test]

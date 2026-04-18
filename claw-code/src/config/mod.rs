@@ -78,11 +78,29 @@ impl Default for Config {
     }
 }
 
+/// A partial configuration used as an overlay.
+///
+/// Every field is `Option<T>` so the loader can distinguish between
+/// "not set in the TOML file" (`None`) and "explicitly set to this
+/// value, even if it equals the default" (`Some(x)`).
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct ConfigOverlay {
+    pub(crate) model: Option<String>,
+    pub(crate) base_url: Option<String>,
+    pub(crate) max_context_tokens: Option<u64>,
+    pub(crate) preserve_recent: Option<usize>,
+    pub(crate) allowed_directory: Option<String>,
+    pub(crate) protected_patterns: Option<Vec<String>>,
+    pub(crate) blocked_commands: Option<Vec<String>>,
+    pub(crate) instructions: Option<String>,
+}
+
 /// Loads and merges configuration from multiple sources.
 ///
-/// The loader checks each layer in priority order and merges
-/// non-default values. The result is a single `Config` with
-/// all layers applied.
+/// The loader walks each layer in priority order and applies it to
+/// the base config via `merge`. Every `Some(_)` field on the overlay
+/// replaces the corresponding field on the base.
 pub struct ConfigLoader {
     /// Directory to look for project config.
     project_dir: Option<PathBuf>,
@@ -124,52 +142,33 @@ impl ConfigLoader {
         config
     }
 
-    /// Load a single TOML config file. Returns `None` if the file
-    /// does not exist or cannot be parsed.
-    pub fn load_file(path: &Path) -> Option<Config> {
+    /// Load a single TOML config file into an overlay.
+    ///
+    /// Returns `None` if the file does not exist or cannot be parsed.
+    pub fn load_file(path: &Path) -> Option<ConfigOverlay> {
         let content = std::fs::read_to_string(path).ok()?;
         toml::from_str(&content).ok()
     }
 
-    /// Merge an overlay config onto a base config.
+    /// Merge an overlay onto a base config.
     ///
-    /// Non-default values in the overlay replace the base.
-    /// Collections (protected_patterns, blocked_commands) are replaced, not appended.
-    pub fn merge(base: Config, overlay: Config) -> Config {
-        let defaults = Config::default();
-
+    /// Every `Some(_)` field in the overlay replaces the corresponding
+    /// field in the base. `None` fields leave the base value untouched.
+    /// Collections (`protected_patterns`, `blocked_commands`) are
+    /// replaced wholesale when set, not appended.
+    pub fn merge(base: Config, overlay: ConfigOverlay) -> Config {
         Config {
-            model: if overlay.model != defaults.model {
-                overlay.model
-            } else {
-                base.model
-            },
-            base_url: if overlay.base_url != defaults.base_url {
-                overlay.base_url
-            } else {
-                base.base_url
-            },
-            max_context_tokens: if overlay.max_context_tokens != defaults.max_context_tokens {
-                overlay.max_context_tokens
-            } else {
-                base.max_context_tokens
-            },
-            preserve_recent: if overlay.preserve_recent != defaults.preserve_recent {
-                overlay.preserve_recent
-            } else {
-                base.preserve_recent
-            },
+            model: overlay.model.unwrap_or(base.model),
+            base_url: overlay.base_url.unwrap_or(base.base_url),
+            max_context_tokens: overlay
+                .max_context_tokens
+                .unwrap_or(base.max_context_tokens),
+            preserve_recent: overlay.preserve_recent.unwrap_or(base.preserve_recent),
             allowed_directory: overlay.allowed_directory.or(base.allowed_directory),
-            protected_patterns: if !overlay.protected_patterns.is_empty() {
-                overlay.protected_patterns
-            } else {
-                base.protected_patterns
-            },
-            blocked_commands: if !overlay.blocked_commands.is_empty() {
-                overlay.blocked_commands
-            } else {
-                base.blocked_commands
-            },
+            protected_patterns: overlay
+                .protected_patterns
+                .unwrap_or(base.protected_patterns),
+            blocked_commands: overlay.blocked_commands.unwrap_or(base.blocked_commands),
             instructions: overlay.instructions.or(base.instructions),
         }
     }

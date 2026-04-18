@@ -69,6 +69,26 @@ fn default_hook_timeout() -> u64 {
     5000
 }
 
+/// A partial configuration used as an overlay.
+///
+/// Every field is `Option<T>` so the loader can distinguish between
+/// "not set in the TOML file" (`None`) and "explicitly set to this
+/// value, even if it equals the struct default" (`Some(x)`).
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct ConfigOverlay {
+    pub(crate) model: Option<String>,
+    pub(crate) base_url: Option<String>,
+    pub(crate) max_context_tokens: Option<u64>,
+    pub(crate) preserve_recent: Option<usize>,
+    pub(crate) allowed_directory: Option<String>,
+    pub(crate) protected_patterns: Option<Vec<String>>,
+    pub(crate) blocked_commands: Option<Vec<String>>,
+    pub(crate) mcp_servers: Option<Vec<McpServerConfig>>,
+    pub(crate) hooks: Option<HooksConfig>,
+    pub(crate) instructions: Option<String>,
+}
+
 /// Loads and merges configuration from multiple sources.
 pub struct ConfigLoader;
 
@@ -87,29 +107,38 @@ impl ConfigLoader {
         )
     }
 
-    /// Load config from a path.
+    /// Load a full, pre-merged `Config` from a path.
     ///
     /// Hint: `std::fs::read_to_string(path).ok().and_then(|s| toml::from_str(&s).ok())`.
     pub fn load_path(_path: &Path) -> Option<Config> {
         unimplemented!("TODO ch14: read the TOML file at path and parse it into a Config")
     }
 
+    /// Load a partial `ConfigOverlay` from a path. The layered loader
+    /// uses this so it can tell "unset" from "set to the default".
     #[allow(dead_code)]
-    fn load_file(relative_path: &str) -> Option<Config> {
-        let path = PathBuf::from(relative_path);
-        Self::load_path(&path)
+    pub fn load_overlay(_path: &Path) -> Option<ConfigOverlay> {
+        unimplemented!("TODO ch14: read the TOML file at path and parse it into a ConfigOverlay")
     }
 
-    /// Merge overlay into base. Non-default values in overlay override base.
+    #[allow(dead_code)]
+    fn load_file(relative_path: &str) -> Option<ConfigOverlay> {
+        let path = PathBuf::from(relative_path);
+        Self::load_overlay(&path)
+    }
+
+    /// Apply `overlay` onto `base`. Every `Some(_)` field replaces the
+    /// corresponding field on `base`; `None` fields leave it untouched.
     ///
     /// Hints:
-    /// - Compare each field against `Config::default()` — if overlay differs, overwrite base.
-    /// - For `Option<T>` fields, overlay wins when it is `Some(_)`.
-    /// - For `Vec<T>` fields, overlay wins when non-empty and different from defaults.
+    /// - Pattern-match each `Option<T>` field: `if let Some(v) = overlay.x { base.x = v; }`.
+    /// - For fields already `Option<T>` on `Config` (`allowed_directory`,
+    ///   `instructions`), assign the whole overlay value when it is `Some(_)`.
+    /// - Do NOT compare against `Config::default()` — that heuristic cannot
+    ///   distinguish "unset" from "explicitly set to the default value" and
+    ///   will silently drop later-layer overrides (see issue #10).
     #[allow(dead_code)]
-    fn merge(_base: &mut Config, _overlay: Config) {
-        unimplemented!(
-            "TODO ch14: copy each overlay field into base when it differs from the default"
-        )
+    fn merge(_base: &mut Config, _overlay: ConfigOverlay) {
+        unimplemented!("TODO ch14: apply every Some(_) field from overlay onto base")
     }
 }

@@ -372,4 +372,4 @@ static portion of your system prompt.
 
 ---
 
-[← Chapter 7: The Agentic Loop](./ch07-query-engine.md) · [Contents](./ch00-overview.md) · [Chapter 9: File Tools →](./ch09-file-tools.md)
+[← Chapter 7: The Agentic Loop (Deep Dive)](./ch07-query-engine.md) · [Contents](./ch00-overview.md) · [Chapter 9: File Tools →](./ch09-file-tools.md)

@@ -181,7 +181,7 @@ Despite these differences, the core protocol is identical. An LLM sees a list of
 There is no new source file to create in this chapter. The `EchoTool` exists
 only in the test file (`src/tests/ch3.rs`). Your job is to verify that the types
 you built in Chapter 4 -- `Tool`, `ToolDefinition`, `ToolSet` --
-work correctly with a concrete tool implementation. If the chapter 3 tests pass,
+work correctly with a concrete tool implementation. If the `test_ch2_` tests pass,
 your type definitions are correct.
 
 ## Run the tests
@@ -213,4 +213,4 @@ In the next chapter we build the `SimpleAgent` -- the loop that ties providers a
 
 ---
 
-[← Chapter 5: Provider & Streaming](./ch05-provider-streaming.md) · [Contents](./ch00-overview.md) · [Chapter 7: The Agentic Loop →](./ch07-query-engine.md)
+[← Chapter 5: Provider & Streaming](./ch05-provider-streaming.md) · [Contents](./ch00-overview.md) · [Chapter 7: The Agentic Loop (Deep Dive) →](./ch07-query-engine.md)

@@ -30,7 +30,7 @@ All tool implementations live under `src/tools/`, one file per tool:
 ```
 src/tools/
   mod.rs       -- re-exports everything
-  ask.rs       -- AskTool (Chapter 14)
+  ask.rs       -- AskTool (bonus)
   bash.rs      -- BashTool
   edit.rs      -- EditTool
   read.rs      -- ReadTool

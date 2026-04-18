@@ -551,7 +551,7 @@ in later chapters. The module structure in the starter:
 ```
 src/tools/
   mod.rs    -- re-exports all tools
-  ask.rs    -- AskTool (Chapter 14)
+  ask.rs    -- AskTool (bonus)
   bash.rs   -- BashTool (Chapter 10)
   edit.rs   -- EditTool
   read.rs   -- ReadTool

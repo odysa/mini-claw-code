@@ -39,7 +39,7 @@ The LLM never touches your filesystem. It *asks* your code to run tools — read
 This book builds that loop from scratch and then grows it into the full architecture of a real coding agent: streaming, permissions, hooks, plan mode, configuration, and more. **18 chapters. Test-driven. No magic.**
 
 <p align="center">
-  <img src="docs/architecture.png" alt="Mini Claw Code architecture: User ↔ Agent ↔ LLM + Tools" width="900">
+  <img src="docs/architecture.svg" alt="Mini Claw Code architecture: User ↔ Agent ↔ LLM + Tools" width="900">
 </p>
 
 ## What you'll build
@@ -62,13 +62,9 @@ All test-driven. No API key needed until Chapter 5 — and even then, the defaul
 
 Every coding agent — yours included — runs on this:
 
-```mermaid
-flowchart TD
-    A["User prompt"] --> B["LLM"]
-    B -->|"StopReason::Stop"| C["Return text"]
-    B -->|"StopReason::ToolUse"| D["Execute tool calls"]
-    D -->|"feed results back"| B
-```
+<p align="center">
+  <img src="docs/core-loop.svg" alt="Core loop: user prompt → LLM → StopReason::Stop or ToolUse → loop back" width="900">
+</p>
 
 Match on `StopReason`. Follow instructions. That's the architecture.
 
@@ -117,19 +113,9 @@ Match on `StopReason`. Follow instructions. That's the architecture.
 | 17 | Settings Hierarchy | TOML layers, env overrides, `CostTracker` |
 | 18 | Project Instructions | CLAUDE.md discovery, `ContextManager` |
 
-```mermaid
-flowchart LR
-    C1["1-3\nStart"] --> C2["4-7\nCore"]
-    C2 --> C3["8-12\nPrompt+Tools"]
-    C3 --> C4["13-16\nSafety"]
-    C4 --> C5["17-18\nConfig"]
-
-    style C1 fill:#2d333b,stroke:#539bf5,color:#adbac7
-    style C2 fill:#2d333b,stroke:#539bf5,color:#adbac7
-    style C3 fill:#2d333b,stroke:#539bf5,color:#adbac7
-    style C4 fill:#2d333b,stroke:#f69d50,color:#adbac7
-    style C5 fill:#2d333b,stroke:#57ab5a,color:#adbac7
-```
+<p align="center">
+  <img src="docs/roadmap.svg" alt="Chapter roadmap: Start (1-3) → Core (4-7) → Prompt & Tools (8-12) → Safety (13-16) → Config (17-18)" width="900">
+</p>
 
 ## Safety warning
 

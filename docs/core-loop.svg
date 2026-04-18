@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400">
+  <style>
+    .f { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; }
+    .title { fill: #1f1f1d; font-weight: 600; }
+    .body { fill: #3d3929; font-weight: 500; }
+    .sub { fill: #7a7468; font-weight: 400; }
+    .label { fill: #94897a; font-weight: 600; letter-spacing: 0.12em; }
+    .mono { font-family: 'SF Mono', 'Menlo', 'Consolas', monospace; }
+  </style>
+
+  <defs>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#1f1f1d" flood-opacity="0.06"/>
+    </filter>
+    <filter id="soft-strong" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#c15f3c" flood-opacity="0.10"/>
+    </filter>
+    <linearGradient id="llm-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#fdf6f0"/>
+    </linearGradient>
+
+    <marker id="arr-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#c15f3c"/>
+    </marker>
+    <marker id="arr-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#9b9689"/>
+    </marker>
+    <marker id="arr-sage" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#6b7a4f"/>
+    </marker>
+  </defs>
+
+  <!-- Canvas -->
+  <rect width="960" height="400" fill="#faf9f5"/>
+
+  <!-- User prompt (left) -->
+  <g filter="url(#soft)">
+    <rect x="40" y="164" width="188" height="88" rx="16" fill="#ffffff" stroke="#e8e6dc" stroke-width="1"/>
+  </g>
+  <circle cx="66" cy="196" r="6" fill="#d97757"/>
+  <text x="80" y="201" class="f label" font-size="10">INPUT</text>
+  <text x="134" y="226" text-anchor="middle" class="f title" font-size="15">User prompt</text>
+
+  <!-- LLM (center, primary) -->
+  <g filter="url(#soft-strong)">
+    <rect x="340" y="144" width="216" height="128" rx="18" fill="url(#llm-grad)" stroke="#d97757" stroke-width="1.5"/>
+  </g>
+  <circle cx="366" cy="176" r="6" fill="#d97757"/>
+  <text x="380" y="181" class="f label" font-size="10" fill="#c15f3c">PROVIDER CALL</text>
+  <text x="448" y="212" text-anchor="middle" class="f title" font-size="20">LLM</text>
+  <line x1="380" y1="224" x2="516" y2="224" stroke="#f0e5d8" stroke-width="1"/>
+  <text x="448" y="246" text-anchor="middle" class="f mono body" font-size="12">returns StopReason</text>
+  <text x="448" y="262" text-anchor="middle" class="f sub" font-size="11">Stop | ToolUse</text>
+
+  <!-- Return text (top right, Stop branch) -->
+  <g filter="url(#soft)">
+    <rect x="676" y="60" width="244" height="88" rx="16" fill="#ffffff" stroke="#e8e6dc" stroke-width="1"/>
+  </g>
+  <circle cx="702" cy="92" r="6" fill="#6b7a4f"/>
+  <text x="716" y="97" class="f label" font-size="10" fill="#6b7a4f">DONE · STOP</text>
+  <text x="798" y="122" text-anchor="middle" class="f title" font-size="15">Return text to user</text>
+
+  <!-- Execute tool calls (bottom right, ToolUse branch) -->
+  <g filter="url(#soft)">
+    <rect x="676" y="260" width="244" height="88" rx="16" fill="#ffffff" stroke="#e8e6dc" stroke-width="1"/>
+  </g>
+  <circle cx="702" cy="292" r="6" fill="#d97757"/>
+  <text x="716" y="297" class="f label" font-size="10" fill="#c15f3c">TOOL · USE</text>
+  <text x="798" y="322" text-anchor="middle" class="f title" font-size="15">Execute tool calls</text>
+
+  <!-- ========== Arrows ========== -->
+
+  <!-- User prompt → LLM -->
+  <line x1="232" y1="208" x2="336" y2="208" stroke="#c15f3c" stroke-width="2" marker-end="url(#arr-accent)"/>
+
+  <!-- LLM → Return text (branch up-right) -->
+  <path d="M 556 180 C 610 180 610 104 672 104" fill="none" stroke="#6b7a4f" stroke-width="2" marker-end="url(#arr-sage)"/>
+  <text x="620" y="146" text-anchor="middle" class="f mono sub" font-size="11" fill="#6b7a4f">StopReason::Stop</text>
+
+  <!-- LLM → Execute tools (branch down-right) -->
+  <path d="M 556 236 C 610 236 610 304 672 304" fill="none" stroke="#c15f3c" stroke-width="2" marker-end="url(#arr-accent)"/>
+  <text x="616" y="280" text-anchor="middle" class="f mono sub" font-size="11" fill="#c15f3c">StopReason::ToolUse</text>
+
+  <!-- Feedback loop: Execute tools → back to LLM -->
+  <path d="M 676 320 C 520 360 380 360 360 292 L 360 272" fill="none" stroke="#9b9689" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arr-muted)"/>
+  <text x="520" y="378" text-anchor="middle" class="f sub" font-size="11">feed tool results back as messages</text>
+
+  <!-- Legend -->
+  <g transform="translate(40, 32)">
+    <text x="0" y="10" class="f label" font-size="10">CORE LOOP</text>
+    <text x="0" y="28" class="f title" font-size="14">Every coding agent — yours included — runs on this.</text>
+  </g>
+</svg>

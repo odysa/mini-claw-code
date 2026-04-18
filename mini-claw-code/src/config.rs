@@ -97,6 +97,26 @@ fn default_hook_timeout() -> u64 {
     5000
 }
 
+/// A partial configuration used as an overlay.
+///
+/// Every field is `Option<T>` so the loader can distinguish between
+/// "not set in the TOML file" (`None`) and "explicitly set to this
+/// value, even if it equals the struct default" (`Some(x)`).
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct ConfigOverlay {
+    pub(crate) model: Option<String>,
+    pub(crate) base_url: Option<String>,
+    pub(crate) max_context_tokens: Option<u64>,
+    pub(crate) preserve_recent: Option<usize>,
+    pub(crate) allowed_directory: Option<String>,
+    pub(crate) protected_patterns: Option<Vec<String>>,
+    pub(crate) blocked_commands: Option<Vec<String>>,
+    pub(crate) mcp_servers: Option<Vec<McpServerConfig>>,
+    pub(crate) hooks: Option<HooksConfig>,
+    pub(crate) instructions: Option<String>,
+}
+
 /// Loads and merges configuration from multiple sources.
 pub struct ConfigLoader;
 
@@ -106,15 +126,15 @@ impl ConfigLoader {
         let mut config = Config::default();
 
         // Layer 1: Project config
-        if let Some(project_config) = Self::load_file(".mini-claw/config.toml") {
-            Self::merge(&mut config, project_config);
+        if let Some(project_overlay) = Self::load_file(".mini-claw/config.toml") {
+            Self::merge(&mut config, project_overlay);
         }
 
         // Layer 2: User config
         if let Some(user_dir) = dirs::config_dir() {
             let user_path = user_dir.join("mini-claw/config.toml");
-            if let Some(user_config) = Self::load_path(&user_path) {
-                Self::merge(&mut config, user_config);
+            if let Some(user_overlay) = Self::load_overlay(&user_path) {
+                Self::merge(&mut config, user_overlay);
             }
         }
 
@@ -134,49 +154,57 @@ impl ConfigLoader {
         config
     }
 
-    /// Load config from a specific path.
+    /// Load a full `Config` from a specific path (used when a caller
+    /// wants a standalone, pre-merged config rather than an overlay).
     pub fn load_path(path: &Path) -> Option<Config> {
         let content = std::fs::read_to_string(path).ok()?;
         toml::from_str(&content).ok()
     }
 
-    /// Load config from a path relative to the current directory.
-    fn load_file(relative_path: &str) -> Option<Config> {
-        let path = PathBuf::from(relative_path);
-        Self::load_path(&path)
+    /// Load a partial `ConfigOverlay` from a path. This is what the
+    /// layered loader uses so it can tell "unset" apart from "set to
+    /// the default value".
+    pub fn load_overlay(path: &Path) -> Option<ConfigOverlay> {
+        let content = std::fs::read_to_string(path).ok()?;
+        toml::from_str(&content).ok()
     }
 
-    /// Merge a partial config into the base. Non-default values override.
-    fn merge(base: &mut Config, overlay: Config) {
-        let defaults = Config::default();
+    /// Load an overlay from a path relative to the current directory.
+    fn load_file(relative_path: &str) -> Option<ConfigOverlay> {
+        let path = PathBuf::from(relative_path);
+        Self::load_overlay(&path)
+    }
 
-        if overlay.model != defaults.model {
-            base.model = overlay.model;
+    /// Apply an overlay onto `base`. Every `Some(_)` field replaces
+    /// the corresponding field in the base; `None` fields leave it
+    /// untouched. Collections set to `Some(vec![])` clear the base.
+    fn merge(base: &mut Config, overlay: ConfigOverlay) {
+        if let Some(model) = overlay.model {
+            base.model = model;
         }
-        if overlay.base_url != defaults.base_url {
-            base.base_url = overlay.base_url;
+        if let Some(base_url) = overlay.base_url {
+            base.base_url = base_url;
         }
-        if overlay.max_context_tokens != defaults.max_context_tokens {
-            base.max_context_tokens = overlay.max_context_tokens;
+        if let Some(tokens) = overlay.max_context_tokens {
+            base.max_context_tokens = tokens;
         }
-        if overlay.preserve_recent != defaults.preserve_recent {
-            base.preserve_recent = overlay.preserve_recent;
+        if let Some(preserve_recent) = overlay.preserve_recent {
+            base.preserve_recent = preserve_recent;
         }
         if overlay.allowed_directory.is_some() {
             base.allowed_directory = overlay.allowed_directory;
         }
-        if !overlay.protected_patterns.is_empty()
-            && overlay.protected_patterns != defaults.protected_patterns
-        {
-            base.protected_patterns = overlay.protected_patterns;
+        if let Some(patterns) = overlay.protected_patterns {
+            base.protected_patterns = patterns;
         }
-        if !overlay.blocked_commands.is_empty()
-            && overlay.blocked_commands != defaults.blocked_commands
-        {
-            base.blocked_commands = overlay.blocked_commands;
+        if let Some(commands) = overlay.blocked_commands {
+            base.blocked_commands = commands;
         }
-        if !overlay.mcp_servers.is_empty() {
-            base.mcp_servers = overlay.mcp_servers;
+        if let Some(servers) = overlay.mcp_servers {
+            base.mcp_servers = servers;
+        }
+        if let Some(hooks) = overlay.hooks {
+            base.hooks = hooks;
         }
         if overlay.instructions.is_some() {
             base.instructions = overlay.instructions;

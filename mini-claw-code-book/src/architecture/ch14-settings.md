@@ -17,7 +17,8 @@ cargo test -p mini-claw-code-starter test_ch14  # CostTracker
 ## Goal
 
 - Define a `Config` struct with serde defaults so that partial TOML files deserialize into complete configurations.
-- Implement the `merge()` function with three strategies: compare-against-default for scalars, `Option::or()` for optionals, and replace for collections.
+- Define a `ConfigOverlay` struct whose fields are `Option<T>`, so the loader can tell "field not set in the TOML" apart from "field explicitly set to the default value."
+- Implement the `merge()` function with a single rule: every `Some(_)` in the overlay replaces the base.
 - Build `ConfigLoader` to assemble four layers (defaults, project config, user config, environment variables) in priority order.
 - Implement `CostTracker` to accumulate token counts and compute running cost estimates from per-million pricing.
 
@@ -172,96 +173,82 @@ Having both the `Default` impl and the serde defaults is intentional. `Config::d
 
 ---
 
-## The merge logic
+## The overlay: telling "unset" from "set to default"
 
-The heart of layered configuration is the merge function. Given a base config and an overlay, produce a result where non-default overlay values replace the base.
+Before we can write the merge function, we need a way to answer a question that `Config` itself cannot answer: **was this field actually set in the TOML file?**
+
+A natural first attempt is "compare the overlay value against `Config::default()` -- if it differs, it was set." That heuristic is wrong. It cannot distinguish two different situations:
+
+1. The user did not set the field in their TOML.
+2. The user *did* set the field, and the value they set happens to equal the default.
+
+Case 2 is not hypothetical. If the default `model` is `"anthropic/claude-sonnet-4-20250514"` and the user explicitly writes `model = "anthropic/claude-sonnet-4-20250514"` in their user config to assert it regardless of project overrides, the comparison-to-default heuristic silently treats it as "not set" and keeps whatever the previous layer had. Last-write-wins is violated.
+
+The fix is to encode "set" vs "not set" in the type system. We introduce a second struct -- `ConfigOverlay` -- whose fields are `Option<T>`. Serde deserializes a missing TOML key as `None` and a present one as `Some(value)`. No value comparison needed.
 
 ```rust
-pub fn merge(base: Config, overlay: Config) -> Config {
-    let defaults = Config::default();
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct ConfigOverlay {
+    pub model: Option<String>,
+    pub base_url: Option<String>,
+    pub max_context_tokens: Option<u64>,
+    pub preserve_recent: Option<usize>,
+    pub allowed_directory: Option<String>,
+    pub protected_patterns: Option<Vec<String>>,
+    pub blocked_commands: Option<Vec<String>>,
+    pub instructions: Option<String>,
+}
+```
 
+The struct-level `#[serde(default)]` tells serde to fall back to `Default::default()` for any field missing from the TOML input — and `Default::default()` for `Option<T>` is `None`. That is exactly the "key absent → `None`" mapping we want, and we get it without annotating every field individually.
+
+The two structs play complementary roles. `Config` is the fully-resolved output: every field has a value, everyone downstream can read it without caring how it got there. `ConfigOverlay` is the transport format: a partial, optional view of the same shape, used only while merging layers.
+
+Even `Vec<T>` fields become `Option<Vec<T>>`. This matters -- an overlay that sets `protected_patterns = []` in TOML means "clear the list," which is different from "did not mention the list at all." An `Option<Vec<T>>` represents both cases cleanly; a bare `Vec<T>` cannot.
+
+## The merge logic
+
+With the overlay in hand, merge becomes uniform: every `Some(_)` in the overlay replaces the corresponding field in the base, and every `None` leaves the base untouched.
+
+```rust
+pub fn merge(base: Config, overlay: ConfigOverlay) -> Config {
     Config {
-        model: if overlay.model != defaults.model {
-            overlay.model
-        } else {
-            base.model
-        },
-        base_url: if overlay.base_url != defaults.base_url {
-            overlay.base_url
-        } else {
-            base.base_url
-        },
-        max_context_tokens: if overlay.max_context_tokens != defaults.max_context_tokens {
-            overlay.max_context_tokens
-        } else {
-            base.max_context_tokens
-        },
-        preserve_recent: if overlay.preserve_recent != defaults.preserve_recent {
-            overlay.preserve_recent
-        } else {
-            base.preserve_recent
-        },
+        model: overlay.model.unwrap_or(base.model),
+        base_url: overlay.base_url.unwrap_or(base.base_url),
+        max_context_tokens: overlay.max_context_tokens.unwrap_or(base.max_context_tokens),
+        preserve_recent: overlay.preserve_recent.unwrap_or(base.preserve_recent),
         allowed_directory: overlay.allowed_directory.or(base.allowed_directory),
-        protected_patterns: if !overlay.protected_patterns.is_empty() {
-            overlay.protected_patterns
-        } else {
-            base.protected_patterns
-        },
-        blocked_commands: if !overlay.blocked_commands.is_empty() {
-            overlay.blocked_commands
-        } else {
-            base.blocked_commands
-        },
+        protected_patterns: overlay.protected_patterns.unwrap_or(base.protected_patterns),
+        blocked_commands: overlay.blocked_commands.unwrap_or(base.blocked_commands),
         instructions: overlay.instructions.or(base.instructions),
     }
 }
 ```
 
-Three distinct strategies handle three kinds of fields.
+Two patterns cover every field:
 
-### Scalar fields: compare against defaults
+- `unwrap_or(base.x)` for fields where `Config` holds a concrete value (e.g. `String`, `u64`, `Vec<String>`). If the overlay has `Some(v)`, the result is `v`; otherwise the base value is kept.
+- `.or(base.x)` for fields that are already `Option<T>` on `Config` (`allowed_directory`, `instructions`). `Option::or` returns the first `Some(_)` it finds.
 
-For `model`, `base_url`, `max_context_tokens`, and `preserve_recent`, the merge logic compares the overlay value against the default. If the overlay has a non-default value, it wins. If the overlay has the default value, the base value is preserved.
+That is the entire merge. No value comparisons. No special cases per field. A later layer always wins when it sets a field, regardless of whether the value it sets matches the default, matches the previous layer, or is empty.
 
-This heuristic is simple and works well in practice. A TOML file that does not mention `model` will deserialize with the default model string. The merge logic sees the default and keeps whatever the base had. A TOML file that explicitly sets `model = "custom/model"` will deserialize with that value. The merge logic sees it differs from the default and uses it.
+### Collections: replace, not append
 
-The tradeoff: you cannot explicitly set a field back to its default value in a higher-priority layer. If the user config sets `model = "custom/model"` and the project config wants to revert to the default, it cannot -- omitting the field preserves the user's choice, and setting it to the default string looks like "not set." In practice this is rarely a problem. The escape hatch is environment variables, which always win.
+When an overlay does set `protected_patterns` or `blocked_commands`, its value fully replaces the base. Appending would mean every config layer adds to the list with no way to remove entries from a lower layer. Replacing gives each layer that mentions the field full control over its contents.
 
-### Optional fields: use `or()`
-
-For `allowed_directory` and `instructions`, the merge uses `Option::or()`. If the overlay has `Some(value)`, it wins. If the overlay is `None`, the base value is preserved.
-
-```rust
-allowed_directory: overlay.allowed_directory.or(base.allowed_directory),
-```
-
-This is cleaner than the scalar comparison because `Option` already encodes "set" vs "not set." A TOML file that omits `allowed_directory` deserializes to `None` -- an explicit "I did not set this." A TOML file that sets `allowed_directory = "/workspace"` deserializes to `Some("/workspace")`.
-
-### Collection fields: replace, not append
-
-For `protected_patterns` and `blocked_commands`, a non-empty overlay replaces the base entirely:
-
-```rust
-protected_patterns: if !overlay.protected_patterns.is_empty() {
-    overlay.protected_patterns
-} else {
-    base.protected_patterns
-},
-```
-
-This is a deliberate choice. Appending would mean every config layer adds to the list, and there is no way to remove an entry from a lower layer. Replacing means each layer that mentions the field gets full control over its contents.
-
-Consider a project that protects `.env` and `.secret` at the project level. If the user config also sets `protected_patterns = [".credentials"]`, the replace strategy means only `.credentials` is protected -- the project patterns are gone. Is that right? It depends on the layer order. Since project config is loaded first (lowest priority among files) and user config is loaded second (higher priority), the user config's patterns replace the project's. For most settings this makes sense -- the user knows their environment better than the project author.
+Consider a project that protects `.env` and `.secret` at the project level. If the user config also sets `protected_patterns = [".credentials"]`, the replace strategy means only `.credentials` is protected -- the project patterns are gone. Since project config is loaded first (lowest priority among files) and user config is loaded second (higher priority), the user config's patterns replace the project's. For most settings this makes sense -- the user knows their environment better than the project author.
 
 If you wanted append semantics, you would extend the collections instead:
 
 ```rust
 // Append (not what we do):
-let mut patterns = base.protected_patterns;
-patterns.extend(overlay.protected_patterns);
+if let Some(extra) = overlay.protected_patterns {
+    base.protected_patterns.extend(extra);
+}
 ```
 
-Claude Code supports both strategies depending on the field. Our implementation keeps it simple with replace-only.
+Claude Code supports both strategies depending on the field. Our implementation keeps it simple with replace-only, and the overlay's `Option<Vec<T>>` type is what lets "layer did not mention this field" stay distinct from "layer explicitly set it to an empty list."
 
 ---
 
@@ -329,7 +316,7 @@ The `dirs::config_dir()` call uses the `dirs` crate to find the platform-appropr
 ### Loading a single file
 
 ```rust
-pub fn load_file(path: &Path) -> Option<Config> {
+pub fn load_file(path: &Path) -> Option<ConfigOverlay> {
     let content = std::fs::read_to_string(path).ok()?;
     toml::from_str(&content).ok()
 }
@@ -340,16 +327,18 @@ Two lines, two possible failure points, both handled with `.ok()?`:
 1. The file might not exist -- `read_to_string` returns `Err`, `.ok()` converts to `None`, `?` returns `None`.
 2. The file might contain invalid TOML -- `toml::from_str` returns `Err`, same chain.
 
-Returning `Option<Config>` instead of `Result<Config, Error>` is a deliberate choice. Missing config files are not errors -- they are the normal case. Most users will not have a user config file. Most projects will not have a `.claw/config.toml`. The loader should silently skip missing files and apply defaults. Invalid TOML is arguably an error worth reporting, but for simplicity we treat it the same way. A production implementation would log a warning for parse failures while still falling back to defaults.
+Notice the return type is `Option<ConfigOverlay>`, not `Option<Config>`. The loader deliberately parses into the partial type -- that is how `merge` later knows which fields the file actually mentioned.
 
-The `toml` crate handles deserialization. Because every field on `Config` has a `#[serde(default)]` or `#[serde(default = "...")]` attribute, a TOML file that only sets one field still produces a complete `Config`. The missing fields get their defaults:
+Returning `Option<_>` instead of `Result<_, Error>` is a deliberate choice. Missing config files are not errors -- they are the normal case. Most users will not have a user config file. Most projects will not have a `.claw/config.toml`. The loader should silently skip missing files and apply defaults. Invalid TOML is arguably an error worth reporting, but for simplicity we treat it the same way. A production implementation would log a warning for parse failures while still falling back to defaults.
+
+The `toml` crate handles deserialization. Because every field on `ConfigOverlay` is `Option<T>` with `#[serde(default)]`, a TOML file that only sets one field still parses cleanly -- every other field becomes `None`:
 
 ```toml
-# This is a valid, complete config file:
+# This is a valid config file:
 model = "anthropic/claude-haiku-3-20250414"
 ```
 
-This deserializes into a `Config` with the custom model and defaults for everything else.
+This deserializes into a `ConfigOverlay` with `model: Some(...)` and every other field `None`. When `merge` applies it, only `model` is touched on the base.
 
 ### Environment variable overrides
 
@@ -515,11 +504,11 @@ base_url = "https://my-proxy.example.com/v1"
 When both exist, the loader merges them:
 
 1. **Defaults** -- all fields get their default values.
-2. **Project config** -- `model` overrides (but happens to match default), `max_context_tokens` becomes 100000, `protected_patterns` and `blocked_commands` are set, `instructions` is set.
-3. **User config** -- `model` still matches default so the project value (also default) is kept. `base_url` overrides to the proxy URL.
+2. **Project config** parses into a `ConfigOverlay` with `Some(_)` for exactly the keys the file mentions: `model`, `max_context_tokens`, `protected_patterns`, `blocked_commands`, `instructions`. `merge` applies each one to the base.
+3. **User config** parses into an overlay with `Some(_)` for `model` and `base_url`. Even though its `model` value happens to equal the default, that no longer matters -- the overlay says the field was set, so it replaces the project's value. `base_url` likewise replaces the default.
 4. **Environment** -- if `MINI_CLAW_MODEL` is set, it overrides everything.
 
-The final config has the project's safety rules, the user's proxy URL, and defaults for everything else. Each layer contributes what it knows without needing to repeat what it does not care about.
+The final config has the project's safety rules, the user's model and proxy URL, and defaults for everything else. Each layer contributes what it knows without needing to repeat what it does not care about, and a layer is never silently ignored just because the value it set coincides with the default.
 
 ---
 
@@ -529,7 +518,7 @@ Claude Code has a similar 4-level hierarchy: project settings, user settings, en
 
 **Format.** Claude Code uses JSON (`settings.json`, `settings.local.json`) rather than TOML. JSON is more familiar to web developers (Claude Code's primary audience) and integrates naturally with TypeScript. We use TOML because it is the Rust ecosystem standard -- every Rust developer already reads `Cargo.toml` daily.
 
-**Merge sophistication.** Claude Code supports per-key override strategies. Some fields append (permission rules accumulate across layers), some replace (model name), and some use first-wins semantics (project instructions take precedence over user instructions for the same key). Our merge logic uses a single strategy per field type: compare-against-default for scalars, `or()` for optionals, replace for collections. Simpler, but it covers the common cases.
+**Merge sophistication.** Claude Code supports per-key override strategies. Some fields append (permission rules accumulate across layers), some replace (model name), and some use first-wins semantics (project instructions take precedence over user instructions for the same key). Our merge logic uses a single strategy: every field the overlay set replaces the base, collections included. Simpler, but it covers the common cases.
 
 **Cost tracking.** Claude Code tracks costs per model with cache-aware pricing. When the API reports `cache_read_tokens`, those tokens are billed at a reduced rate (typically 90% cheaper than regular input tokens). Our `CostTracker` ignores caching -- it treats all input tokens the same. Adding cache-aware pricing would mean extending `record()` to accept `cache_read_tokens` and applying a separate rate, but the architecture does not change.
 
@@ -577,7 +566,7 @@ Key cost tracker tests (`test_ch14`):
 
 ## Key takeaway
 
-Layered configuration lets each level (defaults, project, user, environment) contribute only what it knows. The merge function's three strategies -- compare-against-default for scalars, `or()` for optionals, and replace for collections -- handle the vast majority of real-world cases without complexity.
+Layered configuration lets each level (defaults, project, user, environment) contribute only what it knows. Splitting the shape into a fully-resolved `Config` and a partial `ConfigOverlay` (fields are `Option<T>`) puts the "was this field set?" question in the type system: `None` means the file did not mention it, `Some(v)` means it did -- regardless of what `v` is. Merge then has a single rule: every `Some(_)` replaces the base.
 
 ---
 
@@ -587,11 +576,13 @@ This chapter built two subsystems that the rest of the agent depends on.
 
 - **`Config`** holds every configurable parameter in a single struct. Serde's `#[serde(default)]` attributes make partial TOML files work -- you only set what you want to change.
 
-- **`ConfigLoader`** implements the 4-level merge pipeline: defaults, project config, user config, environment variables. Each layer overrides non-default values from the previous one. Scalars use compare-against-default, optionals use `or()`, and collections use full replacement.
+- **`ConfigOverlay`** is the partial counterpart to `Config`: every field is `Option<T>`. `None` means the field was not set in the layer, `Some(v)` means it was -- and stays distinguishable from the default even when `v` happens to equal the default.
+
+- **`ConfigLoader`** implements the 4-level merge pipeline: defaults, project config, user config, environment variables. Each file layer is parsed into a `ConfigOverlay` and applied with a single rule: every `Some(_)` replaces the base.
 
 - **`CostTracker`** accumulates token usage across a session and computes estimated cost from per-million pricing. Its `summary()` method produces the one-line status string the TUI displays.
 
-- **The merge strategy** is the key design decision. Compare-against-default for scalars means you cannot explicitly reset a field to its default in a higher-priority layer, but it keeps the logic simple and covers the vast majority of real-world use cases.
+- **The merge strategy** is the key design decision. Encoding "set vs unset" in the type system (instead of guessing from the value) guarantees last-write-wins and makes explicit resets -- clearing a list, re-asserting a default -- work correctly.
 
 - **Environment variables** are deliberately limited to three fields. Safety-critical settings like `blocked_commands` and `protected_patterns` should come from config files that are checked into source control or managed explicitly -- not from environment variables that might be manipulated.
 

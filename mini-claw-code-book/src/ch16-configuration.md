@@ -85,6 +85,48 @@ The `#[serde(default)]` attribute on the struct is critical. It tells serde:
 returning an error." This means a config file can specify just one field and
 every other field gets a sensible default.
 
+### Config vs ConfigOverlay
+
+`Config` is the fully-resolved shape we hand to the rest of the agent -- every
+field already has a value. When we *load* a layer, though, we need to know
+which fields that layer actually set, because the merge logic has to
+distinguish "the user did not mention this field" from "the user explicitly
+set this field, even if the value happens to equal the default." `Config`
+alone cannot tell those two cases apart.
+
+The answer is a sibling struct, `ConfigOverlay`, whose fields are `Option<T>`.
+Serde deserializes a missing TOML key as `None` and a present one as
+`Some(value)`:
+
+```rust
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct ConfigOverlay {
+    pub model: Option<String>,
+    pub base_url: Option<String>,
+    pub max_context_tokens: Option<u64>,
+    pub preserve_recent: Option<usize>,
+    pub allowed_directory: Option<String>,
+    pub protected_patterns: Option<Vec<String>>,
+    pub blocked_commands: Option<Vec<String>>,
+    pub mcp_servers: Option<Vec<McpServerConfig>>,
+    pub hooks: Option<HooksConfig>,
+    pub instructions: Option<String>,
+}
+```
+
+The struct-level `#[serde(default)]` makes serde fall back to `Default::default()` for any missing TOML key. For `Option<T>`, that is `None` — which is exactly the "field absent → unset" mapping the merge logic needs.
+
+Every field gets `Option<T>`, even the `Vec<T>` ones. That last detail matters:
+an overlay that sets `protected_patterns = []` in TOML means "clear the list,"
+which is genuinely different from "did not mention the list." `Option<Vec<T>>`
+represents both cases cleanly; a bare `Vec<T>` cannot.
+
+`Config` and `ConfigOverlay` have the same shape but play different roles.
+`Config` is the output -- a complete set of values downstream code can read.
+`ConfigOverlay` is the transport format -- a partial, optional view used only
+while merging layers together.
+
 ## Defaults
 
 The `Default` implementation defines the baseline:
@@ -246,15 +288,15 @@ impl ConfigLoader {
         let mut config = Config::default();
 
         // Layer 1: Project config
-        if let Some(project_config) = Self::load_file(".mini-claw/config.toml") {
-            Self::merge(&mut config, project_config);
+        if let Some(project_overlay) = Self::load_file(".mini-claw/config.toml") {
+            Self::merge(&mut config, project_overlay);
         }
 
         // Layer 2: User config
         if let Some(user_dir) = dirs::config_dir() {
             let user_path = user_dir.join("mini-claw/config.toml");
-            if let Some(user_config) = Self::load_path(&user_path) {
-                Self::merge(&mut config, user_config);
+            if let Some(user_overlay) = Self::load_overlay(&user_path) {
+                Self::merge(&mut config, user_overlay);
             }
         }
 
@@ -298,7 +340,7 @@ environment variable exists but is not a valid number, the override is skipped.
 
 ### File loading helpers
 
-Two helper methods handle reading and parsing TOML files:
+Three helpers handle reading and parsing TOML files:
 
 ```rust
 pub fn load_path(path: &Path) -> Option<Config> {
@@ -306,53 +348,60 @@ pub fn load_path(path: &Path) -> Option<Config> {
     toml::from_str(&content).ok()
 }
 
-fn load_file(relative_path: &str) -> Option<Config> {
+pub fn load_overlay(path: &Path) -> Option<ConfigOverlay> {
+    let content = std::fs::read_to_string(path).ok()?;
+    toml::from_str(&content).ok()
+}
+
+fn load_file(relative_path: &str) -> Option<ConfigOverlay> {
     let path = PathBuf::from(relative_path);
-    Self::load_path(&path)
+    Self::load_overlay(&path)
 }
 ```
 
-Both return `Option<Config>`. The `?` operator on `.ok()` converts `Result`
-into `Option`, so any I/O error or parse error produces `None` and the layer
-is skipped.
+The `?` operator on `.ok()` converts `Result` into `Option`, so any I/O or
+parse error produces `None` and the layer is skipped.
 
-`load_path` is public -- callers can use it to load a config from any
-arbitrary path. `load_file` is private and handles the relative path case for
-project config.
+`load_overlay` is what the layered loader actually calls -- it returns the
+partial `ConfigOverlay` so `merge` can see which fields were set.
+`load_path` is kept as a convenience for callers that just want a
+pre-resolved `Config` from a single file without going through the layered
+pipeline.
 
 ### The merge strategy
 
-The `merge()` method is where the layered override logic lives:
+The `merge()` method is where the layered override logic lives. Because the
+overlay is `ConfigOverlay`, each field is already tagged with whether the
+layer set it (`Some(_)`) or not (`None`). Merge becomes a straight walk:
 
 ```rust
-fn merge(base: &mut Config, overlay: Config) {
-    if overlay.model != Config::default().model {
-        base.model = overlay.model;
+fn merge(base: &mut Config, overlay: ConfigOverlay) {
+    if let Some(model) = overlay.model {
+        base.model = model;
     }
-    if overlay.base_url != Config::default().base_url {
-        base.base_url = overlay.base_url;
+    if let Some(base_url) = overlay.base_url {
+        base.base_url = base_url;
     }
-    if overlay.max_context_tokens != Config::default().max_context_tokens {
-        base.max_context_tokens = overlay.max_context_tokens;
+    if let Some(tokens) = overlay.max_context_tokens {
+        base.max_context_tokens = tokens;
     }
-    if overlay.preserve_recent != Config::default().preserve_recent {
-        base.preserve_recent = overlay.preserve_recent;
+    if let Some(preserve_recent) = overlay.preserve_recent {
+        base.preserve_recent = preserve_recent;
     }
     if overlay.allowed_directory.is_some() {
         base.allowed_directory = overlay.allowed_directory;
     }
-    if !overlay.protected_patterns.is_empty()
-        && overlay.protected_patterns != Config::default().protected_patterns
-    {
-        base.protected_patterns = overlay.protected_patterns;
+    if let Some(patterns) = overlay.protected_patterns {
+        base.protected_patterns = patterns;
     }
-    if !overlay.blocked_commands.is_empty()
-        && overlay.blocked_commands != Config::default().blocked_commands
-    {
-        base.blocked_commands = overlay.blocked_commands;
+    if let Some(commands) = overlay.blocked_commands {
+        base.blocked_commands = commands;
     }
-    if !overlay.mcp_servers.is_empty() {
-        base.mcp_servers = overlay.mcp_servers;
+    if let Some(servers) = overlay.mcp_servers {
+        base.mcp_servers = servers;
+    }
+    if let Some(hooks) = overlay.hooks {
+        base.hooks = hooks;
     }
     if overlay.instructions.is_some() {
         base.instructions = overlay.instructions;
@@ -360,21 +409,22 @@ fn merge(base: &mut Config, overlay: Config) {
 }
 ```
 
-The merge logic compares each overlay field against the default. If a field in
-the overlay still has its default value, it was probably not set in the TOML
-file (remember, `#[serde(default)]` fills missing fields with defaults). So
-the base value is kept. Only explicitly-set values override.
+Every field follows the same rule: if the overlay has `Some(_)`, the base is
+replaced; otherwise the base is left alone. No value comparisons, no special
+cases.
 
-This is a pragmatic compromise. A more sophisticated approach would track which
-fields were explicitly set (using something like `Option<T>` for every field,
-or a separate "was this set?" bitfield). But comparing against defaults works
-well in practice and keeps the code simple.
+An earlier version of this code tried to detect "was this field set?" by
+comparing the overlay value against `Config::default()`. That heuristic silently
+conflates "not set" with "set to a value that happens to equal the default," so
+a higher-priority layer explicitly setting a field to the default value was
+dropped and the previous layer's value leaked through -- a last-write-wins bug
+(see issue #10). Moving the "set vs unset" distinction into the type system via
+`Option<T>` on the overlay makes the merge correct and the intent obvious.
 
-One subtlety: `Vec` fields like `protected_patterns` and `blocked_commands`
-check *both* that the overlay is non-empty *and* that it differs from the
-default. This prevents an edge case where deserializing a TOML file that does
-not mention `protected_patterns` would produce the default value (via
-`#[serde(default)]`) and then "override" the base with the same defaults.
+One subtlety worth noting: `Vec` fields on the overlay are `Option<Vec<T>>`,
+not plain `Vec<T>`. That lets a layer explicitly set `protected_patterns = []`
+in TOML to *clear* the list, which is different from omitting the field
+entirely. `Option<Vec<T>>` encodes both cases; a bare `Vec<T>` cannot.
 
 ## Environment variable overrides
 
@@ -443,15 +493,20 @@ The tests cover each layer and their interactions:
   below.
 - The `Config` struct uses `#[serde(default)]` so that TOML files only need to
   specify the fields they want to change.
+- A sibling `ConfigOverlay` struct with `Option<T>` fields is what makes merge
+  correct. `None` means the layer did not mention the field; `Some(v)` means it
+  did, regardless of what `v` is.
 - Nested types (`McpServerConfig`, `HooksConfig`, `ShellHookConfig`) model
   structured configuration with their own serde attributes and defaults.
-- `ConfigLoader::load()` applies all four layers in order, using a `merge()`
-  function that only overrides fields that differ from the default.
+- `ConfigLoader::load()` applies all four layers in order. Each file layer is
+  parsed into a `ConfigOverlay` and merged with a single rule: every `Some(_)`
+  replaces the base.
 - Environment variables provide the highest-priority override for the most
   commonly changed fields.
 - File loading is resilient: missing or unparseable files are silently skipped.
 
 This pattern is reusable well beyond coding agents. Any CLI tool that needs
-per-project and per-user settings can use the same approach: define a config
-struct with serde defaults, load files from known paths, merge non-default
-values, and apply environment variable overrides last.
+per-project and per-user settings can use the same approach: define a resolved
+`Config` struct plus a partial `ConfigOverlay` with `Option<T>` fields, load
+files from known paths into the overlay, merge `Some(_)` fields onto the base,
+and apply environment variable overrides last.

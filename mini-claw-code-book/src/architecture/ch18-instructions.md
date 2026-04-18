@@ -1,9 +1,10 @@
-# Chapter 15: Project Instructions
+# Chapter 18: Project Instructions
 
 > **File(s) to edit:** `src/instructions.rs`, `src/context.rs`
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_ch17` (InstructionLoader), `cargo test -p mini-claw-code-starter test_ch15` (context integration)
+> **Estimated time:** 40 min
 
-In Chapter 5 you built the `InstructionLoader`, which discovers CLAUDE.md files
+In Chapter 8 you built the `InstructionLoader`, which discovers CLAUDE.md files
 by walking up the filesystem. This chapter discusses how a production agent
 would connect that loader to a prompt assembly pipeline using types like
 `SystemPromptBuilder` and `PromptSection`. These types are conceptual -- the
@@ -11,7 +12,7 @@ starter does not include them. The starter's `InstructionLoader` (in
 `src/instructions.rs`) is the concrete piece you built; the builder and section
 types shown here illustrate the architecture of the reference implementation.
 
-In Chapter 14 you added `Config`, a layered settings hierarchy. One of its
+In Chapter 17 you added `Config`, a layered settings hierarchy. One of its
 fields is `instructions: Option<String>` -- custom text that the user can put
 in a TOML config file and have injected into the system prompt.
 
@@ -27,7 +28,7 @@ cargo test -p mini-claw-code-starter test_ch15  # SystemPromptBuilder, context
 
 ## Goal
 
-- Connect the `InstructionLoader` (from Chapter 5) to `SystemPromptBuilder` so discovered CLAUDE.md files become dynamic prompt sections.
+- Connect the `InstructionLoader` (from Chapter 8) to `SystemPromptBuilder` so discovered CLAUDE.md files become dynamic prompt sections.
 - Wire `Config.instructions` as a second dynamic section that gets the final word in the prompt.
 - Verify that the instruction pipeline is directory-aware -- launching from different directories produces different system prompts.
 - Ensure instructions stay below the cache boundary so the agent always uses fresh instructions while caching the stable prompt prefix.
@@ -87,7 +88,7 @@ belong.
 
 ## Revisiting InstructionLoader
 
-You built this in Chapter 5. Let's revisit the code now that we are using it
+You built this in Chapter 8. Let's revisit the code now that we are using it
 in a real pipeline, because the design decisions matter more in context.
 
 ### The struct
@@ -395,13 +396,14 @@ naturally: if the upward walk reaches the home directory and finds a CLAUDE.md,
 it gets included. No special case needed.
 
 **Settings-based tool rules.** Claude Code's `.claude/settings.json` specifies
-per-tool permission rules. These configure the permission engine (Chapter 10),
+per-tool permission rules. These configure the permission engine (Chapter 13),
 not the prompt. Our `Config` keeps it simpler with `allowed_directory`,
 `protected_patterns`, and `blocked_commands`.
 
 **Memory files.** Claude Code supports persistent memory that accumulates facts
 across sessions. Memory is loaded alongside instructions but managed separately.
-We will build a simpler version in Chapter 16.
+Our book stops before memory, but the instruction loader is the natural hook
+point for extending into it.
 
 **Instruction validation.** Claude Code warns when instructions at different
 levels contradict each other. Our implementation trusts the LLM to resolve
@@ -483,9 +485,29 @@ tool schemas) stay cached.
 
 ---
 
-## What's next
+## Where to go from here
 
-In [Chapter 16: Memory](./ch16-memory.md) you will add persistent memory --
-facts that the agent learns during one session and remembers in the next.
-Memory files are loaded alongside instructions, but they are managed differently:
-instructions are authored by humans, memory is authored by the agent itself.
+This is the last chapter in the current series. The foundations are now in
+place: messages, provider, tools, agent loop, prompt, permissions, safety,
+hooks, plan mode, settings, and instructions.
+
+Natural extensions to explore on your own:
+
+- **Persistent memory** -- facts the agent learns in one session and recalls in
+  the next. Memory files load alongside instructions, but they are managed
+  differently: instructions are authored by humans, memory is authored by the
+  agent itself.
+- **Token and cost tracking** -- instrumenting the provider to aggregate
+  per-session token usage and surface it in the TUI.
+- **Context compaction** -- summarizing old messages when the conversation
+  approaches the model's context limit.
+- **Sessions and resume** -- serializing the message history to disk so a
+  conversation can be paused and resumed.
+- **MCP (Model Context Protocol)** -- loading tools from external MCP servers
+  at runtime instead of hardcoding them at startup.
+- **Subagents** -- spawning child agents with a filtered tool set for scoped
+  subtasks.
+
+---
+
+[← Chapter 17: Settings Hierarchy](./ch17-settings.md) · [Contents](./ch00-overview.md)

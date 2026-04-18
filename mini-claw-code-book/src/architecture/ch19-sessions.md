@@ -1,3 +1,0 @@
-# Chapter: sessions
-
-> Coming soon.

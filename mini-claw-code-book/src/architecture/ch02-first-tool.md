@@ -1,7 +1,8 @@
 # Chapter 2: Your First Tool Call
 
-> **File to edit:** `src/tools/read.rs`
+> **File(s) to edit:** `src/tools/read.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch2_`
+> **Estimated time:** 15 min
 
 An LLM can't read files, run commands, or browse the web. It can only generate text. But it can *ask your code* to do those things. That's what tools are.
 
@@ -51,9 +52,9 @@ Two methods:
 
 ### Why `#[async_trait]` instead of plain `async fn`?
 
-Later, tools are stored in a `ToolSet` — a `HashMap<String, Box<dyn Tool>>`. This requires dynamic dispatch, which needs a known return size. `async fn` in traits generates uniquely-sized `Future` types per implementation, breaking dynamic dispatch. `#[async_trait]` rewrites them into `Pin<Box<dyn Future>>` which has a fixed size. You write normal `async fn` code; the macro handles the boxing.
+The short version: tools are stored heterogeneously as `Box<dyn Tool>`, which requires object safety. `async fn` in traits breaks object safety; `#[async_trait]` boxes the returned future so dynamic dispatch works. The `Provider` trait uses a different style (RPITIT) because it is always used as a generic parameter, never as `dyn Provider`.
 
-The `Provider` trait avoids this with RPITIT (`-> impl Future`) because providers are used as generic parameters (`P: Provider`), never as `dyn Provider`.
+The full trade-off -- object safety vs zero-cost, boxing vs inference -- is explained once in [Why two async trait styles?](./ch06-tool-interface.md#async-styles). Every async trait in this book picks one side or the other.
 
 ## The implementation
 
@@ -132,4 +133,4 @@ A tool is the bridge between "the LLM wants to read a file" and "the file is act
 
 ---
 
-**Next:** [Chapter 3: The Agentic Loop →](./intro03-agentic-loop.md)
+[← Chapter 1: Your First LLM Call](./ch01-first-llm-call.md) · [Contents](./ch00-overview.md) · [Chapter 3: The Agentic Loop →](./ch03-agentic-loop.md)

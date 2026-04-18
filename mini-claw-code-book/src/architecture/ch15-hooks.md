@@ -1,9 +1,10 @@
-# Chapter 12: Hooks
+# Chapter 15: Hooks
 
 > **File(s) to edit:** `src/hooks.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch20`
+> **Estimated time:** 40 min
 
-The permission engine from Chapter 10 decides whether a tool call runs. The safety checks from Chapter 11 catch dangerous patterns before the user even sees a prompt. But both systems are baked into the agent -- they enforce rules that you, the developer, chose at compile time. What about the user?
+The permission engine from Chapter 13 decides whether a tool call runs. The safety checks from Chapter 14 catch dangerous patterns before the user even sees a prompt. But both systems are baked into the agent -- they enforce rules that you, the developer, chose at compile time. What about the user?
 
 Users have policies that the agent author cannot anticipate. A team might require that every bash command is logged to an audit file. A project might enforce that file writes only touch a specific directory. A CI pipeline might need to run a linter after every edit. These are not safety checks in the "prevent `rm -rf /`" sense -- they are workflow hooks that extend the agent's behavior at runtime.
 
@@ -24,7 +25,7 @@ cargo test -p mini-claw-code-starter test_ch20
 
 ## The event model
 
-Before writing any code, let's define when hooks fire. The agent loop from Chapter 4 has a clear lifecycle:
+Before writing any code, let's define when hooks fire. The agent loop from Chapter 7 has a clear lifecycle:
 
 ```
 User prompt arrives
@@ -133,7 +134,7 @@ pub trait Hook: Send + Sync {
 
 One method. It receives an event reference and returns an action. The trait requires `Send + Sync` because hooks live inside the `HookRunner` and the runner may be shared across async tasks. The `async_trait` attribute handles the usual ceremony of boxing the returned future.
 
-This is the same pattern as the `Tool` trait from Chapter 3 -- a single async method that takes structured input and returns structured output. The difference is scope: tools interact with the outside world (filesystem, shell), while hooks interact with the agent's own execution.
+This is the same pattern as the `Tool` trait from Chapter 6 -- a single async method that takes structured input and returns structured output. The difference is scope: tools interact with the outside world (filesystem, shell), while hooks interact with the agent's own execution.
 
 ---
 
@@ -166,7 +167,7 @@ impl HookRegistry {
 }
 ```
 
-The builder API should look familiar -- it mirrors `ToolSet` from Chapter 1. The `with()` method takes ownership and returns `self` for chaining. The `register()` method takes `&mut self` for imperative code. Both accept `impl Hook + 'static`, boxing the concrete type into a trait object.
+The builder API should look familiar -- it mirrors `ToolSet` from Chapter 4. The `with()` method takes ownership and returns `self` for chaining. The `register()` method takes `&mut self` for imperative code. Both accept `impl Hook + 'static`, boxing the concrete type into a trait object.
 
 ### The dispatch method
 
@@ -432,10 +433,14 @@ This chapter added an event-driven hook system that lets external code observe, 
 
 - **`ShellHook`** delegates to an external shell command via `tokio::process::Command`. Non-zero exits block the call. The `for_tool()` method restricts which tools trigger the command using `glob::Pattern`.
 
-The hook system completes the safety and control layer. The permission engine (Chapter 10) enforces mode-based access rules. Safety checks (Chapter 11) catch dangerous patterns statically. Hooks (this chapter) provide the escape hatch for policies that are too specific or too dynamic to hardcode.
+The hook system completes the safety and control layer. The permission engine (Chapter 13) enforces mode-based access rules. Safety checks (Chapter 14) catch dangerous patterns statically. Hooks (this chapter) provide the escape hatch for policies that are too specific or too dynamic to hardcode.
 
 ---
 
 ## What's next
 
-Chapter 13 -- Plan Mode -- ties together everything from Part III. Plan mode is a restricted execution mode where only read-only tools run. The agent can read files, search code, and reason about a task, but it cannot write, edit, or execute commands. The permission engine checks tool categories. Safety checks validate arguments. Hooks fire for observation. But nothing destructive happens. It is the ultimate guardrail: the agent plans, the user reviews, and only then does execution begin.
+Chapter 16 -- Plan Mode -- ties together everything from Part III. Plan mode is a restricted execution mode where only read-only tools run. The agent can read files, search code, and reason about a task, but it cannot write, edit, or execute commands. The permission engine checks tool categories. Safety checks validate arguments. Hooks fire for observation. But nothing destructive happens. It is the ultimate guardrail: the agent plans, the user reviews, and only then does execution begin.
+
+---
+
+[← Chapter 14: Safety Checks](./ch14-safety.md) · [Contents](./ch00-overview.md) · [Chapter 16: Plan Mode →](./ch16-plan-mode.md)

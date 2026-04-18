@@ -1,3 +1,0 @@
-# Chapter: compaction
-
-> Coming soon.

@@ -1,7 +1,8 @@
 # Chapter 3: The Agentic Loop
 
-> **File to edit:** `src/agent.rs`
+> **File(s) to edit:** `src/agent.rs`
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_ch3_` (single_turn), `cargo test -p mini-claw-code-starter test_ch5_` (SimpleAgent)
+> **Estimated time:** 20 min
 
 You have a provider (talks to the LLM) and a tool (reads files). Now you connect them. This is where the agent comes alive.
 
@@ -236,4 +237,4 @@ That is the architecture. Everything else — streaming, permissions, plan mode,
 
 ---
 
-**Next:** Dive into the full architecture with [Chapter 4: Messages & Types →](./ch01-messages-types.md)
+[← Chapter 2: Your First Tool Call](./ch02-first-tool.md) · [Contents](./ch00-overview.md) · [Chapter 4: Messages & Types →](./ch04-messages-types.md)

@@ -3,7 +3,7 @@ use crate::types::{Message, Provider, TokenUsage};
 /// Manages conversation context by compacting old messages when the token
 /// budget is exceeded.
 ///
-/// # Chapter 15: Context Management
+/// # Chapter 18: Project Instructions
 pub struct ContextManager {
     max_tokens: u64,
     preserve_recent: usize,
@@ -21,7 +21,7 @@ impl ContextManager {
 
     /// Add the tokens from a single turn to the running total.
     pub fn record(&mut self, _usage: &TokenUsage) {
-        unimplemented!("TODO ch15: increment tokens_used by input_tokens + output_tokens")
+        unimplemented!("TODO ch18: increment tokens_used by input_tokens + output_tokens")
     }
 
     pub fn tokens_used(&self) -> u64 {
@@ -47,7 +47,7 @@ impl ContextManager {
         _messages: &mut Vec<Message>,
     ) -> anyhow::Result<()> {
         unimplemented!(
-            "TODO ch15: summarize the middle of the history into a single System message"
+            "TODO ch18: summarize the middle of the history into a single System message"
         )
     }
 

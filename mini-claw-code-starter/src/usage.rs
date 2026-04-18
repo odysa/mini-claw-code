@@ -4,7 +4,7 @@ use crate::types::TokenUsage;
 
 /// Tracks cumulative token usage and estimated cost across multiple turns.
 ///
-/// # Chapter 14: Token & Cost Tracking
+/// # Chapter 17: Settings Hierarchy — Token & Cost Tracking
 pub struct CostTracker {
     inner: Mutex<CostTrackerInner>,
     input_price: f64,
@@ -33,7 +33,7 @@ impl CostTracker {
 
     /// Add a single turn's `TokenUsage` to the running totals and bump turn_count.
     pub fn record(&self, _usage: &TokenUsage) {
-        unimplemented!("TODO ch14: lock the mutex, add input/output tokens, increment turn_count")
+        unimplemented!("TODO ch17: lock the mutex, add input/output tokens, increment turn_count")
     }
 
     pub fn total_input_tokens(&self) -> u64 {
@@ -52,17 +52,17 @@ impl CostTracker {
     ///
     /// Hint: `(total_input * input_price + total_output * output_price) / 1_000_000.0`.
     pub fn total_cost(&self) -> f64 {
-        unimplemented!("TODO ch14: compute cost from tokens and per-million pricing")
+        unimplemented!("TODO ch17: compute cost from tokens and per-million pricing")
     }
 
     /// Render a one-line human-readable summary like
     /// `"tokens: 123 in + 45 out | cost: $0.0012"`.
     pub fn summary(&self) -> String {
-        unimplemented!("TODO ch14: format 'tokens: N in + M out | cost: $X.XXXX'")
+        unimplemented!("TODO ch17: format 'tokens: N in + M out | cost: $X.XXXX'")
     }
 
     /// Reset all counters to zero.
     pub fn reset(&self) {
-        unimplemented!("TODO ch14: zero out total_input, total_output, and turn_count")
+        unimplemented!("TODO ch17: zero out total_input, total_output, and turn_count")
     }
 }

@@ -5,7 +5,7 @@ use crate::types::*;
 
 /// A tool that runs bash commands and returns their output.
 ///
-/// # Chapter 4: More Tools — Bash
+/// # Chapter 10: Bash Tool
 ///
 /// This tool runs a command via `bash -c` and captures stdout + stderr.
 pub struct BashTool {
@@ -22,7 +22,7 @@ impl BashTool {
     /// Create a new BashTool. Schema: one required "command" parameter (string).
     pub fn new() -> Self {
         unimplemented!(
-            "TODO ch7: build a ToolDefinition for 'bash' with a required 'command' string param"
+            "TODO ch10: build a ToolDefinition for 'bash' with a required 'command' string param"
         )
     }
 }
@@ -43,7 +43,7 @@ impl Tool for BashTool {
     /// - If both empty, return `"(no output)"`
     async fn call(&self, _args: Value) -> anyhow::Result<String> {
         unimplemented!(
-            "TODO ch7: run `bash -c <command>`, capture stdout+stderr, fall back to (no output)"
+            "TODO ch10: run `bash -c <command>`, capture stdout+stderr, fall back to (no output)"
         )
     }
 }

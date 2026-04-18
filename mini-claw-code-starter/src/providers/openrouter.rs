@@ -87,7 +87,7 @@ struct ResponseMessage {
 
 /// An HTTP provider that talks to OpenRouter (or any OpenAI-compatible API).
 ///
-/// # Chapter 6: The HTTP Provider
+/// # Chapter 5: Provider & Streaming — HTTP backend
 ///
 /// Your task: Implement the constructor methods and the Provider trait.
 /// The serde types above handle serialization — you write the logic.
@@ -155,7 +155,7 @@ impl OpenRouterProvider {
 impl crate::streaming::StreamProvider for OpenRouterProvider {
     /// Stream a chat request using SSE.
     ///
-    /// # Chapter 10: Streaming
+    /// # Chapter 5: Provider & Streaming — SSE
     ///
     /// Hints:
     /// 1. Build ChatRequest with stream: true

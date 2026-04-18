@@ -5,7 +5,7 @@ use crate::types::*;
 
 /// A tool that writes content to a file, creating directories as needed.
 ///
-/// # Chapter 4: More Tools — Write
+/// # Chapter 9: File Tools — Write
 pub struct WriteTool {
     definition: ToolDefinition,
 }
@@ -20,7 +20,7 @@ impl WriteTool {
     /// Create a new WriteTool. Schema: required "path" and "content" parameters.
     pub fn new() -> Self {
         unimplemented!(
-            "TODO ch6: build a ToolDefinition for 'write' with required 'path' and 'content' params"
+            "TODO ch9: build a ToolDefinition for 'write' with required 'path' and 'content' params"
         )
     }
 }
@@ -39,6 +39,6 @@ impl Tool for WriteTool {
     /// - Write file: `tokio::fs::write(path, content).await?`
     /// - Return confirmation: `format!("wrote {path}")`
     async fn call(&self, _args: Value) -> anyhow::Result<String> {
-        unimplemented!("TODO ch6: extract path+content, mkdir parents, write the file")
+        unimplemented!("TODO ch9: extract path+content, mkdir parents, write the file")
     }
 }

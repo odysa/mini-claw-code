@@ -61,7 +61,7 @@ impl HookRegistry {
     /// - Return `ModifyArgs` if any hook modified args, otherwise `Continue`.
     pub async fn dispatch(&self, _event: &HookEvent) -> HookAction {
         unimplemented!(
-            "TODO ch12: run every hook; Block short-circuits, ModifyArgs accumulates (last wins)"
+            "TODO ch15: run every hook; Block short-circuits, ModifyArgs accumulates (last wins)"
         )
     }
 
@@ -109,7 +109,7 @@ impl Hook for LoggingHook {
     ///
     /// Hint: Formats are `pre:{tool}`, `post:{tool}`, `agent:start`, `agent:end`.
     async fn on_event(&self, _event: &HookEvent) -> HookAction {
-        unimplemented!("TODO ch12: push a summary of the event into self.log, return Continue")
+        unimplemented!("TODO ch15: push a summary of the event into self.log, return Continue")
     }
 }
 
@@ -133,7 +133,7 @@ impl Hook for BlockingHook {
     /// Block `PreToolCall` events whose tool name is in `blocked_tools`.
     async fn on_event(&self, _event: &HookEvent) -> HookAction {
         unimplemented!(
-            "TODO ch12: on PreToolCall for a blocked tool, return Block(reason); else Continue"
+            "TODO ch15: on PreToolCall for a blocked tool, return Block(reason); else Continue"
         )
     }
 }
@@ -176,7 +176,7 @@ impl Hook for ShellHook {
     /// - Spawn error → `Block(format!("hook error: {e}"))`.
     async fn on_event(&self, _event: &HookEvent) -> HookAction {
         unimplemented!(
-            "TODO ch12: for matching tool events run sh -c command; non-zero or spawn error → Block"
+            "TODO ch15: for matching tool events run sh -c command; non-zero or spawn error → Block"
         )
     }
 }

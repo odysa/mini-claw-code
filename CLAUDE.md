@@ -23,7 +23,7 @@ cargo build -p mini-claw-code
 cargo test -p mini-claw-code
 
 # Run a single test by name
-cargo test -p mini-claw-code test_ch2_read_file
+cargo test -p mini-claw-code test_read_file
 
 # Lint (format check + clippy)
 cargo fmt --check -p mini-claw-code

@@ -12,7 +12,7 @@ use crate::types::{Tool, ToolDefinition};
 
 /// Abstracts how user input is collected.
 ///
-/// # Chapter 11: User Input
+/// # Bonus: AskTool (no V2 chapter yet)
 #[async_trait::async_trait]
 pub trait InputHandler: Send + Sync {
     async fn ask(&self, question: &str, options: &[String]) -> anyhow::Result<String>;
@@ -24,7 +24,7 @@ pub trait InputHandler: Send + Sync {
 
 /// Tool that lets the LLM ask the user a clarifying question.
 ///
-/// # Chapter 11: User Input
+/// # Bonus: AskTool (no V2 chapter yet)
 pub struct AskTool {
     definition: ToolDefinition,
     handler: Arc<dyn InputHandler>,

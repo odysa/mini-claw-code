@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
 use crate::types::*;
@@ -175,29 +176,37 @@ fn pattern_matches(pattern: &str, name: &str) -> bool {
 /// Static analysis of tool arguments for safety violations.
 ///
 /// Catches dangerous patterns before the permission prompt even appears:
-/// - Paths outside the allowed directory
+/// - Paths outside the allowed directory (boundary- and symlink-aware)
 /// - Paths matching protected patterns (.env, .git)
-/// - Blocked bash commands (rm -rf /, sudo, etc.)
+/// - Blocked bash commands matched as glob patterns
 pub struct SafetyChecker {
-    /// Allowed working directory. Paths outside this are blocked.
-    allowed_directory: Option<String>,
+    /// Canonicalized allowed directory. Paths resolving outside this tree
+    /// are rejected. `None` disables the boundary check.
+    allowed_directory: Option<PathBuf>,
+    /// Original (pre-canonicalization) allowed directory, used to resolve
+    /// relative target paths.
+    raw_allowed_directory: Option<PathBuf>,
     /// Glob patterns for files that cannot be modified.
     protected_patterns: Vec<String>,
-    /// Command substrings that are blocked in bash.
-    blocked_commands: Vec<String>,
+    /// Compiled glob patterns blocked in bash commands.
+    blocked_commands: Vec<glob::Pattern>,
 }
 
 impl SafetyChecker {
     pub fn new() -> Self {
         Self {
             allowed_directory: None,
+            raw_allowed_directory: None,
             protected_patterns: Vec::new(),
             blocked_commands: Vec::new(),
         }
     }
 
-    pub fn with_allowed_directory(mut self, dir: impl Into<String>) -> Self {
-        self.allowed_directory = Some(dir.into());
+    pub fn with_allowed_directory(mut self, dir: impl Into<PathBuf>) -> Self {
+        let raw: PathBuf = dir.into();
+        let canonical = raw.canonicalize().unwrap_or_else(|_| raw.clone());
+        self.allowed_directory = Some(canonical);
+        self.raw_allowed_directory = Some(raw);
         self
     }
 
@@ -207,7 +216,10 @@ impl SafetyChecker {
     }
 
     pub fn with_blocked_commands(mut self, commands: Vec<String>) -> Self {
-        self.blocked_commands = commands;
+        self.blocked_commands = commands
+            .iter()
+            .filter_map(|p| glob::Pattern::new(p).ok())
+            .collect();
         self
     }
 
@@ -216,12 +228,11 @@ impl SafetyChecker {
         Self::new()
             .with_protected_patterns(vec![".env".into(), ".env.*".into(), ".git/config".into()])
             .with_blocked_commands(vec![
-                "rm -rf /".into(),
                 "rm -rf /*".into(),
-                "sudo ".into(),
-                "> /dev/sda".into(),
-                "mkfs.".into(),
-                ":(){:|:&};:".into(),
+                "sudo *".into(),
+                "* > /dev/sd*".into(),
+                "mkfs.*".into(),
+                ":(){:|:&};:*".into(),
             ])
     }
 
@@ -247,17 +258,26 @@ impl SafetyChecker {
 
     /// Check if a path violates safety rules.
     pub fn check_path(&self, path: &str) -> Permission {
-        // Check allowed directory
-        if let Some(ref allowed) = self.allowed_directory
-            && !path.starts_with(allowed.as_str())
-        {
-            return Permission::Deny(format!(
-                "path `{}` is outside allowed directory `{}`",
-                path, allowed
-            ));
+        if let Some(ref allowed) = self.allowed_directory {
+            let canonical = match self.resolve_target(path) {
+                Ok(p) => p,
+                Err(reason) => {
+                    return Permission::Deny(format!(
+                        "path `{}` cannot be validated: {}",
+                        path, reason
+                    ));
+                }
+            };
+
+            if !canonical.starts_with(allowed) {
+                return Permission::Deny(format!(
+                    "path `{}` is outside allowed directory `{}`",
+                    path,
+                    allowed.display()
+                ));
+            }
         }
 
-        // Check protected patterns
         for pattern in &self.protected_patterns {
             if path_matches_pattern(path, pattern) {
                 return Permission::Deny(format!(
@@ -270,13 +290,49 @@ impl SafetyChecker {
         Permission::Allow
     }
 
-    /// Check if a bash command is blocked.
+    /// Resolve `path` to a canonical absolute form that can be compared
+    /// against `allowed_directory` with `Path::starts_with`. For paths
+    /// that do not yet exist (e.g. new-file writes), the parent is
+    /// canonicalized and the filename appended — this follows symlinks
+    /// on the parent and normalizes `..` components.
+    fn resolve_target(&self, path: &str) -> Result<PathBuf, String> {
+        let target = Path::new(path);
+        let base = self.raw_allowed_directory.as_deref();
+        let absolute = if target.is_absolute() {
+            target.to_path_buf()
+        } else if let Some(base) = base {
+            base.join(target)
+        } else {
+            target.to_path_buf()
+        };
+
+        if absolute.exists() {
+            return absolute
+                .canonicalize()
+                .map_err(|e| format!("canonicalize failed: {e}"));
+        }
+
+        let parent = absolute.parent().ok_or("no parent directory")?;
+        if !parent.exists() {
+            return Err(format!("parent does not exist: {}", parent.display()));
+        }
+        let mut canonical = parent
+            .canonicalize()
+            .map_err(|e| format!("parent canonicalize failed: {e}"))?;
+        if let Some(name) = absolute.file_name() {
+            canonical.push(name);
+        }
+        Ok(canonical)
+    }
+
+    /// Check if a bash command matches any blocked glob pattern.
     pub fn check_command(&self, command: &str) -> Permission {
-        for blocked in &self.blocked_commands {
-            if command.contains(blocked.as_str()) {
+        let trimmed = command.trim();
+        for pattern in &self.blocked_commands {
+            if pattern.matches(trimmed) {
                 return Permission::Deny(format!(
-                    "command contains blocked pattern: `{}`",
-                    blocked
+                    "command matches blocked pattern: `{}`",
+                    pattern.as_str()
                 ));
             }
         }

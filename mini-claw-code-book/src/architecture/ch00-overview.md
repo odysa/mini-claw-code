@@ -38,17 +38,17 @@ mini-claw-code-starter/src/
 
 ## How to use this book
 
-**Start with the Getting Started section.** Three short, hands-on chapters get you from zero to a working agent in under an hour:
+**Start with Chapters 1-3.** Three short, hands-on chapters get you from zero to a working agent in under an hour:
 
-1. [**Your First LLM Call**](./intro01-first-llm-call.md) — implement `MockProvider` (`test_ch1_`)
-2. [**Your First Tool Call**](./intro02-first-tool.md) — implement `ReadTool` (`test_ch2_`)
-3. [**The Agentic Loop**](./intro03-agentic-loop.md) — implement `single_turn` and `SimpleAgent` (`test_ch3_`, `test_ch5_`)
+1. [**Your First LLM Call**](./ch01-first-llm-call.md) — implement `MockProvider` (`test_ch1_`)
+2. [**Your First Tool Call**](./ch02-first-tool.md) — implement `ReadTool` (`test_ch2_`)
+3. [**The Agentic Loop**](./ch03-agentic-loop.md) — implement `single_turn` and `SimpleAgent` (`test_ch3_`, `test_ch5_`)
 
-Then dive into the **Deep Dive** chapters (1-15) for the full architecture: streaming, permissions, hooks, plan mode, configuration, and more.
+Then continue with Chapters 4-18 for the full architecture: streaming, permissions, hooks, plan mode, configuration, and more.
 
 The `mini-claw-code-starter` crate contains stub implementations with `unimplemented!()` markers and doc comments describing what to do. Read the chapter, fill in the stubs, then verify your work by running the tests.
 
-**Important: Deep dive chapter numbers do NOT match test file numbers.** The chapters were reorganized by topic, but test files kept their original numbering. Use the mapping table below to find the correct test command for each chapter.
+**Important: chapter numbers do NOT match test file numbers.** The chapters were reorganized by topic, but test files kept their original numbering. Use the mapping table below to find the correct test command for each chapter.
 
 **Run tests to check your progress:**
 
@@ -68,40 +68,48 @@ cargo test -p mini-claw-code-starter
 
 ## Chapter roadmap
 
+### Getting Started
+
+| Chapter | Topic | File(s) to edit | Test command |
+|---------|-------|-----------------|--------------|
+| 1 | Your First LLM Call | `src/mock.rs` | `test_ch1_` |
+| 2 | Your First Tool Call | `src/tools/read.rs` | `test_ch2_` |
+| 3 | The Agentic Loop | `src/agent.rs` | `test_ch3_`, `test_ch5_` |
+
 ### Part I: Core Agent
 
 | Chapter | Topic | File(s) to edit | Test command |
 |---------|-------|-----------------|--------------|
-| 1 | Messages & Types | `src/types.rs` (pre-filled) | `test_ch1_` |
-| 2 | Provider & Streaming | `src/mock.rs`, `src/streaming.rs`, `src/providers/openrouter.rs` | `test_ch1_`, `test_ch6_`, `test_ch10` |
-| 3 | Tool Interface | `src/tools/read.rs` | `test_ch2_` |
-| 4 | The Agentic Loop | `src/agent.rs` | `test_ch3_`, `test_ch5_` |
+| 4 | Messages & Types | `src/types.rs` (pre-filled) | `test_ch1_` |
+| 5 | Provider & Streaming | `src/mock.rs`, `src/streaming.rs`, `src/providers/openrouter.rs` | `test_ch1_`, `test_ch6_`, `test_ch10` |
+| 6 | Tool Interface | `src/tools/read.rs` | `test_ch2_` |
+| 7 | The Agentic Loop (Deep Dive) | `src/agent.rs` | `test_ch3_`, `test_ch5_` |
 
 ### Part II: Prompt & Tools
 
 | Chapter | Topic | File(s) to edit | Test command |
 |---------|-------|-----------------|--------------|
-| 5 | System Prompt | `src/instructions.rs` | `test_ch17` |
-| 6 | File Tools | `src/tools/read.rs`, `src/tools/write.rs`, `src/tools/edit.rs` | `test_ch2_`, `test_ch4_` |
-| 7 | Bash Tool | `src/tools/bash.rs` | `test_ch4_` |
-| 8 | Search Tools | (extension -- no stubs) | (no tests) |
-| 9 | Tool Registry | `src/types.rs` (ToolSet) | `test_ch7_` |
+| 8 | System Prompt | `src/instructions.rs` | `test_ch17` |
+| 9 | File Tools | `src/tools/read.rs`, `src/tools/write.rs`, `src/tools/edit.rs` | `test_ch2_`, `test_ch4_` |
+| 10 | Bash Tool | `src/tools/bash.rs` | `test_ch4_` |
+| 11 | Search Tools | (extension -- no stubs) | (no tests) |
+| 12 | Tool Registry | `src/types.rs` (ToolSet) | `test_ch7_` |
 
 ### Part III: Safety & Control
 
 | Chapter | Topic | File(s) to edit | Test command |
 |---------|-------|-----------------|--------------|
-| 10 | Permission Engine | `src/permissions.rs` | `test_ch19` |
-| 11 | Safety Checks | `src/safety.rs` | `test_ch18` |
-| 12 | Hooks | `src/hooks.rs` | `test_ch20` |
-| 13 | Plan Mode | `src/planning.rs` | `test_ch12` |
+| 13 | Permission Engine | `src/permissions.rs` | `test_ch19` |
+| 14 | Safety Checks | `src/safety.rs` | `test_ch18` |
+| 15 | Hooks | `src/hooks.rs` | `test_ch20` |
+| 16 | Plan Mode | `src/planning.rs` | `test_ch12` |
 
 ### Part IV: Configuration
 
 | Chapter | Topic | File(s) to edit | Test command |
 |---------|-------|-----------------|--------------|
-| 14 | Settings Hierarchy | `src/config.rs`, `src/usage.rs` | `test_ch16`, `test_ch14` |
-| 15 | Project Instructions | `src/instructions.rs`, `src/context.rs` | `test_ch17`, `test_ch15` |
+| 17 | Settings Hierarchy | `src/config.rs`, `src/usage.rs` | `test_ch16`, `test_ch14` |
+| 18 | Project Instructions | `src/instructions.rs`, `src/context.rs` | `test_ch17`, `test_ch15` |
 
 ### Bonus (no chapter yet -- stubs + tests available)
 

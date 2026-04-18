@@ -1,4 +1,4 @@
-# Chapter 6: File Tools
+# Chapter 9: File Tools
 
 > **File(s) to edit:** `src/tools/read.rs`, `src/tools/write.rs`, `src/tools/edit.rs`
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_ch2_` (ReadTool), `cargo test -p mini-claw-code-starter test_ch4_` (WriteTool, EditTool)
@@ -13,7 +13,7 @@
 
 A coding agent that cannot touch the filesystem is just a chatbot with delusions
 of grandeur. It can describe code changes, suggest fixes, explain algorithms --
-but it cannot do any of it. The tools you built in Chapter 3 gave your agent
+but it cannot do any of it. The tools you built in Chapter 6 gave your agent
 hands. In this chapter you give those hands something to hold: files.
 
 File operations are the most fundamental tools in any coding agent's toolkit.
@@ -551,8 +551,8 @@ in later chapters. The module structure in the starter:
 ```
 src/tools/
   mod.rs    -- re-exports all tools
-  ask.rs    -- AskTool (Chapter 11)
-  bash.rs   -- BashTool (Chapter 7)
+  ask.rs    -- AskTool (Chapter 14)
+  bash.rs   -- BashTool (Chapter 10)
   edit.rs   -- EditTool
   read.rs   -- ReadTool
   write.rs  -- WriteTool
@@ -618,10 +618,10 @@ Here is what each test verifies:
 Three tools, one pattern. Every tool in this chapter follows the same structure:
 
 1. **A struct** with a `definition: ToolDefinition` field.
-2. **A `new()` constructor** that builds the definition with the parameter builder from Chapter 1.
+2. **A `new()` constructor** that builds the definition with the parameter builder from Chapter 4.
 3. **A `Tool` impl** with `definition()` and `call()`.
 
-The pattern scales. When you add Bash in Chapter 7, the shape is identical --
+The pattern scales. When you add Bash in Chapter 10, the shape is identical --
 only the `call()` logic changes. This is the power of the `Tool` trait: a
 uniform interface that makes every tool interchangeable from the agent's
 perspective.
@@ -641,10 +641,10 @@ The key lessons from this chapter:
 
 File tools are the agent's hands on the codebase. The three-tool split -- read, write, edit -- gives the LLM clear verbs for distinct operations rather than one overloaded "file" tool. The `EditTool`'s uniqueness check is the single most important design decision: it forces the LLM to provide an unambiguous match, catching mistakes early and enabling reliable self-correction.
 
-In [Chapter 7: Bash Tool](./ch07-bash-tool.md), you will build the most
+In [Chapter 10: Bash Tool](./ch10-bash-tool.md), you will build the most
 powerful (and most dangerous) tool in the agent's arsenal -- one that can run
 arbitrary shell commands.
 
 ---
 
-[← Chapter 5: System Prompt](./ch05-system-prompt.md) · [Contents](./ch00-overview.md) · [Chapter 7: Bash Tool →](./ch07-bash-tool.md)
+[← Chapter 8: System Prompt](./ch08-system-prompt.md) · [Contents](./ch00-overview.md) · [Chapter 10: Bash Tool →](./ch10-bash-tool.md)

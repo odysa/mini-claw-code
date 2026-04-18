@@ -1,4 +1,4 @@
-# Chapter 5: System Prompt
+# Chapter 8: System Prompt
 
 > **File(s) to edit:** `src/instructions.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch17` (InstructionLoader)
@@ -365,11 +365,11 @@ A system prompt is not a single string -- it is an assembly of modular sections,
 
 ## What's next
 
-In [Chapter 6: File Tools](./ch06-file-tools.md) you will implement the tools
+In [Chapter 9: File Tools](./ch09-file-tools.md) you will implement the tools
 that let your agent interact with the filesystem -- reading, writing, and
 editing files. These are the tools whose schemas will eventually appear in the
 static portion of your system prompt.
 
 ---
 
-[← Chapter 4: The Agentic Loop](./ch04-query-engine.md) · [Contents](./ch00-overview.md) · [Chapter 6: File Tools →](./ch06-file-tools.md)
+[← Chapter 7: The Agentic Loop](./ch07-query-engine.md) · [Contents](./ch00-overview.md) · [Chapter 9: File Tools →](./ch09-file-tools.md)

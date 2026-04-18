@@ -1,4 +1,4 @@
-# Chapter 10: Permission Engine
+# Chapter 13: Permission Engine
 
 > **File(s) to edit:** `src/permissions.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch19`
@@ -6,11 +6,11 @@
 
 Your agent does whatever the LLM tells it to.
 
-Think about that for a moment. In Chapters 1-9 you built a fully functional coding agent with several tools. The LLM can read files, write files, edit files, and execute arbitrary shell commands. The SimpleAgent dutifully dispatches every tool call the model requests. If the model says `bash("rm -rf /")`, the agent runs it. If it writes garbage over your source files, the agent writes. If it decides to `curl | sh` something from the internet, the agent curls. There is nothing between the LLM's request and the tool's execution.
+Think about that for a moment. In Chapters 1-12 you built a fully functional coding agent with several tools. The LLM can read files, write files, edit files, and execute arbitrary shell commands. The SimpleAgent dutifully dispatches every tool call the model requests. If the model says `bash("rm -rf /")`, the agent runs it. If it writes garbage over your source files, the agent writes. If it decides to `curl | sh` something from the internet, the agent curls. There is nothing between the LLM's request and the tool's execution.
 
 This is fine for a tutorial. It is not fine for software you run on your actual codebase.
 
-Chapter 10 changes that. We build the `PermissionEngine` -- the gatekeeper that evaluates every tool call before it executes. It sits between the SimpleAgent and the tools, and for each call it returns one of three answers: allow it silently, deny it, or ask the user for approval. The decision depends on configured rules, a default permission, and whether the user has already approved this tool during the session.
+Chapter 13 changes that. We build the `PermissionEngine` -- the gatekeeper that evaluates every tool call before it executes. It sits between the SimpleAgent and the tools, and for each call it returns one of three answers: allow it silently, deny it, or ask the user for approval. The decision depends on configured rules, a default permission, and whether the user has already approved this tool during the session.
 
 This is the first chapter of Part III: Safety & Control. By the end of it, your agent will no longer blindly obey the LLM. It will ask permission first.
 
@@ -420,8 +420,8 @@ The engine is pure logic -- it does not execute tools, and it does not interact 
 
 The permission engine decides *whether* a tool call should run based on who the tool is and what mode the user is in. But it does not look at *what the tool is being asked to do*. A bash tool is bash whether it runs `ls` or `rm -rf /`. A write tool is a write tool whether it targets `src/main.rs` or `.env`.
 
-Chapter 11 adds safety checks -- static analysis of tool arguments that catches dangerous patterns before the permission prompt even appears. It validates paths against allowed directories, matches filenames against protected patterns (`.env`, `.git/config`), and filters bash commands for blocked patterns (`rm -rf /`, `sudo`, fork bombs). Safety checks wrap tools so that dangerous calls are blocked before they execute.
+Chapter 14 adds safety checks -- static analysis of tool arguments that catches dangerous patterns before the permission prompt even appears. It validates paths against allowed directories, matches filenames against protected patterns (`.env`, `.git/config`), and filters bash commands for blocked patterns (`rm -rf /`, `sudo`, fork bombs). Safety checks wrap tools so that dangerous calls are blocked before they execute.
 
 ---
 
-[← Chapter 9: Tool Registry](./ch09-tool-registry.md) · [Contents](./ch00-overview.md) · [Chapter 11: Safety Checks →](./ch11-safety.md)
+[← Chapter 12: Tool Registry](./ch12-tool-registry.md) · [Contents](./ch00-overview.md) · [Chapter 14: Safety Checks →](./ch14-safety.md)

@@ -1,4 +1,4 @@
-# Chapter 9: Tool Registry
+# Chapter 12: Tool Registry
 
 > **File(s) to edit:** `src/types.rs` (ToolSet)
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch7_` (integration tests)
@@ -13,7 +13,7 @@ You have five tools. You have a `SimpleAgent`. This chapter wires them together.
 - Handle unknown tool calls gracefully by returning an error string that lets the LLM recover.
 - Run the full integration test suite proving that real tools execute with real side effects inside the agent loop.
 
-Over the past chapters you built the individual tools that let your agent interact with the world -- file reading and writing (Chapter 6), command execution (Chapter 7), and optionally pattern search (Chapter 8). Each tool implements the `Tool` trait, has a JSON schema, and returns a `String`. But they exist in isolation. The agent has no way to discover them, expose their schemas to the LLM, or dispatch calls by name.
+Over the past chapters you built the individual tools that let your agent interact with the world -- file reading and writing (Chapter 9), command execution (Chapter 10), and optionally pattern search (Chapter 11). Each tool implements the `Tool` trait, has a JSON schema, and returns a `String`. But they exist in isolation. The agent has no way to discover them, expose their schemas to the LLM, or dispatch calls by name.
 
 The tool registry is the bridge. It holds every available tool in a single `ToolSet`, exposes their schemas to the LLM so it knows what it can call, and dispatches incoming tool calls to the correct implementation by name. By the end of this chapter, you will have a fully functional coding agent that can read, write, edit, and execute commands -- the complete tool loop, now with real tools instead of test doubles.
 
@@ -30,7 +30,7 @@ All tool implementations live under `src/tools/`, one file per tool:
 ```
 src/tools/
   mod.rs       -- re-exports everything
-  ask.rs       -- AskTool (Chapter 11)
+  ask.rs       -- AskTool (Chapter 14)
   bash.rs      -- BashTool
   edit.rs      -- EditTool
   read.rs      -- ReadTool
@@ -69,7 +69,7 @@ This is *dynamic dispatch*. When the agent calls `tool.call(args)`, the compiler
 
 ## Building a ToolSet
 
-The `ToolSet` you defined in Chapter 1 is a `HashMap<String, Box<dyn Tool>>` with a builder API. Now we use it for real. Here is a helper function that assembles the standard tool set:
+The `ToolSet` you defined in Chapter 4 is a `HashMap<String, Box<dyn Tool>>` with a builder API. Now we use it for real. Here is a helper function that assembles the standard tool set:
 
 ```rust
 fn default_tools() -> ToolSet {
@@ -333,11 +333,11 @@ Claude Code's tool registry is substantially larger, but the architecture is the
 
 **Scale.** Claude Code registers 40+ tools spanning file operations, git, browser, notebooks, MCP (Model Context Protocol), and more. Each tool has permission metadata, cost hints, and rich terminal rendering. Our five tools (four core plus AskTool) cover the essential capabilities -- the same protocol, less surface area.
 
-**Dynamic registration.** Our `ToolSet` is built at startup and never changes. Claude Code's registry is dynamic -- MCP tools are discovered and registered at runtime when a user configures an MCP server. A tool can appear or disappear mid-session. The `ToolSet::push()` method you built in Chapter 1 supports this pattern, though we do not exercise it yet.
+**Dynamic registration.** Our `ToolSet` is built at startup and never changes. Claude Code's registry is dynamic -- MCP tools are discovered and registered at runtime when a user configures an MCP server. A tool can appear or disappear mid-session. The `ToolSet::push()` method you built in Chapter 4 supports this pattern, though we do not exercise it yet.
 
 **Tool groups.** Claude Code organizes tools into permission groups. File tools, git tools, and shell tools each have group-level allow/deny rules. Our flat `ToolSet` is simpler -- the permission engine (when implemented) would check per-tool metadata.
 
-**Usage statistics.** Claude Code tracks how often each tool is called, how long each call takes, and how many tokens each result consumes. This data feeds into the TUI's status display and helps with cost estimation. Our book does not cover usage statistics, though the `TokenUsage` type from Chapter 1 gives you a starting point at the message level.
+**Usage statistics.** Claude Code tracks how often each tool is called, how long each call takes, and how many tokens each result consumes. This data feeds into the TUI's status display and helps with cost estimation. Our book does not cover usage statistics, though the `TokenUsage` type from Chapter 4 gives you a starting point at the message level.
 
 Despite these differences, the core protocol is identical. The LLM sees a list of tool schemas. It decides to call one. The agent looks up the tool by name, executes it, and feeds the result back. Everything else -- permissions, groups, statistics, dynamic registration -- is orchestration around that lookup.
 
@@ -397,13 +397,13 @@ But a working agent is not a safe agent. Right now, the engine executes every to
 
 Part III -- Safety & Control -- adds the guardrails that turn a working agent into a trustworthy one:
 
-- **Chapter 10: Permission Engine** -- The system that checks every tool call before execution. It evaluates permission rules, respects the permission mode, and asks the user when needed.
-- **Chapter 11: Safety Checks** -- Static analysis of tool arguments. Catches dangerous patterns (`rm -rf`, `git push --force`) before the permission prompt even appears.
-- **Chapter 12: Hook System** -- Pre-tool and post-tool hooks that run shell commands around tool execution. Lets users enforce custom policies (run linters after edits, block certain paths).
-- **Chapter 13: Plan Mode** -- A restricted execution mode where only read-only tools run. The agent can analyze and plan but never modify. This is where `is_read_only()` finally gets enforced.
+- **Chapter 13: Permission Engine** -- The system that checks every tool call before execution. It evaluates permission rules, respects the permission mode, and asks the user when needed.
+- **Chapter 14: Safety Checks** -- Static analysis of tool arguments. Catches dangerous patterns (`rm -rf`, `git push --force`) before the permission prompt even appears.
+- **Chapter 15: Hook System** -- Pre-tool and post-tool hooks that run shell commands around tool execution. Lets users enforce custom policies (run linters after edits, block certain paths).
+- **Chapter 16: Plan Mode** -- A restricted execution mode where only read-only tools run. The agent can analyze and plan but never modify. This is where `is_read_only()` finally gets enforced.
 
 The tools you built in Part II are the hands. Part III teaches the agent when to use them -- and when not to.
 
 ---
 
-[← Chapter 8: Search Tools](./ch08-search-tools.md) · [Contents](./ch00-overview.md) · [Chapter 10: Permission Engine →](./ch10-permissions.md)
+[← Chapter 11: Search Tools](./ch11-search-tools.md) · [Contents](./ch00-overview.md) · [Chapter 13: Permission Engine →](./ch13-permissions.md)

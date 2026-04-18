@@ -1,4 +1,4 @@
-# Chapter 1: Messages & Types
+# Chapter 4: Messages & Types
 
 > **File(s) to edit:** `src/types.rs` (pre-filled in starter)
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch1_`
@@ -304,7 +304,7 @@ Just two required methods -- this is deliberately minimal:
 
 Note that `call()` returns `anyhow::Result<String>` -- not a `ToolResult` struct. The starter simplifies tool output to plain strings. If a tool fails, you can return `Ok(format!("error: {e}"))` to let the model see the error and recover, or return `Err(e)` for unrecoverable situations.
 
-The trait uses `#[async_trait]` and is marked `Send + Sync` so tools can be stored as `Box<dyn Tool>` in the `ToolSet` and called from async contexts. For why `Tool` uses `#[async_trait]` while `Provider` uses RPITIT, see [Why two async trait styles?](./ch03-tool-interface.md#async-styles).
+The trait uses `#[async_trait]` and is marked `Send + Sync` so tools can be stored as `Box<dyn Tool>` in the `ToolSet` and called from async contexts. For why `Tool` uses `#[async_trait]` while `Provider` uses RPITIT, see [Why two async trait styles?](./ch06-tool-interface.md#async-styles).
 
 ---
 
@@ -405,7 +405,7 @@ pub trait Provider: Send + Sync {
 }
 ```
 
-Unlike `Tool`, `Provider` uses RPITIT (return-position `impl Trait` in traits) rather than `#[async_trait]`. The full trade-off is covered in [Why two async trait styles?](./ch03-tool-interface.md#async-styles).
+Unlike `Tool`, `Provider` uses RPITIT (return-position `impl Trait` in traits) rather than `#[async_trait]`. The full trade-off is covered in [Why two async trait styles?](./ch06-tool-interface.md#async-styles).
 
 A blanket impl lets `Arc<P>` also be a `Provider`, which is needed later for sharing a provider between an agent and its subagents:
 
@@ -413,7 +413,7 @@ A blanket impl lets `Arc<P>` also be a `Provider`, which is needed later for sha
 impl<P: Provider> Provider for Arc<P> { ... }
 ```
 
-We will implement the `MockProvider` and `OpenRouterProvider` in Chapter 2.
+We will implement the `MockProvider` and `OpenRouterProvider` in Chapter 5.
 
 ---
 
@@ -458,4 +458,4 @@ None of these types do anything on their own -- they are the nouns of the system
 
 ---
 
-[← Getting Started Chapter 3: The Agentic Loop](./intro03-agentic-loop.md) · [Contents](./ch00-overview.md) · [Chapter 2: Provider & Streaming →](./ch02-provider-streaming.md)
+[← Chapter 3: The Agentic Loop](./ch03-agentic-loop.md) · [Contents](./ch00-overview.md) · [Chapter 5: Provider & Streaming →](./ch05-provider-streaming.md)

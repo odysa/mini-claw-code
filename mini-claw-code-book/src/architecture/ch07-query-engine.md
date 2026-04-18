@@ -1,4 +1,4 @@
-# Chapter 4: The Agentic Loop
+# Chapter 7: The Agentic Loop (Deep Dive)
 
 > **File(s) to edit:** `src/agent.rs`
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_ch3_` (single_turn), `cargo test -p mini-claw-code-starter test_ch5_` (SimpleAgent)
@@ -23,8 +23,8 @@ Here is the entire agent lifecycle in one sentence: **prompt the LLM, check if i
 
 That is it. The `SimpleAgent` implements this loop. It owns three things:
 
-1. A **provider** -- the LLM backend (from Chapter 2)
-2. A **tool set** -- the registered tools (from Chapter 3)
+1. A **provider** -- the LLM backend (from Chapter 5)
+2. A **tool set** -- the registered tools (from Chapter 6)
 3. A **config** -- safety limits and behavior knobs
 
 ```mermaid
@@ -434,4 +434,4 @@ This is the skeleton that everything else hangs on. Every feature you add later 
 
 ---
 
-[← Chapter 3: Tool Interface](./ch03-tool-interface.md) · [Contents](./ch00-overview.md) · [Chapter 5: System Prompt →](./ch05-system-prompt.md)
+[← Chapter 6: Tool Interface](./ch06-tool-interface.md) · [Contents](./ch00-overview.md) · [Chapter 8: System Prompt →](./ch08-system-prompt.md)

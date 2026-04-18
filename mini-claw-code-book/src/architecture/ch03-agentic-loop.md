@@ -237,4 +237,4 @@ That is the architecture. Everything else — streaming, permissions, plan mode,
 
 ---
 
-[← Chapter 2: Your First Tool Call](./intro02-first-tool.md) · [Contents](./ch00-overview.md) · [Deep Dive Chapter 1: Messages & Types →](./ch01-messages-types.md)
+[← Chapter 2: Your First Tool Call](./ch02-first-tool.md) · [Contents](./ch00-overview.md) · [Chapter 4: Messages & Types →](./ch04-messages-types.md)

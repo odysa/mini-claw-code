@@ -1,4 +1,4 @@
-# Chapter 7: Bash Tool
+# Chapter 10: Bash Tool
 
 > **File(s) to edit:** `src/tools/bash.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch4_` (bash tests are grouped with other tools)
@@ -14,7 +14,7 @@ The bash tool is the most powerful tool in a coding agent. It is also the most d
 
 This power is what makes a coding agent useful. An agent that can only read and write files is a fancy text editor. An agent that can run arbitrary shell commands is a programmer. It can try things, see what happens, and iterate -- the same workflow a human developer follows. Claude Code's bash tool is its most-used tool by far, accounting for the majority of all tool invocations in a typical session.
 
-In this chapter you will build the `BashTool`. It takes a command string, runs it in a bash subprocess with a timeout, and returns the combined output. The implementation is straightforward -- the hard part is everything we deliberately leave out. There is no sandboxing, no command filtering, no permission checking. The LLM can run anything. Chapters 10-13 add the safety rails. For now, we build the engine and trust the driver.
+In this chapter you will build the `BashTool`. It takes a command string, runs it in a bash subprocess with a timeout, and returns the combined output. The implementation is straightforward -- the hard part is everything we deliberately leave out. There is no sandboxing, no command filtering, no permission checking. The LLM can run anything. Chapters 13-16 add the safety rails. For now, we build the engine and trust the driver.
 
 ## How the BashTool processes a command
 
@@ -269,12 +269,12 @@ This is not a hypothetical concern. LLMs can be manipulated through prompt injec
 
 For the purposes of this tutorial, the bash tool is safe to use with trusted prompts in a controlled environment. Do not point it at untrusted input. Do not run it on a machine with sensitive data. Use a container, a VM, or at minimum a dedicated user account with limited permissions.
 
-Chapters 10-13 build the safety infrastructure that makes the bash tool safe for production:
+Chapters 13-16 build the safety infrastructure that makes the bash tool safe for production:
 
-- **Chapter 10 (Permissions)** adds the permission engine that gates every tool call, requiring user approval for destructive operations.
-- **Chapter 11 (Safety)** adds command classification that detects and blocks dangerous patterns like `rm -rf`, `chmod 777`, and `curl | bash`.
-- **Chapter 12 (Hooks)** adds pre-tool hooks that can inspect and reject commands before execution.
-- **Chapter 13 (Plan Mode)** adds a read-only mode where destructive tools are blocked entirely.
+- **Chapter 13 (Permissions)** adds the permission engine that gates every tool call, requiring user approval for destructive operations.
+- **Chapter 14 (Safety)** adds command classification that detects and blocks dangerous patterns like `rm -rf`, `chmod 777`, and `curl | bash`.
+- **Chapter 15 (Hooks)** adds pre-tool hooks that can inspect and reject commands before execution.
+- **Chapter 16 (Plan Mode)** adds a read-only mode where destructive tools are blocked entirely.
 
 Until you build those chapters, treat the bash tool with the respect you would give `sudo` access to an unpredictable collaborator.
 
@@ -339,8 +339,8 @@ The bash tool is what makes a coding agent a *programmer* rather than a text edi
 
 ## What's next
 
-In [Chapter 8: Search Tools](./ch08-search-tools.md) you will build the tools that help the agent navigate large codebases -- glob for finding files by pattern and grep for searching file contents. These read-only tools are the agent's eyes, complementing the hands (bash, write, edit) you have already built.
+In [Chapter 11: Search Tools](./ch11-search-tools.md) you will build the tools that help the agent navigate large codebases -- glob for finding files by pattern and grep for searching file contents. These read-only tools are the agent's eyes, complementing the hands (bash, write, edit) you have already built.
 
 ---
 
-[← Chapter 6: File Tools](./ch06-file-tools.md) · [Contents](./ch00-overview.md) · [Chapter 8: Search Tools →](./ch08-search-tools.md)
+[← Chapter 9: File Tools](./ch09-file-tools.md) · [Contents](./ch00-overview.md) · [Chapter 11: Search Tools →](./ch11-search-tools.md)

@@ -1,4 +1,4 @@
-# Chapter 2: Provider & Streaming
+# Chapter 5: Provider & Streaming
 
 > **File(s) to edit:** `src/mock.rs`, `src/streaming.rs`, `src/providers/openrouter.rs`
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_ch1_` (MockProvider), `cargo test -p mini-claw-code-starter test_ch6_` (OpenRouterProvider), `cargo test -p mini-claw-code-starter test_ch10` (streaming)
@@ -11,7 +11,7 @@
 - Implement `OpenRouterProvider` so that the agent can talk to a real LLM API (OpenAI-compatible).
 - Understand when to use `std::sync::Mutex` vs `tokio::sync::Mutex` in async code.
 
-In Chapter 1 we defined the data that flows through our agent. Now we need something to *drive* that data -- an LLM backend that takes a conversation and returns an assistant response. In this chapter you will build:
+In Chapter 4 we defined the data that flows through our agent. Now we need something to *drive* that data -- an LLM backend that takes a conversation and returns an assistant response. In this chapter you will build:
 
 1. A `Provider` trait that abstracts over any LLM backend
 2. A `StreamProvider` trait that adds real-time token streaming via channels
@@ -78,13 +78,13 @@ A few things to notice:
 
 **No `#[async_trait]`.** The `Provider` trait uses *return-position `impl Trait` in traits* (RPITIT) -- stabilized in Rust 1.75. Writing `fn chat(...) -> impl Future<...>` instead of `async fn chat(...)` gives us explicit control over the lifetime and `Send` bound; `async fn` in a trait does not always infer `Send` for the returned future, which would prevent spawning onto a multi-threaded runtime. The explicit `impl Future<...> + Send + 'a` signature solves that, and it avoids the heap allocation that `#[async_trait]` would require.
 
-The `Tool` trait in Chapter 3 uses `#[async_trait]` for the opposite reason -- object safety for heterogeneous storage. For the full explanation of when to pick which style, see [Why two async trait styles?](./ch03-tool-interface.md#async-styles).
+The `Tool` trait in Chapter 6 uses `#[async_trait]` for the opposite reason -- object safety for heterogeneous storage. For the full explanation of when to pick which style, see [Why two async trait styles?](./ch06-tool-interface.md#async-styles).
 
 **Why `Send + Sync` on the trait itself?** Our agent loop will hold a `P: Provider` behind a shared reference (and later behind `Arc`). The `Sync` bound lets multiple tasks share the provider, and `Send` lets it cross thread boundaries.
 
 **Lifetime `'a` everywhere.** The returned future borrows both `&self` and the input slices. Tying them to a single lifetime `'a` tells the compiler the future lives no longer than those borrows, avoiding `'static` requirements.
 
-The `Provider` trait is already defined in `src/types.rs` (Chapter 1). The starter puts it alongside the message types because everything lives in a flat layout.
+The `Provider` trait is already defined in `src/types.rs` (Chapter 4). The starter puts it alongside the message types because everything lives in a flat layout.
 
 ## The Arc\<P\> blanket impl
 
@@ -637,8 +637,8 @@ The provider layer decouples the agent from any specific LLM backend. The `MockP
 
 You built the LLM abstraction layer. The `Provider` and `StreamProvider` traits decouple the agent from any specific backend. The `MockProvider` enables deterministic testing. The SSE parser and `StreamAccumulator` handle the real-time streaming protocol. And the `Arc<P>` blanket impl prepares you for provider sharing in later chapters.
 
-In Chapter 3, you will explore the `Tool` trait -- the other half of the agent's interface with the outside world.
+In Chapter 6, you will explore the `Tool` trait -- the other half of the agent's interface with the outside world.
 
 ---
 
-[← Chapter 1: Messages & Types](./ch01-messages-types.md) · [Contents](./ch00-overview.md) · [Chapter 3: Tool Interface →](./ch03-tool-interface.md)
+[← Chapter 4: Messages & Types](./ch04-messages-types.md) · [Contents](./ch00-overview.md) · [Chapter 6: Tool Interface →](./ch06-tool-interface.md)

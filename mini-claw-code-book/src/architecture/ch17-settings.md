@@ -1,4 +1,4 @@
-# Chapter 14: Settings Hierarchy
+# Chapter 17: Settings Hierarchy
 
 > **File(s) to edit:** `src/config.rs`, `src/usage.rs`
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_ch16` (Config, ConfigLoader), `cargo test -p mini-claw-code-starter test_ch14` (CostTracker)
@@ -113,13 +113,13 @@ Eight fields spanning three categories: provider settings, safety settings, and 
 
 **`protected_patterns`** is a list of glob patterns for files that cannot be written to. A project might protect `*.lock` files, `.env`, or `Cargo.toml` to prevent the agent from accidentally modifying build-critical files.
 
-**`blocked_commands`** lists command substrings that the bash tool rejects. If any blocked substring appears in a command, execution is denied. This is the configuration surface for the safety checks from Chapter 11.
+**`blocked_commands`** lists command substrings that the bash tool rejects. If any blocked substring appears in a command, execution is denied. This is the configuration surface for the safety checks from Chapter 14.
 
 ### Agent behavior
 
 **`preserve_recent`** controls how many recent messages the compaction engine preserves. When compacting, the engine summarizes older messages but keeps the most recent `preserve_recent` messages intact so the model has fresh context. The default of 10 keeps roughly the last 2-3 tool-use rounds.
 
-**`instructions`** injects custom text into the system prompt. This is where project-specific guidance goes -- "always use async/await", "prefer Vec over slices in public APIs", "tests must use the mock provider". Chapter 15 builds the full instruction system; this field is the config hook for it.
+**`instructions`** injects custom text into the system prompt. This is where project-specific guidance goes -- "always use async/await", "prefer Vec over slices in public APIs", "tests must use the mock provider". Chapter 18 builds the full instruction system; this field is the config hook for it.
 
 ### Key Rust concept: `#[serde(default)]` for partial deserialization
 
@@ -414,7 +414,7 @@ pub fn record(&mut self, usage: &crate::types::TokenUsage) {
 }
 ```
 
-Called after each provider response. The `TokenUsage` struct (from Chapter 1) carries the per-request token counts. The tracker accumulates them and increments the turn counter.
+Called after each provider response. The `TokenUsage` struct (from Chapter 4) carries the per-request token counts. The tracker accumulates them and increments the turn counter.
 
 Note that `record` takes a reference to `TokenUsage`, not ownership. The caller typically has the usage attached to an `AssistantTurn` and should not have to give it up just to record costs.
 
@@ -591,8 +591,8 @@ This chapter built two subsystems that the rest of the agent depends on.
 
 ## What's next
 
-Configuration tells the agent *how* to behave. Chapter 15 -- Project Instructions -- tells it *what* to know. The `instructions` field you saw in `Config` is just a string. The instruction system reads `CLAUDE.md` files from the project tree, merges them with user instructions, and injects them into the system prompt. Together, settings and instructions make the agent context-aware -- it adapts its behavior and knowledge to each project it works in.
+Configuration tells the agent *how* to behave. Chapter 18 -- Project Instructions -- tells it *what* to know. The `instructions` field you saw in `Config` is just a string. The instruction system reads `CLAUDE.md` files from the project tree, merges them with user instructions, and injects them into the system prompt. Together, settings and instructions make the agent context-aware -- it adapts its behavior and knowledge to each project it works in.
 
 ---
 
-[← Chapter 13: Plan Mode](./ch13-plan-mode.md) · [Contents](./ch00-overview.md) · [Chapter 15: Project Instructions →](./ch15-instructions.md)
+[← Chapter 16: Plan Mode](./ch16-plan-mode.md) · [Contents](./ch00-overview.md) · [Chapter 18: Project Instructions →](./ch18-instructions.md)

@@ -1,4 +1,4 @@
-# Chapter 13: Plan Mode
+# Chapter 16: Plan Mode
 
 > **File(s) to edit:** `src/planning.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch12`
@@ -22,7 +22,7 @@ This pattern is not hypothetical. Claude Code ships with a plan mode that
 restricts the agent to read-only operations until the user explicitly approves
 the plan. Every serious coding agent has some version of this -- a way to let
 the model reason about a task before committing to changes. The `is_read_only()`
-flag you set on tools back in Chapter 9 has been waiting for exactly this moment.
+flag you set on tools back in Chapter 12 has been waiting for exactly this moment.
 
 ```bash
 cargo test -p mini-claw-code-starter test_ch12
@@ -571,13 +571,13 @@ Plan mode is caller-driven separation of concerns: the agent analyzes with read-
 Plan mode completes Part III -- Safety & Control. Over four chapters you built
 the layers that turn a reckless agent into a disciplined one:
 
-- **Chapter 10: Permission Engine** -- Checks every tool call against permission
+- **Chapter 13: Permission Engine** -- Checks every tool call against permission
   rules before execution. Ask, allow, or deny based on the tool and the mode.
-- **Chapter 11: Safety Checks** -- Static analysis of tool arguments. Catches
+- **Chapter 14: Safety Checks** -- Static analysis of tool arguments. Catches
   dangerous patterns before the permission prompt appears.
-- **Chapter 12: Hook System** -- Pre-tool and post-tool hooks for custom
+- **Chapter 15: Hook System** -- Pre-tool and post-tool hooks for custom
   policies. Run linters after edits, block certain paths, enforce project rules.
-- **Chapter 13: Plan Mode** -- A two-phase workflow that separates analysis from
+- **Chapter 16: Plan Mode** -- A two-phase workflow that separates analysis from
   action. The agent reads and reasons first, then modifies only after approval.
 
 The key architectural insight is **caller-driven approval**. The `PlanAgent`
@@ -594,9 +594,9 @@ test harness.
 Part III gave your agent safety and control. Part IV -- Configuration --
 builds the systems that make your agent project-aware:
 
-- **Chapter 14: Settings Hierarchy** -- Layered configuration from global
+- **Chapter 17: Settings Hierarchy** -- Layered configuration from global
   defaults to project-specific overrides.
-- **Chapter 15: Project Instructions** -- Loading and assembling CLAUDE.md files
+- **Chapter 18: Project Instructions** -- Loading and assembling CLAUDE.md files
   that tell the agent how to work with this specific codebase.
 
 The safety infrastructure you built in Part III protects the agent from doing
@@ -604,4 +604,4 @@ harm. The configuration infrastructure in Part IV teaches it to do good.
 
 ---
 
-[← Chapter 12: Hooks](./ch12-hooks.md) · [Contents](./ch00-overview.md) · [Chapter 14: Settings Hierarchy →](./ch14-settings.md)
+[← Chapter 15: Hooks](./ch15-hooks.md) · [Contents](./ch00-overview.md) · [Chapter 17: Settings Hierarchy →](./ch17-settings.md)

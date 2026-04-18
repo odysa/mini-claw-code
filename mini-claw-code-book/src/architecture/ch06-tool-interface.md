@@ -1,4 +1,4 @@
-# Chapter 3: Tool Interface
+# Chapter 6: Tool Interface
 
 > **File(s) to edit:** `src/tools/read.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch2_`
@@ -12,7 +12,7 @@
 
 In the last chapter we gave our agent a voice by connecting it to an LLM provider. But a model that can only produce text is like a programmer who can only talk about code without ever touching a keyboard. In this chapter we give the agent hands.
 
-You already defined the tool types in Chapter 1 -- `ToolDefinition`, `Tool` trait, and `ToolSet`. In this chapter we will understand *why* those types are designed the way they are, explore the critical distinction between `#[async_trait]` and RPITIT, and then wire everything together by implementing your first concrete tool: an `EchoTool`.
+You already defined the tool types in Chapter 4 -- `ToolDefinition`, `Tool` trait, and `ToolSet`. In this chapter we will understand *why* those types are designed the way they are, explore the critical distinction between `#[async_trait]` and RPITIT, and then wire everything together by implementing your first concrete tool: an `EchoTool`.
 
 ## Tool lifecycle
 
@@ -51,7 +51,7 @@ The key simplification: we drop the generic parameters and the safety/display me
 
 This is the most important design decision in the type system, and it is worth understanding deeply. The same trade-off drives every async trait in this book -- `Provider`, `Tool`, `StreamProvider`, `Hook`, `SafetyCheck`. Read this section once; other chapters link back to it.
 
-Look at the `Provider` trait from Chapter 1:
+Look at the `Provider` trait from Chapter 4:
 
 ```rust
 pub trait Provider: Send + Sync {
@@ -78,7 +78,7 @@ Tool:     stored in Box<dyn>    -> #[async_trait] (boxed future, object-safe)
 
 This split is a deliberate design choice. If Rust stabilizes `dyn async fn` in the future, we could drop `async_trait` entirely. Until then, the two-strategy approach gives us the best of both worlds.
 
-Note that in the `MockProvider` impl from Chapter 2, we wrote `async fn chat(...)` directly. That works because Rust 1.75+ allows `async fn` in trait impls even when the trait signature uses the RPITIT form. The compiler desugars it correctly. You can do the same for `Tool` impls -- write `async fn call(...)` and the `#[async_trait]` macro handles the rest.
+Note that in the `MockProvider` impl from Chapter 5, we wrote `async fn chat(...)` directly. That works because Rust 1.75+ allows `async fn` in trait impls even when the trait signature uses the RPITIT form. The compiler desugars it correctly. You can do the same for `Tool` impls -- write `async fn call(...)` and the `#[async_trait]` macro handles the rest.
 
 ## Why errors are values, not `Err`
 
@@ -171,8 +171,8 @@ Claude Code's tool system is substantially larger:
 - **Zod schemas** provide runtime validation with TypeScript type inference. We use `serde_json::Value` with a builder.
 - **React rendering** -- tools can return React elements that render rich terminal UI (diffs, tables, progress bars). We return plain strings.
 - **Progress events** -- tools emit typed progress events during execution. We have `activity_description()` for a simple spinner.
-- **Tool groups and permissions** -- tools are organized into permission groups with allow/deny lists. We will build our permission system in Chapter 10, but it will be simpler.
-- **Cost hints** -- tools can declare estimated token costs to help the context manager. Our `TokenUsage` type from Chapter 1 tracks tokens at the message level, but we do not carry cost hints on individual tools.
+- **Tool groups and permissions** -- tools are organized into permission groups with allow/deny lists. We will build our permission system in Chapter 13, but it will be simpler.
+- **Cost hints** -- tools can declare estimated token costs to help the context manager. Our `TokenUsage` type from Chapter 4 tracks tokens at the message level, but we do not carry cost hints on individual tools.
 
 Despite these differences, the core protocol is identical. An LLM sees a list of tool schemas, decides to call one, the agent executes it, and the result goes back to the LLM. Everything else -- validation, permissions, progress, rendering -- is orchestration around that loop. Understanding the `Tool` trait gives you the foundation to understand Claude Code's full system.
 
@@ -180,7 +180,7 @@ Despite these differences, the core protocol is identical. An LLM sees a list of
 
 There is no new source file to create in this chapter. The `EchoTool` exists
 only in the test file (`src/tests/ch3.rs`). Your job is to verify that the types
-you built in Chapter 1 -- `Tool`, `ToolDefinition`, `ToolSet` --
+you built in Chapter 4 -- `Tool`, `ToolDefinition`, `ToolSet` --
 work correctly with a concrete tool implementation. If the chapter 3 tests pass,
 your type definitions are correct.
 
@@ -203,7 +203,7 @@ The `Tool` trait is deliberately minimal -- just `definition()` and `call()`. Th
 
 ## Summary
 
-This chapter focused on the *why* behind the tool types you defined in Chapter 1:
+This chapter focused on the *why* behind the tool types you defined in Chapter 4:
 
 - **`#[async_trait]` vs RPITIT** -- the critical distinction. Tools need object safety for heterogeneous storage; providers need zero-cost generics. The two-strategy approach gives you both.
 - **Errors are values** -- tool failures return `Ok("error: ...")`, not `Err(...)`. The agent loop continues. The model adapts.
@@ -213,4 +213,4 @@ In the next chapter we build the `SimpleAgent` -- the loop that ties providers a
 
 ---
 
-[← Chapter 2: Provider & Streaming](./ch02-provider-streaming.md) · [Contents](./ch00-overview.md) · [Chapter 4: The Agentic Loop →](./ch04-query-engine.md)
+[← Chapter 5: Provider & Streaming](./ch05-provider-streaming.md) · [Contents](./ch00-overview.md) · [Chapter 7: The Agentic Loop →](./ch07-query-engine.md)

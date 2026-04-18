@@ -32,7 +32,7 @@ pub enum StreamEvent {
 
 /// Collects [`StreamEvent`]s into a complete [`AssistantTurn`].
 ///
-/// # Chapter 10: Streaming
+/// # Chapter 5: Provider & Streaming
 ///
 /// The accumulator buffers text deltas and tool call fragments, then
 /// assembles them into a complete turn when `finish()` is called.
@@ -126,7 +126,7 @@ struct DeltaFunction {
 
 /// Parse one SSE `data:` line into zero or more [`StreamEvent`]s.
 ///
-/// # Chapter 10: SSE Parsing
+/// # Chapter 5: SSE Parsing
 ///
 /// Hints:
 /// - Strip the `data: ` prefix. If no prefix, return None.
@@ -162,7 +162,7 @@ pub trait StreamProvider: Send + Sync {
 /// A mock streaming provider that wraps [`MockProvider`] and synthesizes
 /// [`StreamEvent`]s from each canned response.
 ///
-/// # Chapter 10: MockStreamProvider
+/// # Chapter 5: MockStreamProvider
 ///
 /// Wraps a MockProvider. When `stream_chat` is called:
 /// 1. Call inner.chat() to get the complete turn

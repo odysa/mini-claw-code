@@ -35,7 +35,7 @@ impl PathValidator {
     /// - Return Ok if the canonical result starts with `self.allowed_dir`, Err otherwise.
     pub fn validate_path(&self, _path: &str) -> Result<(), String> {
         unimplemented!(
-            "TODO ch11: canonicalize path (or its parent) and check it stays under allowed_dir"
+            "TODO ch14: canonicalize path (or its parent) and check it stays under allowed_dir"
         )
     }
 }
@@ -87,7 +87,7 @@ impl CommandFilter {
     /// Hint: Trim the command, then check each `glob::Pattern` in `self.blocked_patterns`.
     pub fn is_blocked(&self, _command: &str) -> Option<&str> {
         unimplemented!(
-            "TODO ch11: return the first blocked pattern that matches the trimmed command"
+            "TODO ch14: return the first blocked pattern that matches the trimmed command"
         )
     }
 }
@@ -133,7 +133,7 @@ impl SafetyCheck for ProtectedFileCheck {
     /// - Match each pattern against both the full path and the bare file name.
     fn check(&self, _tool_name: &str, _args: &Value) -> Result<(), String> {
         unimplemented!(
-            "TODO ch11: for write/edit, fail if path (or file name) matches any protected pattern"
+            "TODO ch14: for write/edit, fail if path (or file name) matches any protected pattern"
         )
     }
 }
@@ -169,7 +169,7 @@ impl Tool for SafeToolWrapper {
     /// so the agent sees the rejection as a normal tool result instead of crashing.
     async fn call(&self, _args: Value) -> anyhow::Result<String> {
         unimplemented!(
-            "TODO ch11: run each SafetyCheck; on first failure return error-shaped Ok, else call inner"
+            "TODO ch14: run each SafetyCheck; on first failure return error-shaped Ok, else call inner"
         )
     }
 }

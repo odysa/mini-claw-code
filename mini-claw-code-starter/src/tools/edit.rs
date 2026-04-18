@@ -5,7 +5,7 @@ use crate::types::*;
 
 /// A tool that replaces an exact string in a file (must appear exactly once).
 ///
-/// # Chapter 4: More Tools — Edit
+/// # Chapter 9: File Tools — Edit
 pub struct EditTool {
     definition: ToolDefinition,
 }
@@ -20,7 +20,7 @@ impl EditTool {
     /// Create a new EditTool. Schema: required "path", "old_string", "new_string" parameters.
     pub fn new() -> Self {
         unimplemented!(
-            "TODO ch6: build a ToolDefinition for 'edit' with required path/old_string/new_string"
+            "TODO ch9: build a ToolDefinition for 'edit' with required path/old_string/new_string"
         )
     }
 }
@@ -42,7 +42,7 @@ impl Tool for EditTool {
     /// - Return confirmation: `format!("edited {path}")`
     async fn call(&self, _args: Value) -> anyhow::Result<String> {
         unimplemented!(
-            "TODO ch6: read file, require exactly one match of old_string, replace, write"
+            "TODO ch9: read file, require exactly one match of old_string, replace, write"
         )
     }
 }

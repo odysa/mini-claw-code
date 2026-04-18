@@ -6,7 +6,7 @@ use crate::types::*;
 
 /// A tool that spawns a child agent to handle a subtask independently.
 ///
-/// # Chapter 13: Subagents
+/// # Bonus: Subagents (no V2 chapter yet)
 ///
 /// The child gets its own message history and tools. The parent sees only
 /// the final answer. Provider sharing uses `Arc<P>`.

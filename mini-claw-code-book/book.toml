@@ -5,14 +5,13 @@ language = "en"
 src = "src"
 
 [build]
-build-dir = "book/en"
+build-dir = "book"
 
 [preprocessor.mermaid]
 command = "mdbook-mermaid"
 
 [output.html]
-additional-js = ["mermaid.min.js", "mermaid-init.js", "lang-switcher.js"]
-additional-css = ["lang-switcher.css"]
-site-url = "/mini-claw-code/en/"
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+site-url = "/mini-claw-code/"
 git-repository-url = "https://github.com/odysa/mini-claw-code"
 git-repository-icon = "fab-github"

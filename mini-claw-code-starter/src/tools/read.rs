@@ -5,7 +5,7 @@ use crate::types::*;
 
 /// A tool that reads the contents of a file.
 ///
-/// # Chapter 2: Your First Tool
+/// # Chapter 2: Your First Tool Call
 ///
 /// Each tool has three parts:
 /// - A `ToolDefinition` describing its name, description, and JSON schema parameters
@@ -28,7 +28,7 @@ impl ReadTool {
     /// Use `ToolDefinition::new("read", "Read the contents of a file.").param(...)`.
     pub fn new() -> Self {
         unimplemented!(
-            "TODO ch3: build a ToolDefinition for 'read' with a required 'path' string param"
+            "TODO ch2: build a ToolDefinition for 'read' with a required 'path' string param"
         )
     }
 }
@@ -45,6 +45,6 @@ impl Tool for ReadTool {
     /// - Extract path: `args["path"].as_str().context("missing 'path' argument")?`
     /// - Read file: `tokio::fs::read_to_string(path).await.with_context(|| ...)?`
     async fn call(&self, _args: Value) -> anyhow::Result<String> {
-        unimplemented!("TODO ch3: extract 'path' from args and read the file via tokio::fs")
+        unimplemented!("TODO ch2: extract 'path' from args and read the file via tokio::fs")
     }
 }

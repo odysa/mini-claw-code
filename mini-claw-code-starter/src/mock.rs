@@ -5,7 +5,7 @@ use crate::types::*;
 
 /// A mock provider for testing. Returns pre-configured responses in sequence.
 ///
-/// # Chapter 1: MockProvider
+/// # Chapter 1: Your First LLM Call
 ///
 /// Your task: Implement a provider that stores a list of `AssistantTurn` responses
 /// and returns them one by one each time `chat()` is called.

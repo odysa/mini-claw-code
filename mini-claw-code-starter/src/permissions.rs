@@ -28,7 +28,7 @@ impl PermissionRule {
     /// Hint: Parse `self.tool_pattern` as a `glob::Pattern` (for wildcards like
     /// `"bash:*"`). Fall back to exact equality if the pattern is invalid.
     pub fn matches(&self, _tool_name: &str) -> bool {
-        unimplemented!("TODO ch10: glob-match tool_pattern against tool_name (exact fallback)")
+        unimplemented!("TODO ch13: glob-match tool_pattern against tool_name (exact fallback)")
     }
 }
 
@@ -63,12 +63,12 @@ impl PermissionEngine {
     /// - Otherwise iterate `rules`; the first rule that matches wins.
     /// - Fall back to `self.default_permission`.
     pub fn evaluate(&self, _tool_name: &str, _args: &Value) -> Permission {
-        unimplemented!("TODO ch10: session_allow → first matching rule → default_permission")
+        unimplemented!("TODO ch13: session_allow → first matching rule → default_permission")
     }
 
     /// Remember that the user granted session-wide allow for this tool.
     pub fn record_session_allow(&mut self, _tool_name: &str) {
-        unimplemented!("TODO ch10: insert tool_name into self.session_allows")
+        unimplemented!("TODO ch13: insert tool_name into self.session_allows")
     }
 
     pub fn is_allowed(&self, tool_name: &str, args: &Value) -> bool {

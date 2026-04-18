@@ -14,7 +14,7 @@ When your plan is ready, call the `exit_plan` tool to submit it for review.";
 
 /// A two-phase agent that separates planning (read-only) from execution (all tools).
 ///
-/// # Chapter 13: Plan Mode
+/// # Chapter 16: Plan Mode
 ///
 /// During the **plan** phase only read-only tools (plus `exit_plan`) are visible.
 /// During the **execute** phase all registered tools are available.
@@ -101,7 +101,7 @@ impl<P: StreamProvider> PlanAgent<P> {
         _events: mpsc::UnboundedSender<AgentEvent>,
     ) -> anyhow::Result<String> {
         unimplemented!(
-            "TODO ch13: streaming agent loop gated by `allowed`; handle exit_plan specially"
+            "TODO ch16: streaming agent loop gated by `allowed`; handle exit_plan specially"
         )
     }
 }

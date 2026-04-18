@@ -1,6 +1,9 @@
-// Chapter 7: The CLI
+// Bonus: Interactive CLI (no book chapter yet — self-guided)
 //
-// Build an interactive CLI that reads prompts in a loop and runs the agent.
+// Wire the agent you built in Chapters 1-10 into an interactive REPL.
+// The reference implementation is at `mini-claw-code/examples/chat.rs`;
+// fill in this stub to build your own without peeking. Run it with:
+//     cargo run -p mini-claw-code-starter --example chat
 //
 // Steps:
 // 1. Import types: BashTool, EditTool, Message, OpenRouterProvider, ReadTool, SimpleAgent, WriteTool

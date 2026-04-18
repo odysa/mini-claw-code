@@ -31,7 +31,7 @@ pub(crate) fn tool_summary(call: &ToolCall) -> String {
 
 /// Handle a single prompt with at most one round of tool calls.
 ///
-/// # Chapter 3: Single Turn
+/// # Chapter 3: The Agentic Loop
 ///
 /// Steps:
 /// 1. Collect tool definitions with `tools.definitions()`
@@ -51,12 +51,12 @@ pub async fn single_turn<P: Provider>(
     _tools: &ToolSet,
     _prompt: &str,
 ) -> anyhow::Result<String> {
-    unimplemented!("TODO ch4: one provider call; on ToolUse execute tools and make a second call")
+    unimplemented!("TODO ch3: one provider call; on ToolUse execute tools and make a second call")
 }
 
 /// A simple AI agent that connects a provider to tools via a loop.
 ///
-/// # Chapter 5: The Agent Loop
+/// # Chapter 3: The Agentic Loop (SimpleAgent)
 ///
 /// The agent loop is just `single_turn()` wrapped in a loop:
 /// 1. Send the user's prompt to the provider
@@ -90,7 +90,7 @@ impl<P: Provider> SimpleAgent<P> {
     /// - If found, call it. Catch errors with unwrap_or_else.
     /// - If not found, return "error: unknown tool `{name}`"
     async fn execute_tools(&self, _calls: &[ToolCall]) -> Vec<(String, String)> {
-        unimplemented!("TODO ch4: look up each tool, call it, collect (id, content) pairs")
+        unimplemented!("TODO ch3: look up each tool, call it, collect (id, content) pairs")
     }
 
     /// Push an assistant turn and its tool results into the message history.
@@ -102,13 +102,13 @@ impl<P: Provider> SimpleAgent<P> {
         _results: Vec<(String, String)>,
     ) {
         unimplemented!(
-            "TODO ch4: push Message::Assistant(turn), then one Message::ToolResult per result"
+            "TODO ch3: push Message::Assistant(turn), then one Message::ToolResult per result"
         )
     }
 
     /// Run the agent loop with existing message history and emit events.
     ///
-    /// # Chapter 9: Events
+    /// # Chapter 7: The Agentic Loop (Deep Dive) — AgentEvents
     ///
     /// Like `chat()` but takes ownership of messages and sends AgentEvents
     /// through the channel instead of printing. Returns the full message history.
@@ -118,7 +118,7 @@ impl<P: Provider> SimpleAgent<P> {
         _events: mpsc::UnboundedSender<AgentEvent>,
     ) -> Vec<Message> {
         unimplemented!(
-            "TODO ch4: like chat() but emit AgentEvents on each turn; return final history"
+            "TODO ch3: like chat() but emit AgentEvents on each turn; return final history"
         )
     }
 
@@ -130,7 +130,7 @@ impl<P: Provider> SimpleAgent<P> {
 
     /// Run the agent loop, accumulating into the provided message history.
     ///
-    /// # Chapter 7: The CLI
+    /// # Chapter 7: The Agentic Loop (Deep Dive) — multi-turn chat
     ///
     /// This is `run()` adapted for multi-turn conversation:
     /// 1. The caller pushes `Message::User(…)` before calling
@@ -141,7 +141,7 @@ impl<P: Provider> SimpleAgent<P> {
     /// 5. Return the cloned text
     #[allow(clippy::ptr_arg)]
     pub async fn chat(&self, _messages: &mut Vec<Message>) -> anyhow::Result<String> {
-        unimplemented!("TODO ch4: loop — provider.chat, match stop_reason, execute tools, repeat")
+        unimplemented!("TODO ch3: loop — provider.chat, match stop_reason, execute tools, repeat")
     }
 
     /// Run the agent loop with the given prompt.

@@ -103,7 +103,7 @@ impl ConfigLoader {
     ///   `MINI_CLAW_MAX_TOKENS`.
     pub fn load() -> Config {
         unimplemented!(
-            "TODO ch14: merge default → project → user → env layers into a single Config"
+            "TODO ch17: merge default → project → user → env layers into a single Config"
         )
     }
 
@@ -111,14 +111,14 @@ impl ConfigLoader {
     ///
     /// Hint: `std::fs::read_to_string(path).ok().and_then(|s| toml::from_str(&s).ok())`.
     pub fn load_path(_path: &Path) -> Option<Config> {
-        unimplemented!("TODO ch14: read the TOML file at path and parse it into a Config")
+        unimplemented!("TODO ch17: read the TOML file at path and parse it into a Config")
     }
 
     /// Load a partial `ConfigOverlay` from a path. The layered loader
     /// uses this so it can tell "unset" from "set to the default".
     #[allow(dead_code)]
     pub fn load_overlay(_path: &Path) -> Option<ConfigOverlay> {
-        unimplemented!("TODO ch14: read the TOML file at path and parse it into a ConfigOverlay")
+        unimplemented!("TODO ch17: read the TOML file at path and parse it into a ConfigOverlay")
     }
 
     #[allow(dead_code)]
@@ -139,6 +139,6 @@ impl ConfigLoader {
     ///   will silently drop later-layer overrides (see issue #10).
     #[allow(dead_code)]
     fn merge(_base: &mut Config, _overlay: ConfigOverlay) {
-        unimplemented!("TODO ch14: apply every Some(_) field from overlay onto base")
+        unimplemented!("TODO ch17: apply every Some(_) field from overlay onto base")
     }
 }

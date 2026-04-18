@@ -2,6 +2,7 @@
 
 > **File(s) to edit:** `src/permissions.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch19`
+> **Estimated time:** 40 min
 
 Your agent does whatever the LLM tells it to.
 
@@ -420,3 +421,7 @@ The engine is pure logic -- it does not execute tools, and it does not interact 
 The permission engine decides *whether* a tool call should run based on who the tool is and what mode the user is in. But it does not look at *what the tool is being asked to do*. A bash tool is bash whether it runs `ls` or `rm -rf /`. A write tool is a write tool whether it targets `src/main.rs` or `.env`.
 
 Chapter 11 adds safety checks -- static analysis of tool arguments that catches dangerous patterns before the permission prompt even appears. It validates paths against allowed directories, matches filenames against protected patterns (`.env`, `.git/config`), and filters bash commands for blocked patterns (`rm -rf /`, `sudo`, fork bombs). Safety checks wrap tools so that dangerous calls are blocked before they execute.
+
+---
+
+[← Chapter 9: Tool Registry](./ch09-tool-registry.md) · [Contents](./ch00-overview.md) · [Chapter 11: Safety Checks →](./ch11-safety.md)

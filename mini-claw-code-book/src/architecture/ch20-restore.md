@@ -1,3 +1,0 @@
-# Chapter: restore
-
-> Coming soon.

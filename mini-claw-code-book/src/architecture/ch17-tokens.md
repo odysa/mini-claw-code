@@ -1,3 +1,0 @@
-# Chapter: tokens
-
-> Coming soon.

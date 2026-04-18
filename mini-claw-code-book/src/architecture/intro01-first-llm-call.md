@@ -1,7 +1,8 @@
 # Chapter 1: Your First LLM Call
 
-> **File to edit:** `src/mock.rs`
+> **File(s) to edit:** `src/mock.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch1_`
+> **Estimated time:** 15 min
 
 Before building an agent, you need to talk to an LLM. In this chapter you will implement a `MockProvider` — a fake LLM that returns canned responses. No API key, no HTTP, no network. Just the protocol.
 
@@ -161,7 +162,7 @@ cargo test -p mini-claw-code-starter test_ch1_
 
 You implemented the `Provider` trait — the interface every LLM backend must satisfy. The `MockProvider` is your testing workhorse. Every test in this entire course uses it instead of calling a real API.
 
-Later (Chapter 5) you'll see `OpenRouterProvider`, which makes real HTTP calls. But the trait is the same. Swap the provider, and the rest of the code doesn't change.
+Later (Deep Dive, Chapter 2) you'll see `OpenRouterProvider`, which makes real HTTP calls. But the trait is the same. Swap the provider, and the rest of the code doesn't change.
 
 ## Key takeaway
 
@@ -169,4 +170,4 @@ An LLM is a function: `messages in → (text, tool_calls, stop_reason) out`. Eve
 
 ---
 
-**Next:** [Chapter 2: Your First Tool Call →](./intro02-first-tool.md)
+[← Contents](./ch00-overview.md) · [Chapter 2: Your First Tool Call →](./intro02-first-tool.md)

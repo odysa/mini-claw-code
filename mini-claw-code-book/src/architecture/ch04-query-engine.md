@@ -2,6 +2,7 @@
 
 > **File(s) to edit:** `src/agent.rs`
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_ch3_` (single_turn), `cargo test -p mini-claw-code-starter test_ch5_` (SimpleAgent)
+> **Estimated time:** 45 min
 
 ## Goal
 
@@ -176,7 +177,7 @@ The caller owns the message history and passes it as `&mut Vec<Message>`. This i
 
 1. **Multi-turn conversations** -- The caller can push a new `Message::User(...)` and call `chat()` again. The agent picks up where it left off with the full context.
 2. **Inspection** -- After `chat()` returns, the caller can examine the full message history to see every tool call, every result, every intermediate step.
-3. **Persistence** -- The caller can serialize the messages to disk for session save/resume (Chapter 19).
+3. **Persistence** -- The caller can serialize the messages to disk for session save/resume.
 
 ## run(): the convenience wrapper
 
@@ -430,3 +431,7 @@ The agentic loop is surprisingly small -- a `loop`, a `match` on `StopReason`, a
 After this chapter, you have a working coding agent. Not a complete one -- it has no real tools yet (those come in later chapters) -- but the core loop is done. You can register any tool that implements the `Tool` trait, point it at any provider that implements `Provider`, and the agent will autonomously loop until it has an answer.
 
 This is the skeleton that everything else hangs on. Every feature you add later -- real tools like Bash and Read, permissions, streaming -- plugs into the loop you just built.
+
+---
+
+[← Chapter 3: Tool Interface](./ch03-tool-interface.md) · [Contents](./ch00-overview.md) · [Chapter 5: System Prompt →](./ch05-system-prompt.md)

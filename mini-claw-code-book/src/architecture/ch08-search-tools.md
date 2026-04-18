@@ -2,6 +2,7 @@
 
 > **File(s) to edit:** (extension -- no stubs in starter)
 > **Tests:** No tests in the starter. GlobTool and GrepTool are extension tools.
+> **Estimated time:** 25 min (read-only)
 
 ## Goal
 
@@ -468,3 +469,7 @@ This chapter added two search tools that let the agent discover and navigate cod
 Search tools are what turn a coding agent from a tool that edits known files into one that can explore and understand an unfamiliar codebase. The two-tool split (glob for names, grep for contents) maps directly to the two questions a developer asks when navigating code: "what files exist?" and "where is this thing?" Keeping them separate gives the LLM a clear, unambiguous interface for each question.
 
 With search tools in place, the agent can now explore an unfamiliar codebase on its own. Given a prompt like "find and fix the bug in the parser," it can glob for source files, grep for the parser code, read the relevant files, and then use the write and edit tools from Chapter 6 to make changes. The tool suite is becoming complete.
+
+---
+
+[← Chapter 7: Bash Tool](./ch07-bash-tool.md) · [Contents](./ch00-overview.md) · [Chapter 9: Tool Registry →](./ch09-tool-registry.md)

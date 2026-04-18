@@ -2,6 +2,7 @@
 
 > **File(s) to edit:** `src/hooks.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch20`
+> **Estimated time:** 40 min
 
 The permission engine from Chapter 10 decides whether a tool call runs. The safety checks from Chapter 11 catch dangerous patterns before the user even sees a prompt. But both systems are baked into the agent -- they enforce rules that you, the developer, chose at compile time. What about the user?
 
@@ -439,3 +440,7 @@ The hook system completes the safety and control layer. The permission engine (C
 ## What's next
 
 Chapter 13 -- Plan Mode -- ties together everything from Part III. Plan mode is a restricted execution mode where only read-only tools run. The agent can read files, search code, and reason about a task, but it cannot write, edit, or execute commands. The permission engine checks tool categories. Safety checks validate arguments. Hooks fire for observation. But nothing destructive happens. It is the ultimate guardrail: the agent plans, the user reviews, and only then does execution begin.
+
+---
+
+[← Chapter 11: Safety Checks](./ch11-safety.md) · [Contents](./ch00-overview.md) · [Chapter 13: Plan Mode →](./ch13-plan-mode.md)

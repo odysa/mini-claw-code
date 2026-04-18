@@ -2,6 +2,7 @@
 
 > **File(s) to edit:** `src/safety.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch18`
+> **Estimated time:** 40 min
 
 The permission engine from Chapter 10 gates every tool call -- it decides whether to allow, deny, or ask the user before execution proceeds. But it makes that decision based on the *tool*, not the *arguments*. A `write` call in auto mode is allowed regardless of whether the target path is `src/main.rs` or `.env`. A `bash` call in default mode prompts the user whether the command is `ls` or `rm -rf /`. The permission engine knows *who* is knocking. It does not look at what they are carrying.
 
@@ -379,3 +380,7 @@ The architecture -- composable checks that inspect arguments and wrap tools -- d
 ## What's next
 
 In [Chapter 12: Hook System](./ch12-hooks.md) you will build pre-tool and post-tool hooks -- shell commands that run before and after tool execution. Hooks let users enforce custom policies beyond what the built-in safety checker covers: run a linter after every edit, block writes to specific directories, log every bash command. Where the safety checker is a built-in guard, hooks are user-defined guards.
+
+---
+
+[← Chapter 10: Permission Engine](./ch10-permissions.md) · [Contents](./ch00-overview.md) · [Chapter 12: Hooks →](./ch12-hooks.md)

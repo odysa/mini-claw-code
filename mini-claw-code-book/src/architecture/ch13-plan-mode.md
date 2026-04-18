@@ -2,6 +2,7 @@
 
 > **File(s) to edit:** `src/planning.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch12`
+> **Estimated time:** 50 min
 
 Your agent can now read files, write code, run shell commands, and do all of it
 under a permission system with safety checks and hooks. There is one problem:
@@ -590,17 +591,17 @@ test harness.
 
 ## What's next
 
-Part III gave your agent safety and control. Part IV -- Configuration & Context
--- builds the systems that make your agent project-aware:
+Part III gave your agent safety and control. Part IV -- Configuration --
+builds the systems that make your agent project-aware:
 
 - **Chapter 14: Settings Hierarchy** -- Layered configuration from global
   defaults to project-specific overrides.
 - **Chapter 15: Project Instructions** -- Loading and assembling CLAUDE.md files
   that tell the agent how to work with this specific codebase.
-- **Chapter 16: Memory System** -- Persistent memory that survives across
-  sessions.
-- **Chapter 17: Token & Cost Tracking** -- Monitoring how much context and money
-  each interaction consumes.
 
 The safety infrastructure you built in Part III protects the agent from doing
 harm. The configuration infrastructure in Part IV teaches it to do good.
+
+---
+
+[← Chapter 12: Hooks](./ch12-hooks.md) · [Contents](./ch00-overview.md) · [Chapter 14: Settings Hierarchy →](./ch14-settings.md)

@@ -2,6 +2,7 @@
 
 > **File(s) to edit:** `src/types.rs` (pre-filled in starter)
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch1_`
+> **Estimated time:** 20 min (study only)
 
 ## Goal
 
@@ -303,7 +304,7 @@ Just two required methods -- this is deliberately minimal:
 
 Note that `call()` returns `anyhow::Result<String>` -- not a `ToolResult` struct. The starter simplifies tool output to plain strings. If a tool fails, you can return `Ok(format!("error: {e}"))` to let the model see the error and recover, or return `Err(e)` for unrecoverable situations.
 
-The trait is marked `Send + Sync` (required by `#[async_trait]` for object safety) so tools can be stored in the `ToolSet` and called from async contexts. The `#[async_trait]` macro desugars `async fn call(...)` into a method returning `Pin<Box<dyn Future>>`, which is needed because `ToolSet` stores tools as `Box<dyn Tool>`. You do not need to implement any concrete tools yet -- that comes in later chapters.
+The trait uses `#[async_trait]` and is marked `Send + Sync` so tools can be stored as `Box<dyn Tool>` in the `ToolSet` and called from async contexts. For why `Tool` uses `#[async_trait]` while `Provider` uses RPITIT, see [Why two async trait styles?](./ch03-tool-interface.md#async-styles).
 
 ---
 
@@ -390,11 +391,9 @@ cargo test -p mini-claw-code-starter test_ch1_token_usage_default
 
 ## 1.9 The Provider trait
 
-### Rust concept: RPITIT (return-position impl Trait in traits)
+### The Provider trait
 
-The `Provider` trait uses a feature stabilized in Rust 1.75 called RPITIT. Instead of `async fn chat(...)`, we write `fn chat(...) -> impl Future<...> + Send + 'a`. This lets the compiler generate a unique, zero-cost future type for each implementation -- no heap allocation, no `Box<dyn Future>`. The trade-off is that RPITIT makes the trait *not object-safe*: you cannot write `Box<dyn Provider>`. That is fine here because providers are always used as generic parameters (`struct SimpleAgent<P: Provider>`), not as trait objects.
-
-The `Provider` trait is also defined in `src/types.rs`. It abstracts over any LLM backend:
+The `Provider` trait is defined in `src/types.rs`. It abstracts over any LLM backend:
 
 ```rust
 pub trait Provider: Send + Sync {
@@ -406,7 +405,7 @@ pub trait Provider: Send + Sync {
 }
 ```
 
-This uses RPITIT (return-position `impl Trait` in traits) instead of `#[async_trait]`. The `Provider` is always used as a generic parameter (`P: Provider`), never as `dyn Provider`, so we do not need object safety and can avoid the heap allocation that `async_trait` requires.
+Unlike `Tool`, `Provider` uses RPITIT (return-position `impl Trait` in traits) rather than `#[async_trait]`. The full trade-off is covered in [Why two async trait styles?](./ch03-tool-interface.md#async-styles).
 
 A blanket impl lets `Arc<P>` also be a `Provider`, which is needed later for sharing a provider between an agent and its subagents:
 
@@ -456,3 +455,7 @@ This chapter established the type vocabulary for the entire agent:
 The entire agent -- tools, providers, the loop itself -- is built on the vocabulary defined in this chapter. Getting these types right (especially the `Message` enum and `StopReason`) determines whether the agent loop is simple or tangled. The types are the contract; everything else is implementation.
 
 None of these types do anything on their own -- they are the nouns of the system. In the next chapter, we will implement the `MockProvider` and `OpenRouterProvider`, giving these types their first verbs.
+
+---
+
+[← Getting Started Chapter 3: The Agentic Loop](./intro03-agentic-loop.md) · [Contents](./ch00-overview.md) · [Chapter 2: Provider & Streaming →](./ch02-provider-streaming.md)

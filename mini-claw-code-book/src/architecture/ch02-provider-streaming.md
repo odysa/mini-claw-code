@@ -2,6 +2,7 @@
 
 > **File(s) to edit:** `src/mock.rs`, `src/streaming.rs`, `src/providers/openrouter.rs`
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_ch1_` (MockProvider), `cargo test -p mini-claw-code-starter test_ch6_` (OpenRouterProvider), `cargo test -p mini-claw-code-starter test_ch10` (streaming)
+> **Estimated time:** 60 min
 
 ## Goal
 
@@ -75,9 +76,9 @@ pub trait Provider: Send + Sync {
 
 A few things to notice:
 
-**No `#[async_trait]`.** Older Rust code uses the `async_trait` crate to work around the fact that traits could not have `async fn` methods. Since Rust 1.75, the language supports *return-position `impl Trait` in traits* (RPITIT). Instead of writing `async fn chat(...)`, we write `fn chat(...) -> impl Future<...>` and the compiler handles the rest. The effect is the same -- callers can `.await` the return value -- but we avoid a heap allocation that `async_trait` required (it boxed every future).
+**No `#[async_trait]`.** The `Provider` trait uses *return-position `impl Trait` in traits* (RPITIT) -- stabilized in Rust 1.75. Writing `fn chat(...) -> impl Future<...>` instead of `async fn chat(...)` gives us explicit control over the lifetime and `Send` bound; `async fn` in a trait does not always infer `Send` for the returned future, which would prevent spawning onto a multi-threaded runtime. The explicit `impl Future<...> + Send + 'a` signature solves that, and it avoids the heap allocation that `#[async_trait]` would require.
 
-We use RPITIT rather than `async fn` in the trait signature because it gives us explicit control over the lifetime and `Send` bound. Writing `async fn` in a trait works, but today it does not automatically infer `Send` for the returned future, which means you cannot spawn the future onto a multi-threaded runtime. The explicit `impl Future<...> + Send + 'a` signature solves that.
+The `Tool` trait in Chapter 3 uses `#[async_trait]` for the opposite reason -- object safety for heterogeneous storage. For the full explanation of when to pick which style, see [Why two async trait styles?](./ch03-tool-interface.md#async-styles).
 
 **Why `Send + Sync` on the trait itself?** Our agent loop will hold a `P: Provider` behind a shared reference (and later behind `Arc`). The `Sync` bound lets multiple tasks share the provider, and `Send` lets it cross thread boundaries.
 
@@ -637,3 +638,7 @@ The provider layer decouples the agent from any specific LLM backend. The `MockP
 You built the LLM abstraction layer. The `Provider` and `StreamProvider` traits decouple the agent from any specific backend. The `MockProvider` enables deterministic testing. The SSE parser and `StreamAccumulator` handle the real-time streaming protocol. And the `Arc<P>` blanket impl prepares you for provider sharing in later chapters.
 
 In Chapter 3, you will explore the `Tool` trait -- the other half of the agent's interface with the outside world.
+
+---
+
+[← Chapter 1: Messages & Types](./ch01-messages-types.md) · [Contents](./ch00-overview.md) · [Chapter 3: Tool Interface →](./ch03-tool-interface.md)

@@ -2,6 +2,7 @@
 
 > **File(s) to edit:** `src/tools/bash.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch4_` (bash tests are grouped with other tools)
+> **Estimated time:** 35 min
 
 ## Goal
 
@@ -339,3 +340,7 @@ The bash tool is what makes a coding agent a *programmer* rather than a text edi
 ## What's next
 
 In [Chapter 8: Search Tools](./ch08-search-tools.md) you will build the tools that help the agent navigate large codebases -- glob for finding files by pattern and grep for searching file contents. These read-only tools are the agent's eyes, complementing the hands (bash, write, edit) you have already built.
+
+---
+
+[← Chapter 6: File Tools](./ch06-file-tools.md) · [Contents](./ch00-overview.md) · [Chapter 8: Search Tools →](./ch08-search-tools.md)

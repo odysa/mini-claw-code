@@ -2,6 +2,7 @@
 
 > **File(s) to edit:** `src/types.rs` (ToolSet)
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch7_` (integration tests)
+> **Estimated time:** 30 min
 
 You have five tools. You have a `SimpleAgent`. This chapter wires them together.
 
@@ -336,7 +337,7 @@ Claude Code's tool registry is substantially larger, but the architecture is the
 
 **Tool groups.** Claude Code organizes tools into permission groups. File tools, git tools, and shell tools each have group-level allow/deny rules. Our flat `ToolSet` is simpler -- the permission engine (when implemented) would check per-tool metadata.
 
-**Usage statistics.** Claude Code tracks how often each tool is called, how long each call takes, and how many tokens each result consumes. This data feeds into the TUI's status display and helps with cost estimation. We track token usage at the session level (Chapter 17) but not per-tool.
+**Usage statistics.** Claude Code tracks how often each tool is called, how long each call takes, and how many tokens each result consumes. This data feeds into the TUI's status display and helps with cost estimation. Our book does not cover usage statistics, though the `TokenUsage` type from Chapter 1 gives you a starting point at the message level.
 
 Despite these differences, the core protocol is identical. The LLM sees a list of tool schemas. It decides to call one. The agent looks up the tool by name, executes it, and feeds the result back. Everything else -- permissions, groups, statistics, dynamic registration -- is orchestration around that lookup.
 
@@ -402,3 +403,7 @@ Part III -- Safety & Control -- adds the guardrails that turn a working agent in
 - **Chapter 13: Plan Mode** -- A restricted execution mode where only read-only tools run. The agent can analyze and plan but never modify. This is where `is_read_only()` finally gets enforced.
 
 The tools you built in Part II are the hands. Part III teaches the agent when to use them -- and when not to.
+
+---
+
+[← Chapter 8: Search Tools](./ch08-search-tools.md) · [Contents](./ch00-overview.md) · [Chapter 10: Permission Engine →](./ch10-permissions.md)

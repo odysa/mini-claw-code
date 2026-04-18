@@ -1,3 +1,0 @@
-# Chapter: subagents
-
-> Coming soon.

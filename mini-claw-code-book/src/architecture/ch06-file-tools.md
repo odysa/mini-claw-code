@@ -2,6 +2,7 @@
 
 > **File(s) to edit:** `src/tools/read.rs`, `src/tools/write.rs`, `src/tools/edit.rs`
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_ch2_` (ReadTool), `cargo test -p mini-claw-code-starter test_ch4_` (WriteTool, EditTool)
+> **Estimated time:** 50 min
 
 ## Goal
 
@@ -643,3 +644,7 @@ File tools are the agent's hands on the codebase. The three-tool split -- read, 
 In [Chapter 7: Bash Tool](./ch07-bash-tool.md), you will build the most
 powerful (and most dangerous) tool in the agent's arsenal -- one that can run
 arbitrary shell commands.
+
+---
+
+[← Chapter 5: System Prompt](./ch05-system-prompt.md) · [Contents](./ch00-overview.md) · [Chapter 7: Bash Tool →](./ch07-bash-tool.md)

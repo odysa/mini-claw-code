@@ -2,6 +2,7 @@
 
 > **File(s) to edit:** `src/config.rs`, `src/usage.rs`
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_ch16` (Config, ConfigLoader), `cargo test -p mini-claw-code-starter test_ch14` (CostTracker)
+> **Estimated time:** 60 min
 
 Your agent works. It reads files, writes code, runs commands, checks permissions, enforces safety rules, and restricts itself in plan mode. But every one of those behaviors is hardcoded. The model name is a string literal. The blocked commands list is baked into the source. The maximum context window is a constant. If you want to change any of them, you recompile.
 
@@ -104,7 +105,7 @@ Eight fields spanning three categories: provider settings, safety settings, and 
 
 **`base_url`** is the API endpoint. The default points to OpenRouter (`https://openrouter.ai/api/v1`). Users running a local proxy, a corporate gateway, or a different OpenAI-compatible API change this to point at their endpoint.
 
-**`max_context_tokens`** caps the context window at 200,000 tokens. The compaction engine (Chapter 18) uses this value to decide when to summarize old messages. Different models have different context limits -- Haiku supports 200K, but a self-hosted model might only handle 8K.
+**`max_context_tokens`** caps the context window at 200,000 tokens. A compaction engine would read this value to decide when to summarize old messages. Different models have different context limits -- Haiku supports 200K, but a self-hosted model might only handle 8K.
 
 ### Safety settings
 
@@ -591,3 +592,7 @@ This chapter built two subsystems that the rest of the agent depends on.
 ## What's next
 
 Configuration tells the agent *how* to behave. Chapter 15 -- Project Instructions -- tells it *what* to know. The `instructions` field you saw in `Config` is just a string. The instruction system reads `CLAUDE.md` files from the project tree, merges them with user instructions, and injects them into the system prompt. Together, settings and instructions make the agent context-aware -- it adapts its behavior and knowledge to each project it works in.
+
+---
+
+[← Chapter 13: Plan Mode](./ch13-plan-mode.md) · [Contents](./ch00-overview.md) · [Chapter 15: Project Instructions →](./ch15-instructions.md)

@@ -2,6 +2,7 @@
 
 > **File(s) to edit:** `src/tools/read.rs`
 > **Test to run:** `cargo test -p mini-claw-code-starter test_ch2_`
+> **Estimated time:** 25 min
 
 ## Goal
 
@@ -44,9 +45,11 @@ We are going to keep the shape but cut the ceremony. In our Rust version:
 
 The key simplification: we drop the generic parameters and the safety/display methods. Claude Code needs `<Input, Output, Progress>` because each tool has a distinct strongly-typed input shape and renders different UI. We use `serde_json::Value` for input and `String` for output, which lets us store heterogeneous tools in a single collection without type erasure gymnastics.
 
-## Why `#[async_trait]` for tools but not for providers
+<a id="async-styles"></a>
 
-This is the most important design decision in the type system, and it is worth understanding deeply.
+## Why two async trait styles? (`#[async_trait]` vs RPITIT)
+
+This is the most important design decision in the type system, and it is worth understanding deeply. The same trade-off drives every async trait in this book -- `Provider`, `Tool`, `StreamProvider`, `Hook`, `SafetyCheck`. Read this section once; other chapters link back to it.
 
 Look at the `Provider` trait from Chapter 1:
 
@@ -169,7 +172,7 @@ Claude Code's tool system is substantially larger:
 - **React rendering** -- tools can return React elements that render rich terminal UI (diffs, tables, progress bars). We return plain strings.
 - **Progress events** -- tools emit typed progress events during execution. We have `activity_description()` for a simple spinner.
 - **Tool groups and permissions** -- tools are organized into permission groups with allow/deny lists. We will build our permission system in Chapter 10, but it will be simpler.
-- **Cost hints** -- tools can declare estimated token costs to help the context manager. We will add token tracking in Chapter 17 at the session level.
+- **Cost hints** -- tools can declare estimated token costs to help the context manager. Our `TokenUsage` type from Chapter 1 tracks tokens at the message level, but we do not carry cost hints on individual tools.
 
 Despite these differences, the core protocol is identical. An LLM sees a list of tool schemas, decides to call one, the agent executes it, and the result goes back to the LLM. Everything else -- validation, permissions, progress, rendering -- is orchestration around that loop. Understanding the `Tool` trait gives you the foundation to understand Claude Code's full system.
 
@@ -207,3 +210,7 @@ This chapter focused on the *why* behind the tool types you defined in Chapter 1
 - **EchoTool** -- your first concrete tool, demonstrating the full lifecycle: schema definition, trait implementation, registration, execution.
 
 In the next chapter we build the `SimpleAgent` -- the loop that ties providers and tools together into a functioning agent.
+
+---
+
+[← Chapter 2: Provider & Streaming](./ch02-provider-streaming.md) · [Contents](./ch00-overview.md) · [Chapter 4: The Agentic Loop →](./ch04-query-engine.md)

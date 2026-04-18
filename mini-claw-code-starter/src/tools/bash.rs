@@ -21,10 +21,9 @@ impl Default for BashTool {
 impl BashTool {
     /// Create a new BashTool. Schema: one required "command" parameter (string).
     pub fn new() -> Self {
-        Self {
-            definition: ToolDefinition::new("bash", "Run a bash command and return its output.")
-                .param("command", "string", "The bash command to run", true),
-        }
+        unimplemented!(
+            "TODO ch7: build a ToolDefinition for 'bash' with a required 'command' string param"
+        )
     }
 }
 
@@ -42,36 +41,9 @@ impl Tool for BashTool {
     /// - Convert stdout/stderr: `String::from_utf8_lossy(&output.stdout)`
     /// - Build result: stdout first, then stderr prefixed with `"stderr: "`
     /// - If both empty, return `"(no output)"`
-    async fn call(&self, args: Value) -> anyhow::Result<String> {
-        let cmd = args["command"]
-            .as_str()
-            .context("missing 'command' argument")?;
-
-        let output = tokio::process::Command::new("bash")
-            .arg("-c")
-            .arg(cmd)
-            .output()
-            .await
-            .with_context(|| format!("failed to run command: {cmd}"))?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-        let mut result = String::new();
-        if !stdout.is_empty() {
-            result.push_str(&stdout);
-        }
-        if !stderr.is_empty() {
-            if !result.is_empty() {
-                result.push('\n');
-            }
-            result.push_str("stderr: ");
-            result.push_str(&stderr);
-        }
-        if result.is_empty() {
-            result.push_str("(no output)");
-        }
-
-        Ok(result)
+    async fn call(&self, _args: Value) -> anyhow::Result<String> {
+        unimplemented!(
+            "TODO ch7: run `bash -c <command>`, capture stdout+stderr, fall back to (no output)"
+        )
     }
 }

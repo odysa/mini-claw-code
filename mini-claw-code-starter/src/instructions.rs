@@ -18,55 +18,35 @@ impl InstructionLoader {
     }
 
     /// Discover instruction files by walking up from start_dir.
-    pub fn discover(&self, start_dir: &Path) -> Vec<PathBuf> {
-        let mut found = Vec::new();
-        let mut dir = Some(start_dir.to_path_buf());
-
-        while let Some(current) = dir {
-            for name in &self.file_names {
-                let candidate = current.join(name);
-                if candidate.is_file() {
-                    found.push(candidate);
-                }
-            }
-            dir = current.parent().map(|p| p.to_path_buf());
-        }
-
-        found.reverse();
-        found
+    ///
+    /// Hints:
+    /// - Start at `start_dir`, walk up with `.parent()` until `None`.
+    /// - At each level, check every `file_names` entry; push matches.
+    /// - Reverse at the end so root-level files come first.
+    pub fn discover(&self, _start_dir: &Path) -> Vec<PathBuf> {
+        unimplemented!(
+            "TODO ch15: walk upward from start_dir collecting matching files, return root-first"
+        )
     }
 
     /// Load and concatenate all discovered files, separated by headers.
-    pub fn load(&self, start_dir: &Path) -> Option<String> {
-        let files = self.discover(start_dir);
-        let mut sections = Vec::new();
-
-        for path in &files {
-            if let Ok(content) = std::fs::read_to_string(path)
-                && !content.trim().is_empty()
-            {
-                sections.push(format!(
-                    "# Instructions from {}\n\n{}",
-                    path.display(),
-                    content.trim()
-                ));
-            }
-        }
-
-        if sections.is_empty() {
-            None
-        } else {
-            Some(sections.join("\n\n---\n\n"))
-        }
+    ///
+    /// Hints:
+    /// - Call `self.discover(start_dir)`.
+    /// - For each path, read_to_string; skip if empty after trim.
+    /// - Format each section: "# Instructions from {path}\n\n{content}".
+    /// - Join sections with "\n\n---\n\n". Return `None` if nothing loaded.
+    pub fn load(&self, _start_dir: &Path) -> Option<String> {
+        unimplemented!("TODO ch15: read each discovered file and concatenate with headers")
     }
 
     /// Build a system prompt section from discovered instructions.
-    pub fn system_prompt_section(&self, start_dir: &Path) -> Option<String> {
-        self.load(start_dir).map(|content| {
-            format!(
-                "The following project instructions were loaded automatically. \
-                 Follow them carefully:\n\n{content}"
-            )
-        })
+    ///
+    /// Hint: Call `self.load(start_dir)` and wrap the result in a short preamble
+    /// telling the model these are auto-loaded project instructions.
+    pub fn system_prompt_section(&self, _start_dir: &Path) -> Option<String> {
+        unimplemented!(
+            "TODO ch5: wrap the loaded instruction text with a preamble for the system prompt"
+        )
     }
 }

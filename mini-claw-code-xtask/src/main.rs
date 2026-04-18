@@ -4,7 +4,7 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     match args.first().map(|s| s.as_str()) {
-        Some("check") => check("mini-claw-code-starter"),
+        Some("check") => starter_check("mini-claw-code-starter"),
         Some("solution-check") => check("mini-claw-code"),
         Some("book") => book(),
         Some("book-zh") => book_zh(),
@@ -38,6 +38,23 @@ fn check(package: &str) {
     run("cargo", &["test", "-p", package], "test");
 
     println!("\nAll checks passed for {package}!");
+}
+
+/// Starter-template check: verifies the skeleton compiles and lints cleanly,
+/// but does NOT run tests (they're expected to fail on `unimplemented!()` stubs
+/// until the learner fills them in).
+fn starter_check(package: &str) {
+    println!("Checking starter template {package}...\n");
+
+    run("cargo", &["fmt", "--check", "-p", package], "fmt");
+    run(
+        "cargo",
+        &["clippy", "-p", package, "--", "-D", "warnings"],
+        "clippy",
+    );
+    run("cargo", &["test", "-p", package, "--no-run"], "test-build");
+
+    println!("\nStarter template {package} compiles cleanly.");
 }
 
 fn run(cmd: &str, args: &[&str], label: &str) {

@@ -140,72 +140,15 @@ impl OpenRouterProvider {
     ///   tool_calls: convert each ToolCall to ApiToolCall (arguments.to_string() for Value→String)
     ///   Set tool_calls to None (not Some(vec![])) when empty.
     /// - ToolResult -> role: "tool", content: Some(content.clone()), tool_call_id: Some(id.clone())
-    pub(crate) fn convert_messages(messages: &[Message]) -> Vec<ApiMessage> {
-        messages
-            .iter()
-            .map(|msg| match msg {
-                Message::System(text) => ApiMessage {
-                    role: "system".into(),
-                    content: Some(text.clone()),
-                    tool_calls: None,
-                    tool_call_id: None,
-                },
-                Message::User(text) => ApiMessage {
-                    role: "user".into(),
-                    content: Some(text.clone()),
-                    tool_calls: None,
-                    tool_call_id: None,
-                },
-                Message::Assistant(turn) => {
-                    let tool_calls = if turn.tool_calls.is_empty() {
-                        None
-                    } else {
-                        Some(
-                            turn.tool_calls
-                                .iter()
-                                .map(|tc| ApiToolCall {
-                                    id: tc.id.clone(),
-                                    type_: "function".into(),
-                                    function: ApiFunction {
-                                        name: tc.name.clone(),
-                                        arguments: tc.arguments.to_string(),
-                                    },
-                                })
-                                .collect(),
-                        )
-                    };
-                    ApiMessage {
-                        role: "assistant".into(),
-                        content: turn.text.clone(),
-                        tool_calls,
-                        tool_call_id: None,
-                    }
-                }
-                Message::ToolResult { id, content } => ApiMessage {
-                    role: "tool".into(),
-                    content: Some(content.clone()),
-                    tool_calls: None,
-                    tool_call_id: Some(id.clone()),
-                },
-            })
-            .collect()
+    pub(crate) fn convert_messages(_messages: &[Message]) -> Vec<ApiMessage> {
+        unimplemented!("TODO ch5: map each Message variant to an ApiMessage")
     }
 
     /// Convert our ToolDefinition types to the API's tool format.
     ///
     /// Each tool becomes: { type: "function", function: { name, description, parameters } }
-    pub(crate) fn convert_tools(tools: &[&ToolDefinition]) -> Vec<ApiTool> {
-        tools
-            .iter()
-            .map(|td| ApiTool {
-                type_: "function",
-                function: ApiToolDef {
-                    name: td.name,
-                    description: td.description,
-                    parameters: td.parameters.clone(),
-                },
-            })
-            .collect()
+    pub(crate) fn convert_tools(_tools: &[&ToolDefinition]) -> Vec<ApiTool> {
+        unimplemented!("TODO ch5: wrap each ToolDefinition in an ApiTool with type=function")
     }
 }
 
@@ -224,48 +167,13 @@ impl crate::streaming::StreamProvider for OpenRouterProvider {
     /// 7. Return acc.finish()
     async fn stream_chat(
         &self,
-        messages: &[Message],
-        tools: &[&ToolDefinition],
-        tx: tokio::sync::mpsc::UnboundedSender<crate::streaming::StreamEvent>,
+        _messages: &[Message],
+        _tools: &[&ToolDefinition],
+        _tx: tokio::sync::mpsc::UnboundedSender<crate::streaming::StreamEvent>,
     ) -> anyhow::Result<AssistantTurn> {
-        use crate::streaming::{StreamAccumulator, StreamEvent, parse_sse_line};
-
-        let request = ChatRequest {
-            model: &self.model,
-            messages: Self::convert_messages(messages),
-            tools: Self::convert_tools(tools),
-            stream: true,
-        };
-
-        let mut resp = self
-            .client
-            .post(format!("{}/chat/completions", self.base_url))
-            .bearer_auth(&self.api_key)
-            .json(&request)
-            .send()
-            .await
-            .context("failed to send streaming request")?;
-
-        let mut acc = StreamAccumulator::new();
-        let mut buffer = String::new();
-
-        while let Some(chunk) = resp.chunk().await? {
-            buffer.push_str(&String::from_utf8_lossy(&chunk));
-            while let Some(pos) = buffer.find('\n') {
-                let line = buffer[..pos].trim_end_matches('\r').to_string();
-                buffer = buffer[pos + 1..].to_string();
-                if line.is_empty() {
-                    continue;
-                }
-                if let Some(events) = parse_sse_line(&line) {
-                    for event in events {
-                        acc.feed(&event);
-                        let _ = tx.send(event);
-                    }
-                }
-            }
-        }
-        Ok(acc.finish())
+        unimplemented!(
+            "TODO ch5: POST with stream=true, split SSE lines, parse each, feed the accumulator and send events"
+        )
     }
 }
 
@@ -285,63 +193,11 @@ impl Provider for OpenRouterProvider {
     /// 7. Extract usage from response if present
     async fn chat(
         &self,
-        messages: &[Message],
-        tools: &[&ToolDefinition],
+        _messages: &[Message],
+        _tools: &[&ToolDefinition],
     ) -> anyhow::Result<AssistantTurn> {
-        let request = ChatRequest {
-            model: &self.model,
-            messages: Self::convert_messages(messages),
-            tools: Self::convert_tools(tools),
-            stream: false,
-        };
-
-        let resp = self
-            .client
-            .post(format!("{}/chat/completions", self.base_url))
-            .bearer_auth(&self.api_key)
-            .json(&request)
-            .send()
-            .await
-            .context("failed to send request")?;
-
-        let body = resp.text().await.context("failed to read response body")?;
-        let chat_resp: ChatResponse =
-            serde_json::from_str(&body).context("failed to parse response")?;
-
-        let choice = chat_resp
-            .choices
-            .into_iter()
-            .next()
-            .context("no choices in response")?;
-
-        let tool_calls = choice
-            .message
-            .tool_calls
-            .unwrap_or_default()
-            .into_iter()
-            .map(|tc| ToolCall {
-                id: tc.id,
-                name: tc.function.name,
-                arguments: serde_json::from_str(&tc.function.arguments).unwrap_or(Value::Null),
-            })
-            .collect::<Vec<_>>();
-
-        let stop_reason = if choice.finish_reason.as_deref() == Some("tool_calls") {
-            StopReason::ToolUse
-        } else {
-            StopReason::Stop
-        };
-
-        let usage = chat_resp.usage.map(|u| TokenUsage {
-            input_tokens: u.prompt_tokens.unwrap_or(0),
-            output_tokens: u.completion_tokens.unwrap_or(0),
-        });
-
-        Ok(AssistantTurn {
-            text: choice.message.content,
-            tool_calls,
-            stop_reason,
-            usage,
-        })
+        unimplemented!(
+            "TODO ch5: POST /chat/completions with bearer auth, parse ChatResponse, build AssistantTurn"
+        )
     }
 }

@@ -23,12 +23,12 @@ impl PermissionRule {
         }
     }
 
-    pub fn matches(&self, tool_name: &str) -> bool {
-        if let Ok(pattern) = glob::Pattern::new(&self.tool_pattern) {
-            pattern.matches(tool_name)
-        } else {
-            self.tool_pattern == tool_name
-        }
+    /// Check whether this rule matches the given tool name.
+    ///
+    /// Hint: Parse `self.tool_pattern` as a `glob::Pattern` (for wildcards like
+    /// `"bash:*"`). Fall back to exact equality if the pattern is invalid.
+    pub fn matches(&self, _tool_name: &str) -> bool {
+        unimplemented!("TODO ch10: glob-match tool_pattern against tool_name (exact fallback)")
     }
 }
 
@@ -56,22 +56,19 @@ impl PermissionEngine {
         Self::new(vec![], Permission::Allow)
     }
 
-    pub fn evaluate(&self, tool_name: &str, _args: &Value) -> Permission {
-        if self.session_allows.contains(tool_name) {
-            return Permission::Allow;
-        }
-
-        for rule in &self.rules {
-            if rule.matches(tool_name) {
-                return rule.permission.clone();
-            }
-        }
-
-        self.default_permission.clone()
+    /// Decide the permission for a tool call.
+    ///
+    /// Hints:
+    /// - If `session_allows` already contains `tool_name`, return `Allow`.
+    /// - Otherwise iterate `rules`; the first rule that matches wins.
+    /// - Fall back to `self.default_permission`.
+    pub fn evaluate(&self, _tool_name: &str, _args: &Value) -> Permission {
+        unimplemented!("TODO ch10: session_allow → first matching rule → default_permission")
     }
 
-    pub fn record_session_allow(&mut self, tool_name: &str) {
-        self.session_allows.insert(tool_name.to_string());
+    /// Remember that the user granted session-wide allow for this tool.
+    pub fn record_session_allow(&mut self, _tool_name: &str) {
+        unimplemented!("TODO ch10: insert tool_name into self.session_allows")
     }
 
     pub fn is_allowed(&self, tool_name: &str, args: &Value) -> bool {

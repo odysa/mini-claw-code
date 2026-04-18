@@ -26,46 +26,17 @@ impl PathValidator {
         }
     }
 
-    pub fn validate_path(&self, path: &str) -> Result<(), String> {
-        let target = Path::new(path);
-
-        let resolved = if target.is_absolute() {
-            target.to_path_buf()
-        } else {
-            self.raw_dir.join(target)
-        };
-
-        let canonical_target = if resolved.exists() {
-            resolved
-                .canonicalize()
-                .map_err(|e| format!("cannot resolve path: {e}"))?
-        } else {
-            let parent = resolved.parent().ok_or("invalid path")?;
-            if parent.exists() {
-                let mut canonical = parent
-                    .canonicalize()
-                    .map_err(|e| format!("cannot resolve parent: {e}"))?;
-                if let Some(filename) = resolved.file_name() {
-                    canonical.push(filename);
-                }
-                canonical
-            } else {
-                return Err(format!(
-                    "parent directory does not exist: {}",
-                    parent.display()
-                ));
-            }
-        };
-
-        if canonical_target.starts_with(&self.allowed_dir) {
-            Ok(())
-        } else {
-            Err(format!(
-                "path {} is outside allowed directory {}",
-                canonical_target.display(),
-                self.allowed_dir.display()
-            ))
-        }
+    /// Validate that `path` resolves to somewhere inside `self.allowed_dir`.
+    ///
+    /// Hints:
+    /// - Build the resolved path: absolute stays absolute, relative joins `self.raw_dir`.
+    /// - If it exists, canonicalize; otherwise canonicalize the parent and append
+    ///   the filename (so new files in allowed dirs still validate).
+    /// - Return Ok if the canonical result starts with `self.allowed_dir`, Err otherwise.
+    pub fn validate_path(&self, _path: &str) -> Result<(), String> {
+        unimplemented!(
+            "TODO ch11: canonicalize path (or its parent) and check it stays under allowed_dir"
+        )
     }
 }
 
@@ -111,14 +82,13 @@ impl CommandFilter {
         ])
     }
 
-    pub fn is_blocked(&self, command: &str) -> Option<&str> {
-        let trimmed = command.trim();
-        for pattern in &self.blocked_patterns {
-            if pattern.matches(trimmed) {
-                return Some(pattern.as_str());
-            }
-        }
-        None
+    /// Return the first blocked pattern that matches `command`, or `None`.
+    ///
+    /// Hint: Trim the command, then check each `glob::Pattern` in `self.blocked_patterns`.
+    pub fn is_blocked(&self, _command: &str) -> Option<&str> {
+        unimplemented!(
+            "TODO ch11: return the first blocked pattern that matches the trimmed command"
+        )
     }
 }
 
@@ -156,33 +126,15 @@ impl ProtectedFileCheck {
 }
 
 impl SafetyCheck for ProtectedFileCheck {
-    fn check(&self, tool_name: &str, args: &Value) -> Result<(), String> {
-        match tool_name {
-            "write" | "edit" => {
-                if let Some(path) = args.get("path").and_then(|v| v.as_str()) {
-                    for pattern in &self.patterns {
-                        if pattern.matches(path)
-                            || pattern.matches(
-                                Path::new(path)
-                                    .file_name()
-                                    .unwrap_or_default()
-                                    .to_str()
-                                    .unwrap_or(""),
-                            )
-                        {
-                            return Err(format!(
-                                "file `{path}` is protected (matches pattern `{}`)",
-                                pattern.as_str()
-                            ));
-                        }
-                    }
-                    Ok(())
-                } else {
-                    Ok(())
-                }
-            }
-            _ => Ok(()),
-        }
+    /// Block `write`/`edit` calls whose path matches a protected pattern.
+    ///
+    /// Hints:
+    /// - Only react to tool_name "write" or "edit"; other tools pass.
+    /// - Match each pattern against both the full path and the bare file name.
+    fn check(&self, _tool_name: &str, _args: &Value) -> Result<(), String> {
+        unimplemented!(
+            "TODO ch11: for write/edit, fail if path (or file name) matches any protected pattern"
+        )
     }
 }
 
@@ -211,13 +163,13 @@ impl Tool for SafeToolWrapper {
         self.inner.definition()
     }
 
-    async fn call(&self, args: Value) -> anyhow::Result<String> {
-        let tool_name = self.inner.definition().name;
-        for check in &self.checks {
-            if let Err(reason) = check.check(tool_name, &args) {
-                return Ok(format!("error: safety check failed: {reason}"));
-            }
-        }
-        self.inner.call(args).await
+    /// Run every check before delegating to the inner tool.
+    ///
+    /// Hint: On the first failure, return `Ok(format!("error: safety check failed: {reason}"))`
+    /// so the agent sees the rejection as a normal tool result instead of crashing.
+    async fn call(&self, _args: Value) -> anyhow::Result<String> {
+        unimplemented!(
+            "TODO ch11: run each SafetyCheck; on first failure return error-shaped Ok, else call inner"
+        )
     }
 }

@@ -47,41 +47,11 @@ pub(crate) fn tool_summary(call: &ToolCall) -> String {
 ///      d. Push `Message::Assistant(turn)` then `Message::ToolResult` for each result
 ///      e. Call provider again to get the final answer
 pub async fn single_turn<P: Provider>(
-    provider: &P,
-    tools: &ToolSet,
-    prompt: &str,
+    _provider: &P,
+    _tools: &ToolSet,
+    _prompt: &str,
 ) -> anyhow::Result<String> {
-    let defs = tools.definitions();
-    let mut messages = vec![Message::User(prompt.to_string())];
-
-    let turn = provider.chat(&messages, &defs).await?;
-
-    match turn.stop_reason {
-        StopReason::Stop => Ok(turn.text.unwrap_or_default()),
-        StopReason::ToolUse => {
-            // Execute each tool call, collect results
-            let mut results = Vec::new();
-            for call in &turn.tool_calls {
-                let content = match tools.get(&call.name) {
-                    Some(t) => t
-                        .call(call.arguments.clone())
-                        .await
-                        .unwrap_or_else(|e| format!("error: {e}")),
-                    None => format!("error: unknown tool `{}`", call.name),
-                };
-                results.push((call.id.clone(), content));
-            }
-
-            // Feed results back to the LLM
-            messages.push(Message::Assistant(turn));
-            for (id, content) in results {
-                messages.push(Message::ToolResult { id, content });
-            }
-
-            let final_turn = provider.chat(&messages, &defs).await?;
-            Ok(final_turn.text.unwrap_or_default())
-        }
-    }
+    unimplemented!("TODO ch4: one provider call; on ToolUse execute tools and make a second call")
 }
 
 /// A simple AI agent that connects a provider to tools via a loop.
@@ -119,33 +89,21 @@ impl<P: Provider> SimpleAgent<P> {
     /// - For each call, look up the tool with self.tools.get(&call.name)
     /// - If found, call it. Catch errors with unwrap_or_else.
     /// - If not found, return "error: unknown tool `{name}`"
-    async fn execute_tools(&self, calls: &[ToolCall]) -> Vec<(String, String)> {
-        let mut results = Vec::new();
-        for call in calls {
-            let content = match self.tools.get(&call.name) {
-                Some(t) => t
-                    .call(call.arguments.clone())
-                    .await
-                    .unwrap_or_else(|e| format!("error: {e}")),
-                None => format!("error: unknown tool `{}`", call.name),
-            };
-            results.push((call.id.clone(), content));
-        }
-        results
+    async fn execute_tools(&self, _calls: &[ToolCall]) -> Vec<(String, String)> {
+        unimplemented!("TODO ch4: look up each tool, call it, collect (id, content) pairs")
     }
 
     /// Push an assistant turn and its tool results into the message history.
     // Vec (not slice) because we push new elements.
     #[allow(clippy::ptr_arg)]
     fn push_results(
-        messages: &mut Vec<Message>,
-        turn: AssistantTurn,
-        results: Vec<(String, String)>,
+        _messages: &mut Vec<Message>,
+        _turn: AssistantTurn,
+        _results: Vec<(String, String)>,
     ) {
-        messages.push(Message::Assistant(turn));
-        for (id, content) in results {
-            messages.push(Message::ToolResult { id, content });
-        }
+        unimplemented!(
+            "TODO ch4: push Message::Assistant(turn), then one Message::ToolResult per result"
+        )
     }
 
     /// Run the agent loop with existing message history and emit events.
@@ -156,39 +114,12 @@ impl<P: Provider> SimpleAgent<P> {
     /// through the channel instead of printing. Returns the full message history.
     pub async fn run_with_history(
         &self,
-        mut messages: Vec<Message>,
-        events: mpsc::UnboundedSender<AgentEvent>,
+        _messages: Vec<Message>,
+        _events: mpsc::UnboundedSender<AgentEvent>,
     ) -> Vec<Message> {
-        let defs = self.tools.definitions();
-
-        loop {
-            let turn = match self.provider.chat(&messages, &defs).await {
-                Ok(turn) => turn,
-                Err(e) => {
-                    let _ = events.send(AgentEvent::Error(e.to_string()));
-                    return messages;
-                }
-            };
-
-            match turn.stop_reason {
-                StopReason::Stop => {
-                    let text = turn.text.clone().unwrap_or_default();
-                    let _ = events.send(AgentEvent::Done(text.clone()));
-                    messages.push(Message::Assistant(turn));
-                    return messages;
-                }
-                StopReason::ToolUse => {
-                    for call in &turn.tool_calls {
-                        let _ = events.send(AgentEvent::ToolCall {
-                            name: call.name.clone(),
-                            summary: tool_summary(call),
-                        });
-                    }
-                    let results = self.execute_tools(&turn.tool_calls).await;
-                    Self::push_results(&mut messages, turn, results);
-                }
-            }
-        }
+        unimplemented!(
+            "TODO ch4: like chat() but emit AgentEvents on each turn; return final history"
+        )
     }
 
     /// Run the agent loop, sending events through the channel.
@@ -209,24 +140,8 @@ impl<P: Provider> SimpleAgent<P> {
     /// 4. Push the assistant turn into messages so the history is complete
     /// 5. Return the cloned text
     #[allow(clippy::ptr_arg)]
-    pub async fn chat(&self, messages: &mut Vec<Message>) -> anyhow::Result<String> {
-        let defs = self.tools.definitions();
-
-        loop {
-            let turn = self.provider.chat(messages, &defs).await?;
-
-            match turn.stop_reason {
-                StopReason::Stop => {
-                    let text = turn.text.clone().unwrap_or_default();
-                    messages.push(Message::Assistant(turn));
-                    return Ok(text);
-                }
-                StopReason::ToolUse => {
-                    let results = self.execute_tools(&turn.tool_calls).await;
-                    Self::push_results(messages, turn, results);
-                }
-            }
-        }
+    pub async fn chat(&self, _messages: &mut Vec<Message>) -> anyhow::Result<String> {
+        unimplemented!("TODO ch4: loop — provider.chat, match stop_reason, execute tools, repeat")
     }
 
     /// Run the agent loop with the given prompt.

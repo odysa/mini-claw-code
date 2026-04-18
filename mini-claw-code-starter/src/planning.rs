@@ -85,103 +85,23 @@ impl<P: StreamProvider> PlanAgent<P> {
     }
 
     /// Shared agent loop. When `allowed` is Some, only those tools + exit_plan are permitted.
+    ///
+    /// Hints:
+    /// - Build the tool list: if `allowed` is Some, keep matching tools and append `exit_plan_def`.
+    /// - Loop: stream_chat → on Stop return text; on ToolUse execute each call.
+    /// - During planning, reject non-allowed tools with an error-shaped ToolResult,
+    ///   and treat `exit_plan` as a synthetic tool whose result is "Plan submitted for review."
+    /// - After executing tools, push Message::Assistant(turn) then each Message::ToolResult.
+    /// - If the plan was submitted, emit AgentEvent::Done(plan_text) and return.
     #[allow(clippy::ptr_arg)]
     async fn run_loop(
         &self,
-        messages: &mut Vec<Message>,
-        allowed: Option<&HashSet<&'static str>>,
-        events: mpsc::UnboundedSender<AgentEvent>,
+        _messages: &mut Vec<Message>,
+        _allowed: Option<&HashSet<&'static str>>,
+        _events: mpsc::UnboundedSender<AgentEvent>,
     ) -> anyhow::Result<String> {
-        let all_defs = self.tools.definitions();
-        let defs: Vec<&ToolDefinition> = match allowed {
-            Some(names) => {
-                let mut filtered: Vec<&ToolDefinition> = all_defs
-                    .into_iter()
-                    .filter(|d| names.contains(d.name))
-                    .collect();
-                filtered.push(&self.exit_plan_def);
-                filtered
-            }
-            None => all_defs,
-        };
-
-        loop {
-            let (stream_tx, mut stream_rx) = mpsc::unbounded_channel();
-            let events_clone = events.clone();
-            let forwarder = tokio::spawn(async move {
-                while let Some(event) = stream_rx.recv().await {
-                    if let StreamEvent::TextDelta(text) = event {
-                        let _ = events_clone.send(AgentEvent::TextDelta(text));
-                    }
-                }
-            });
-
-            let turn = match self.provider.stream_chat(messages, &defs, stream_tx).await {
-                Ok(t) => t,
-                Err(e) => {
-                    let _ = events.send(AgentEvent::Error(e.to_string()));
-                    return Err(e);
-                }
-            };
-            let _ = forwarder.await;
-
-            match turn.stop_reason {
-                StopReason::Stop => {
-                    let text = turn.text.clone().unwrap_or_default();
-                    let _ = events.send(AgentEvent::Done(text.clone()));
-                    messages.push(Message::Assistant(turn));
-                    return Ok(text);
-                }
-                StopReason::ToolUse => {
-                    let mut results = Vec::with_capacity(turn.tool_calls.len());
-                    let mut exit_plan = false;
-
-                    for call in &turn.tool_calls {
-                        if allowed.is_some() && call.name == "exit_plan" {
-                            results.push((call.id.clone(), "Plan submitted for review.".into()));
-                            exit_plan = true;
-                            continue;
-                        }
-
-                        if let Some(names) = allowed
-                            && !names.contains(call.name.as_str())
-                        {
-                            results.push((
-                                call.id.clone(),
-                                format!(
-                                    "error: tool '{}' is not available in planning mode",
-                                    call.name
-                                ),
-                            ));
-                            continue;
-                        }
-
-                        let _ = events.send(AgentEvent::ToolCall {
-                            name: call.name.clone(),
-                            summary: tool_summary(call),
-                        });
-                        let content = match self.tools.get(&call.name) {
-                            Some(t) => t
-                                .call(call.arguments.clone())
-                                .await
-                                .unwrap_or_else(|e| format!("error: {e}")),
-                            None => format!("error: unknown tool `{}`", call.name),
-                        };
-                        results.push((call.id.clone(), content));
-                    }
-
-                    let plan_text = turn.text.clone().unwrap_or_default();
-                    messages.push(Message::Assistant(turn));
-                    for (id, content) in results {
-                        messages.push(Message::ToolResult { id, content });
-                    }
-
-                    if exit_plan {
-                        let _ = events.send(AgentEvent::Done(plan_text.clone()));
-                        return Ok(plan_text);
-                    }
-                }
-            }
-        }
+        unimplemented!(
+            "TODO ch13: streaming agent loop gated by `allowed`; handle exit_plan specially"
+        )
     }
 }

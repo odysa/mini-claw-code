@@ -38,23 +38,9 @@ The LLM never touches your filesystem. It *asks* your code to run tools — read
 
 This book builds that loop from scratch and then grows it into the full architecture of a real coding agent: streaming, permissions, hooks, plan mode, configuration, and more. **18 chapters. Test-driven. No magic.**
 
-```mermaid
-flowchart LR
-    U["You: 'Summarize doc.pdf'"] --> A["Your Agent"]
-    A <-->|prompt + tool defs| LLM
-    LLM -->|"tool_call: read('doc.pdf')"| A
-    A --> T["Tools"]
-    T --> A
-    A -->|final answer| U
-
-    subgraph T["Tools"]
-        direction TB
-        bash["bash"]
-        read["read"]
-        write["write"]
-        edit["edit"]
-    end
-```
+<p align="center">
+  <img src="docs/architecture.png" alt="Mini Claw Code architecture: User ↔ Agent ↔ LLM + Tools" width="900">
+</p>
 
 ## What you'll build
 

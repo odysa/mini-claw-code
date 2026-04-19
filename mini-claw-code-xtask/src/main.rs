@@ -1,4 +1,11 @@
+use std::collections::HashMap;
 use std::process::{Command, exit};
+
+/// Markdown authors can precede a `cargo test` code block with this HTML
+/// comment to tell `book_filter_check` to skip every invocation inside the
+/// block. Used for hypothetical commands the reader only runs after adding
+/// extension code (e.g. the GlobTool/GrepTool commands in Chapter 11).
+const BOOK_FILTER_SKIP_MARKER: &str = "<!-- book-filter-check: skip-block -->";
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -100,6 +107,13 @@ fn book_filter_check() {
         exit(1);
     });
 
+    // Cache test names per package up-front so each filter is matched locally
+    // instead of spawning `cargo test --list` per invocation.
+    let mut test_cache: HashMap<&str, Vec<String>> = HashMap::new();
+    for pkg in ["mini-claw-code", "mini-claw-code-starter"] {
+        test_cache.insert(pkg, list_tests(pkg));
+    }
+
     let mut failures: Vec<String> = Vec::new();
     let mut checked = 0usize;
 
@@ -112,33 +126,37 @@ fn book_filter_check() {
             Ok(t) => t,
             Err(_) => continue,
         };
-        let mut skip_next_block = false;
+        let mut skip_current_fence = false;
+        let mut pending_skip = false;
         let mut in_code_fence = false;
         for (lineno, line) in text.lines().enumerate() {
             let trimmed_full = line.trim();
-            if trimmed_full.contains("<!-- book-filter-check: skip-block -->") {
-                skip_next_block = true;
+            if trimmed_full.contains(BOOK_FILTER_SKIP_MARKER) {
+                pending_skip = true;
                 continue;
             }
             if trimmed_full.starts_with("```") {
                 if in_code_fence {
-                    // Leaving a fence — clear the per-block skip flag.
                     in_code_fence = false;
-                    skip_next_block = false;
+                    skip_current_fence = false;
                 } else {
                     in_code_fence = true;
+                    skip_current_fence = pending_skip;
                 }
+                pending_skip = false;
                 continue;
             }
-            if skip_next_block {
+            // The skip marker only suppresses the next code fence; bare lines
+            // between the marker and an eventual fence still get checked.
+            if in_code_fence && skip_current_fence {
                 continue;
             }
+
             let trimmed = line.trim_start_matches(['`', ' ']);
             let Some(rest) = trimmed.strip_prefix("cargo test -p ") else {
                 continue;
             };
 
-            // Split on whitespace, drop trailing backticks from inline code.
             let tokens: Vec<&str> = rest
                 .split_whitespace()
                 .map(|t| t.trim_end_matches('`'))
@@ -148,15 +166,14 @@ fn book_filter_check() {
                 continue;
             }
             let pkg = tokens[0];
-            if pkg != "mini-claw-code" && pkg != "mini-claw-code-starter" {
+            let Some(cached) = test_cache.get(pkg) else {
                 continue;
-            }
+            };
 
-            // Filter tokens are anything before `--` or `#` comment.
+            // Collect substring filters before any `--` separator or inline `#` comment.
             let filters: Vec<&str> = tokens[1..]
                 .iter()
                 .take_while(|t| **t != "--" && !t.starts_with('#'))
-                .filter(|t| !t.starts_with("--"))
                 .copied()
                 .collect();
             if filters.is_empty() {
@@ -165,23 +182,7 @@ fn book_filter_check() {
 
             for filter in filters {
                 checked += 1;
-                let out = Command::new("cargo")
-                    .args(["test", "-p", pkg, filter, "--", "--list"])
-                    .output();
-                let out = match out {
-                    Ok(o) => o,
-                    Err(e) => {
-                        eprintln!("Failed to run cargo test: {e}");
-                        exit(1);
-                    }
-                };
-                let stdout = String::from_utf8_lossy(&out.stdout);
-                // Count lines that look like `<test_name>: test` — the
-                // `--list` output for each matched test case.
-                let matches = stdout
-                    .lines()
-                    .filter(|l| l.trim_end().ends_with(": test"))
-                    .count();
+                let matches = cached.iter().filter(|name| name.contains(filter)).count();
                 let rel = path.strip_prefix(book_src).unwrap_or(&path).display();
                 if matches == 0 {
                     failures.push(format!(
@@ -211,6 +212,22 @@ fn book_filter_check() {
         );
         exit(1);
     }
+}
+
+/// Run `cargo test -p <pkg> -- --list` once and parse the test-name list.
+/// Each matching line has the form `<test_name>: test`.
+fn list_tests(pkg: &str) -> Vec<String> {
+    let out = Command::new("cargo")
+        .args(["test", "-p", pkg, "--", "--list"])
+        .output()
+        .unwrap_or_else(|e| {
+            eprintln!("Failed to run cargo test for {pkg}: {e}");
+            exit(1);
+        });
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter_map(|l| l.trim_end().strip_suffix(": test").map(str::to_string))
+        .collect()
 }
 
 fn book_build() {

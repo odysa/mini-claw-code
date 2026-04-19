@@ -145,6 +145,10 @@ Or read it online at **[odysa.github.io/mini-claw-code](https://odysa.github.io/
 
 Every hands-on chapter follows the same rhythm:
 
+<p align="center">
+  <img src="docs/workflow.svg" alt="Workflow: Read → Open → Replace → Run, loop back if tests fail" width="900">
+</p>
+
 1. **Read** the chapter — it tells you which files to edit and which tests to run.
 2. **Open** the matching file in `mini-claw-code-starter/src/`.
 3. **Replace** `unimplemented!()` with your code.
@@ -155,6 +159,10 @@ Green tests = you got it.
 > **Heads up:** chapter numbers don't match the starter's test file numbers (the chapters were reorganized by topic). Each chapter tells you exactly which `test_chN_` prefix to run. The full mapping is also in the [overview](https://odysa.github.io/mini-claw-code/ch00-overview.html).
 
 ## Project structure
+
+<p align="center">
+  <img src="docs/workspace.svg" alt="Workspace: Book, Starter (your code), Reference, xtask — four crates in one Cargo workspace" width="900">
+</p>
 
 ```
 mini-claw-code-starter/     <- YOUR code (fill in the stubs)

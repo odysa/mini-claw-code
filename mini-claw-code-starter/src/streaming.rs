@@ -66,9 +66,7 @@ impl StreamAccumulator {
     ///   tool call at that index
     /// - `Done` → no-op
     pub fn feed(&mut self, _event: &StreamEvent) {
-        unimplemented!(
-            "TODO ch5a: match on the StreamEvent and update text/tool_calls accordingly"
-        )
+        unimplemented!("TODO ch5a: match on the StreamEvent and update text/tool_calls accordingly")
     }
 
     /// Consume the accumulator and produce a complete [`AssistantTurn`].

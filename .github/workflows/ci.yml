@@ -36,3 +36,14 @@ jobs:
 
       - name: Book test-filter check (fail on zero-match filters)
         run: cargo run -p mini-claw-code-xtask --quiet -- book-filter-check
+
+  book-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mdBook toolchain
+        uses: ./.github/actions/install-mdbook
+
+      - name: Build book
+        run: mdbook build mini-claw-code-book

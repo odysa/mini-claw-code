@@ -1,0 +1,51 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`HookRegistry::dispatch` 按注册顺序迭代 hook。`LoggingHook` 先注册，然后是 `BlockingHook`，对于 `PreToolCall { tool_name: \"bash\" }` 返回 `Block(\"bash disabled\")`。`dispatch` 返回什么，日志 hook 看到了什么？"
+answer.answer = "返回 `Block(\"bash disabled\")`；日志 hook 先运行并在阻止短路之前记录了该事件。"
+prompt.distractors = [
+  "返回 `Continue`，因为日志 hook 的 `Continue` 覆盖了后来的 `Block`。",
+  "返回 `Block(\"bash disabled\")`；日志 hook 被跳过，因为阻止会向前和向后短路。",
+  "返回 `ModifyArgs(...)`，因为 dispatch 将所有 hook 的结果合并为单一动作。",
+]
+context = """
+Dispatch 按顺序运行 hook。日志 hook 运行并返回 `Continue`（并记录该事件），然后阻止 hook 运行并返回 `Block`，这会短路——后续 hook 永远看不到该事件。`test_hooks_registry_block_short_circuits` 验证了这一点，注册顺序就是你选择优先级的方式。
+"""
+id = "f22247be-48fb-4c99-8c28-837052bc2bc6"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `PostToolCall` hook 无法有意义地返回 `Block`？"
+answer.answer = "因为当 `PostToolCall` 触发时，工具已经执行完毕——没有什么可以阻止的了。"
+prompt.distractors = [
+  "因为 `HookAction::Block` 在枚举中只为 `PreToolCall` 事件定义。",
+  "因为 `PostToolCall` hook 在无法影响 agent 循环的后台线程上运行。",
+  "因为注册表会将后置 hook 返回的任何 `Block` 静默降级为 `Continue`。",
+]
+context = """
+这种不对称性是语义上的，而非类型系统强制的——后置 hook *可以*返回 `Block`，但工具已经运行了，所以毫无意义。`BlockingHook` 通过只对 `PreToolCall` 进行模式匹配来编码这一点；对于后置事件，它落入 `Continue`。
+"""
+id = "5d7d873e-00cd-4c16-9c37-49a7dacc3408"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`LoggingHook` 将其日志存储在 `std::sync::Mutex<Vec<String>>` 中。为什么使用 `std::sync::Mutex` 而不是 `tokio::sync::Mutex`？"
+answer.answer = "因为锁只在同步的 `push` 操作期间持有，临界区内没有 `.await`，而 `std::sync::Mutex` 在这种情况下更快。"
+prompt.distractors = [
+  "因为 `tokio::sync::Mutex` 不能在 `async_trait` 方法内使用。",
+  "因为 `Hook` trait 要求 `Send + Sync`，而 `tokio::sync::Mutex` 未实现。",
+  "因为 `Vec<String>` 未实现 `Send`，只有 `std::sync::Mutex` 才能编译通过。",
+]
+context = """
+经验法则：只有在必须跨 `.await` 持有锁时才使用 `tokio::sync::Mutex`。这里的临界区只是一行 `push`，所以更廉价的 std Mutex 是正确的。当 `T: Send` 时，两种 mutex 类型都满足 `Send + Sync`。
+"""
+id = "a07c6de4-8304-49b6-8aa5-28cceb473f32"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`ShellHook` 运行外部命令并解释其退出码。哪个退出码会导致 hook 返回 `HookAction::Block`？"
+answer.answer = "非零"
+prompt.distractors = ["恰好为 0", "恰好为 1", "任意负数退出码"]
+context = """
+退出码 0 表示"一切正常，继续。"任何非零退出都会导致 `ShellHook` 返回 `Block`，并以 stderr 作为原因。这与 Claude Code 的 JSON 配置 hook 一致：shell 通过退出状态传达决定，因此任何现有脚本（`cargo fmt --check`、linter、审计命令）都可以无需修改地接入。
+"""
+id = "e7e8508b-3860-4c6d-8cf9-e6ab9fa8819c"

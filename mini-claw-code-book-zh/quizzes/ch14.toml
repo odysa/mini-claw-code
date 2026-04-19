@@ -1,0 +1,51 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `SafeToolWrapper::call` 在拒绝时返回 `Ok(\"error: safety check failed: ...\")` 而不是 `Err(...)`？"
+answer.answer = "因为安全拒绝是一种受控的拒绝，LLM 应该将其视为工具结果，而不是系统级错误。"
+prompt.distractors = [
+  "因为 `anyhow::Result` 不允许从 `String` 构建 `Err`。",
+  "因为返回 `Err` 会导致 agent 循环 panic 并退出。",
+  "因为使用 `async_trait` 时 `Tool` trait 只允许 `Ok` 值。",
+]
+context = """
+包装器将阻止转换为 LLM 可以读取并作出反应的内容——"我试图写入 `.env`，被阻止了，让我尝试其他方法。"返回 `Err` 会作为基础设施故障而非工具输出冒泡上来。`test_safety_wrapper_blocks_on_check_failure` 通过断言 `Ok("error: safety check failed ...")` 字符串形状来锁定这一合约。
+"""
+id = "2186b34b-235b-474d-bb6d-e8405a4ce60f"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "用户将权限模式设置为 `allow_all`（旁路）。用 `path = \".env\"` 调用被 `SafeToolWrapper` 包装的工具，会发生什么？"
+answer.answer = "安全包装器仍然会阻止调用——`allow_all` 只影响权限引擎，不影响工具中嵌入的安全检查。"
+prompt.distractors = [
+  "调用成功，因为旁路模式禁用了所有守卫层。",
+  "调用以 `Err` 失败，因为权限引擎在包装器内部重新运行。",
+  "调用成功，因为 `ProtectedFileCheck` 只在 `ask` 模式下触发。",
+]
+context = """
+这正是纵深防御的全部意义。权限引擎问"这个工具应该运行吗？"而安全检查问"这次具体的调用危险吗？"安全包装器是任何权限配置都无法降低的底线——即使在旁路模式下，对 `.env` 的写入仍然被阻止。
+"""
+id = "4164b91d-0d73-4aa9-b1e0-4a66ffdd59f8"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`PathValidator::validate_path` 在 `starts_with` 检查之前对路径进行规范化。为什么要规范化而不是直接检查原始字符串前缀？"
+answer.answer = "因为规范化会解析 `..` 和符号链接，所以精心构造的路径如 `/project/../etc/passwd` 无法绕过目录检查。"
+prompt.distractors = [
+  "因为 `Path::starts_with` 要求两个操作数都被规范化才能返回准确结果。",
+  "因为 `std::fs` 拒绝打开任何未经规范化的路径。",
+  "因为规范化是将 `&str` 参数转换为 `PathBuf` 所必需的。",
+]
+context = """
+原始前缀检查会让 `/project/../../etc/passwd` 通过（它以 `/project` 开头），但规范化会将其重写为 `/etc/passwd`，然后 `starts_with(\"/project\")` 失败。`test_safety_path_traversal_blocked` 正是这种场景。
+"""
+id = "a5eccac4-8608-4c9d-a6e7-d0bfa2a41d0e"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "在 starter 中，`CommandFilter::check` 实际上会检查哪个工具名称的参数？（其他工具保持原样通过。）"
+answer.answer = "bash"
+prompt.distractors = ["write", "edit", "read"]
+context = """
+每个 `SafetyCheck` 通过匹配 `tool_name` 来决定其适用的工具。`CommandFilter` 只在 `bash` 时触发——它提取 `command` 参数并与被阻止的 glob 模式进行对比。对于任何其他工具名称，它返回 `Ok(())`，因此将无关工具包装进去是无害的。`test_safety_safety_check_ignores_bash` 和 `test_safety_command_filter_*` 覆盖了这种派发行为。
+"""
+id = "9b7f88ec-0a27-47f7-87fe-59417a98831e"

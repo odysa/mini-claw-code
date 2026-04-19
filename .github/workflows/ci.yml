@@ -45,5 +45,8 @@ jobs:
       - name: Install mdBook toolchain
         uses: ./.github/actions/install-mdbook
 
-      - name: Build book
+      - name: Build English book
         run: mdbook build mini-claw-code-book
+
+      - name: Build Chinese book
+        run: mdbook build mini-claw-code-book-zh

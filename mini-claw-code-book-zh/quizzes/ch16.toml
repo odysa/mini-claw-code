@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "在计划阶段，LLM 以某种方式发出了一个 `write` 工具调用，尽管 `write` 不在过滤后的工具 schema 中。`run_loop` 会怎么做？"
+answer.answer = "跳过写入，推入一个错误工具结果告知 LLM `write` 在计划模式下不可用，并继续循环。"
+prompt.distractors = [
+  "无论如何都执行写入，因为工具在 `ToolSet` 中是已注册的。",
+  "从 `run_loop` 返回 `Err`，中止计划和执行两个阶段。",
+  "静默丢弃工具调用且不产生 `ToolResult`，让下一个 provider 请求运行。",
+]
+context = """
+这是纵深防御的第二层。定义过滤（第 1 层）将工具从 schema 中移除，使模型没有理由调用它。执行守卫（第 2 层）捕获仍然漏出的调用，并返回错误字符串让模型理解该约束。两层都失败才会真正发生写入。`test_plan_plan_blocks_write_tool` 断言文件未在磁盘上创建。
+"""
+id = "9a09986e-af81-4481-96ec-d24286cc27ac"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么当模型调用 `exit_plan` 时，`run_loop` 会推入一个合成的 `ToolResult`（\"Plan submitted for review.\"）？"
+answer.answer = "因为消息协议要求每个工具调用都有一个匹配的工具结果；没有它，下一个 provider 请求就会格式错误。"
+prompt.distractors = [
+  "因为 `exit_plan` 在 `ToolSet` 中实现为真正的工具，必须像任何其他工具一样返回结果。",
+  "因为合成结果是向外部调用者发出 `StopReason::Stop` 信号的方式。",
+  "因为调用者的批准消息在下一阶段从这个合成工具结果中读取。",
+]
+context = """
+`exit_plan` 是一个虚拟工具——一个背后没有 `call()` 的 `ToolDefinition`。由于助手消息包含它的 `ToolCall`，API 合同要求有对应的 `ToolResult`。跳过合成结果，下一个 API 调用就会因请求格式错误而失败。`test_plan_exit_plan_tool` 验证了这种配对。
+"""
+id = "1af0dc99-f719-4f04-ba56-05a560891bb6"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `plan()` 与 `execute()` 共享相同的 `&mut Vec<Message>`，而不是每个阶段各自构建自己的历史？"
+answer.answer = "这样执行阶段就能带着计划阶段的完整上下文进入——系统 prompt、分析工具调用和计划文本对模型都是可见的。"
+prompt.distractors = [
+  "因为 `StreamProvider::stream_chat` 要求跨所有调用共享单例消息 vec。",
+  "因为 `Vec<Message>` 无法克隆，所以调用者必须重用同一个实例。",
+  "因为否则调用者必须在每次执行调用时手动重新注入计划系统 prompt。",
+]
+context = """
+连续性正是两阶段模式有效的原因。调用者通常在两个阶段之间推入 `Message::user(\"Approved. Go ahead.\")`，模型会看到完整轨迹：计划 prompt、用户请求、只读分析、计划、批准，然后带着完整上下文执行。`test_plan_message_continuity` 验证历史在两个阶段中正确增长。
+"""
+id = "5d4365fc-80cb-45ff-bdd4-1a22608a63c6"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`PlanAgent::read_only` 的类型是 `HashSet<&'static str>` 而不是 `HashSet<String>`。使用 `&'static str` 依赖于 Rust 的哪个特性？"
+answer.answer = "字符串字面量具有 `'static` 生命周期"
+prompt.distractors = [
+  "`HashSet` 只能存储 `&str` 引用，而不能存储拥有的 `String` 值。",
+  "`'static` 引用在每次 `contains` 调用时自动克隆，避免所有权问题。",
+  "字符串字面量是引用计数的，当最后一个 `&'static str` 离开作用域时被丢弃。",
+]
+context = """
+像 `\"read\"` 和 `\"bash\"` 这样的工具名称是烘焙进二进制文件中的字符串字面量——它们存在于整个程序生命周期，这正是 `'static` 的含义。使用 `&'static str` 避免了堆分配和克隆，对于成员始终是编译时已知的集合来说是合适的。代价是无法将动态生成的字符串放入集合，但对于工具名称来说这本来也没有意义。
+"""
+id = "7ea9c11a-e4da-4760-abb9-ce6a9ac67c94"

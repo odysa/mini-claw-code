@@ -10,8 +10,13 @@
 
 <p align="center">
   <a href="https://odysa.github.io/mini-claw-code/">Read the Book</a> &middot;
+  <a href="https://odysa.github.io/mini-claw-code/zh/">中文版</a> &middot;
   <a href="#quick-start">Quick Start</a> &middot;
   <a href="#chapter-roadmap">Chapters</a>
+</p>
+
+<p align="center">
+  <a href="./README.zh.md">中文 README</a>
 </p>
 
 ---
@@ -136,10 +141,10 @@ Read the book locally:
 
 ```bash
 cargo install mdbook mdbook-mermaid   # one-time
-cargo x book                          # opens at localhost:3000
+cargo x book                          # English + 中文 on localhost:3000 (switch via the top-right toggle)
 ```
 
-Or read it online at **[odysa.github.io/mini-claw-code](https://odysa.github.io/mini-claw-code/)**.
+Or read it online at **[odysa.github.io/mini-claw-code](https://odysa.github.io/mini-claw-code/)** (English) / **[中文版](https://odysa.github.io/mini-claw-code/zh/)**. Use the **EN / 中文** toggle in the top-right of the site to switch languages at any time.
 
 ## The workflow
 
@@ -184,7 +189,7 @@ mini-claw-code-xtask/       <- Helper commands (cargo x ...)
 cargo test -p mini-claw-code-starter test_read_   # tests for one chapter (see book for mapping)
 cargo test -p mini-claw-code-starter             # all tests
 cargo x check                                    # fmt + clippy + starter build
-cargo x book                                     # serve the tutorial
+cargo x book                                     # serve both languages at localhost:3000 (中文 at /zh/)
 ```
 
 ## Looking for V1?

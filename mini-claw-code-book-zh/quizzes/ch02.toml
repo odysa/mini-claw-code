@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `Tool` trait 使用 `#[async_trait]`，而 `Provider` 使用 RPITIT 风格（返回位置 `impl Trait` 的 `async fn`）？"
+answer.answer = "因为工具以 `Box<dyn Tool>` 的形式存储在 `HashMap` 中，对象安全性要求 `#[async_trait]` 所产生的装箱、类型擦除的 future。"
+prompt.distractors = [
+  "因为 `#[async_trait]` 在 I/O 密集型代码（如文件读取）中比 RPITIT 更快。",
+  "因为 RPITIT 不支持 async trait 方法上的 `&self` 接收者。",
+  "因为 `anyhow::Result` 只能从 `#[async_trait]` 重写的函数中返回。",
+]
+context = """
+`ReadTool` 和 `BashTool` 共存于同一个 `HashMap<String, Box<dyn Tool>>` 中，因此 trait 必须是对象安全的。普通 `async fn` 在 trait 中会返回匿名 future，无法在 `dyn` 背后进行类型擦除；`#[async_trait]` 将其重写为 `Pin<Box<dyn Future + Send + '_>>`，从而可以进行类型擦除。`Provider` 走 RPITIT 路线，因为它始终以泛型 `P: Provider` 的形式持有，而非 `dyn` 背后。
+"""
+id = "bc83bacb-b3b2-475a-851a-1817114fb886"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "在 `ReadTool::call` 中，路径通过 `args[\"path\"].as_str().context(\"missing 'path' argument\")?` 提取。当 LLM 以 `{}`（无 `path` 字段）调用工具时会发生什么？"
+answer.answer = "`as_str()` 返回 `None`，`context` 将其转换为错误，`?` 返回带有消息 \"missing 'path' argument\" 的 `Err`。"
+prompt.distractors = [
+  "`args[\"path\"]` 发生 panic，因为对 `serde_json::Value` 中缺失键的索引是未定义行为。",
+  "`as_str()` 返回空字符串，并以空路径调用 `tokio::fs::read_to_string(\"\")`。",
+  "`?` 运算符在 `context` 运行之前就短路了，因此错误没有附加消息。",
+]
+context = """
+对 `serde_json::Value` 使用缺失键的索引会返回 `Value::Null`（不会 panic）。`Null.as_str()` 为 `None`。来自 `anyhow` 的 `Option::context` 将 `None` 转换为带有给定消息的 `Err`，然后 `?` 将其传播。测试 `test_read_read_missing_arg` 确保了这一行为。
+"""
+id = "b0ebf485-6303-43e7-b0e0-7bb24471b9c4"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "使用 `.param(\"path\", \"string\", \"...\", true)` 构建 `ToolDefinition` 时，由于 `required` 为 `true`，参数名会添加到哪个 JSON Schema 键中？"
+answer.answer = "required"
+prompt.distractors = [
+  "properties",
+  "additionalProperties",
+  "requiredProperties",
+]
+context = """
+构建器将 `\"path\"` 推入参数 schema 的 `required` 数组（`{\"type\": \"object\", \"properties\": {...}, \"required\": [...]}`）。传 `false` 会添加属性但跳过 `required` 推入。`test_read_read_definition` 会检查此 JSON。
+"""
+id = "7e357fc2-61c2-4d5d-9a61-2de2776f9326"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "本章指出每个工具遵循三步模式：**定义（Define）**、**提取（Extract）**、**执行（Execute）**。`ReadTool::call` 中哪一行对应*提取*步骤？"
+answer.answer = "`args[\"path\"].as_str().context(\"missing 'path' argument\")?`"
+prompt.distractors = [
+  "`ToolDefinition::new(\"read\", \"Read the contents of a file.\")`",
+  "`tokio::fs::read_to_string(path).await`",
+  "`.with_context(|| format!(\"failed to read '{path}'\"))`",
+]
+context = """
+提取是指从 LLM 传入的非类型化 `serde_json::Value` 中取出有类型的参数。`ToolDefinition::new(...)` 调用是定义，`read_to_string(...).await` 是执行。后续章节中的每个工具（`WriteTool`、`EditTool`、`BashTool`）都重复这三步结构。
+"""
+id = "70e593f9-91df-4542-a1b4-b9bdecf6fab5"

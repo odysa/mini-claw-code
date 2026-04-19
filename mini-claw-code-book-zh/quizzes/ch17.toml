@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 loader 将 TOML 解析为 `ConfigOverlay`（字段为 `Option<T>`），而不是直接解析为 `Config` 再与 `Config::default()` 比较？"
+answer.answer = "因为与默认值比较无法区分\"用户未设置此字段\"和\"用户显式将其设置为与默认值相同的值\"，这会破坏最后写入获胜的语义。"
+prompt.distractors = [
+  "因为 `Config` 未实现 `Deserialize`，所以 serde 只能生成 `ConfigOverlay`。",
+  "因为 `toml::from_str` 要求目标类型的每个字段都是 `Option<T>`。",
+  "因为 `Option<T>` 的反序列化比 `T` 更廉价，使配置加载更快。",
+]
+context = """
+在类型系统中编码"已设置与未设置"是本章的核心技巧。如果用户配置中有 `model = \"anthropic/claude-sonnet-4-20250514\"`（即默认值），基于值比较的启发式会将其视为"未设置"，悄悄让低优先级层获胜。`Option<T>` 消除了这种歧义：`None` 意味着 TOML 键不存在，`Some(v)` 意味着它存在，无论 `v` 是什么。
+"""
+id = "a4517681-9ca8-48d8-bcba-54a630014308"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "loader 按以下顺序遍历各层：`Config::default()`、项目配置、用户配置、环境变量。在项目配置中有 `protected_patterns = [\".env\"]`，在用户配置中有 `protected_patterns = [\".credentials\"]`，最终 `Config.protected_patterns` 中是什么？"
+answer.answer = "`[\".credentials\"]` —— 用户配置的覆盖层完全替换了项目配置的列表。"
+prompt.distractors = [
+  "`[\".env\", \".credentials\"]` —— 集合默认跨层追加。",
+  "`[\".env\"]` —— 低优先级层在定义列表时获胜。",
+  "`[]` —— 冲突的列表定义相互抵消。",
+]
+context = """
+集合的合并规则是替换，而非追加。每个提及某字段的层都完全控制其值。这使合并逻辑统一（每个字段一条规则），并让高优先级层能真正覆盖低优先级层——包括用空 `[]` 清除列表。如果你想要追加语义，就需要编写不同的合并逻辑。
+"""
+id = "6630aa93-64b6-4c6d-ae68-3fd11096057f"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "环境变量支持被刻意限制为 `model`、`base_url` 和 `max_context_tokens`。为什么 `blocked_commands` 和 `protected_patterns` 被排除在外？"
+answer.answer = "因为安全规则应该来自经过审查的配置文件，而不是受感染的进程可以操纵的环境变量。"
+prompt.distractors = [
+  "因为 serde 无法从单个环境变量字符串中反序列化 `Vec<String>`。",
+  "因为在合并顺序中，环境变量被项目配置遮蔽。",
+  "因为 `std::env::var` 是异步的，会阻塞安全检查流水线。",
+]
+context = """
+这是蓄意的攻击面缩减。CI 流水线为更廉价的模型设置 `MINI_CLAW_MODEL` 是可以的；受感染的环境静默清除 `blocked_commands` 是灾难性的。安全关键设置来自可以进行版本控制和审查的文件。
+"""
+id = "466c9af9-5b12-4384-8c04-d0d7c3f045c4"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`ConfigLoader::load_file` 返回 `Option<ConfigOverlay>`，当文件缺失时静默返回 `None`。为什么\"文件未找到\"被视为正常情况而不是错误？"
+answer.answer = "因为大多数用户和项目不会有配置文件，所以缺失的文件应该回退到默认值，而不是停止 agent。"
+prompt.distractors = [
+  "因为 `std::fs::read_to_string` 无法区分文件缺失和权限错误，所以所有 I/O 失败必须统一处理。",
+  "因为 `toml::from_str` 在 `NotFound` 错误时 panic，所以 loader 必须在反序列化运行之前吞掉它们。",
+  "因为从 `load_file` 返回 `Err` 会迫使合并链中的每一层都被包装在自己的 `Result` 中，使 API 变得臃肿。",
+]
+context = """
+对 `read_to_string` 和 `toml::from_str` 使用 `.ok()?` 将任何失败转换为 `None`，因此该层被跳过，合并继续进行。`test_config_load_nonexistent_path` 锁定了这一点：加载一个虚假路径不会 panic，只是产生 `None`。生产工具可能会对解析失败记录警告，但文件缺失绝对不是错误。
+"""
+id = "e65c953b-5f2c-42fb-a436-79312a46f43b"

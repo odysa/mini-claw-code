@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "在 `single_turn` 中，本章警告：\"在推入 `Message::Assistant(turn)` 之前先收集结果。\"为什么顺序很重要？"
+answer.answer = "`messages.push(Message::Assistant(turn))` 会移动 `turn`，推入之后就无法再借用 `turn.tool_calls` 来迭代它了。"
+prompt.distractors = [
+  "Rust 要求助手消息必须在工具结果之后出现在 `Vec` 中，否则 LLM 会拒绝该请求。",
+  "`tool_calls` 是一个 `Mutex`，先推入 turn 会导致循环尝试重新加锁时死锁。",
+  "借用检查器不允许在任何其他值还在作用域内时向 `Vec` 推入元素。",
+]
+context = """
+`Message::Assistant(turn)` 按值获取 `turn`，这是一次移动。移动之后，局部绑定 `turn` 失效，因此不能在后续行读取 `turn.tool_calls`。解决方法是先将 `tool_calls` 排干到局部 `results` vec 中，然后推入助手消息，再推入工具结果。
+"""
+id = "b9eb3349-b70b-4780-8589-0b8a4af3ccc1"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "LLM 返回了一个名为 `\"search\"` 的工具调用，而你从未注册过该工具。一个正确实现的 `single_turn` 会怎么做？"
+answer.answer = "推入一个 `ToolResult`，其内容类似于 `\"error: unknown tool `search`\"`，并继续执行，让 LLM 能够自行调整。"
+prompt.distractors = [
+  "通过 `unwrap()` 发生 panic，因为未知工具是程序员错误。",
+  "用 `Err(anyhow!(\"unknown tool\"))` 提前返回，中止整个轮次。",
+  "静默丢弃工具调用，并向 LLM 发送空的 `ToolResult`。",
+]
+context = """
+LLM 会产生幻觉工具名。循环将未知工具（以及已知工具 `call()` 返回的任何 `Err`）转换为字符串结果，LLM 将其作为反馈读取并尝试其他方法。`test_single_turn_unknown_tool` 验证了 agent 能够恢复而不是崩溃。
+"""
+id = "9bdcb422-94b9-492c-9cac-1f10b20a12a9"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "在 `SimpleAgent::chat` 中，哪个 `StopReason` 变体会使 `loop { }` 执行 `return` 返回最终文本？"
+answer.answer = "Stop"
+prompt.distractors = [
+  "ToolUse",
+  "EndTurn",
+  "Done",
+]
+context = """
+`StopReason::Stop` 是终止条件——LLM 完成了，`turn.text` 保存答案，循环返回。`StopReason::ToolUse` 则执行 `execute_tools` / `push_results` 并继续迭代。`test_simple_agent_three_turn_loop` 测试了循环最终看到 `Stop` 之前的三轮。
+"""
+id = "c909b9cf-3887-4ebc-82a8-b3baacf0b358"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么第 7 章的 stub `SimpleAgent::run_with_history` 留作 `unimplemented!()`，即使第 3 章的测试调用了 `run()` 和 `chat()`？"
+answer.answer = "没有第 3 章的测试会调用 `run_with_history`，因此 `unimplemented!()` 主体在 `test_simple_agent_` 测试期间从不执行。"
+prompt.distractors = [
+  "`unimplemented!()` 是编译时标记，编译器会静默地将其替换为空函数体。",
+  "Cargo 会自动跳过触及含有 `unimplemented!()` 方法的测试。",
+  "`run_with_history` 签名受 feature gate 控制，在第 3 章的构建中完全排除。",
+]
+context = """
+`unimplemented!()` 是运行时 panic——只有在函数被实际调用时才会触发。第 3 章的测试只使用 `run()` 和 `chat()`，它们经过 `single_turn` / `execute_tools` / `push_results` 路由。基于事件的路径在第 7 章引入；将其留作 stub 可以在不破坏构建的情况下保持第 3 章的表面积较小。
+"""
+id = "eea7c0e9-36da-400c-aaca-a4b60c754d00"

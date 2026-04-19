@@ -23,8 +23,16 @@ jobs:
       - name: Install mdBook toolchain
         uses: ./.github/actions/install-mdbook
 
-      - name: Build book
+      - name: Build English book
         run: mdbook build mini-claw-code-book
+
+      - name: Build Chinese book
+        run: mdbook build mini-claw-code-book-zh
+
+      - name: Combine into single site
+        run: |
+          mkdir -p mini-claw-code-book/book/zh
+          cp -r mini-claw-code-book-zh/book/. mini-claw-code-book/book/zh/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

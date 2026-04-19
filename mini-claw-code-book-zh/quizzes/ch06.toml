@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `Tool` trait 使用 `#[async_trait]`，而 `Provider` trait 使用 RPITIT（在返回位置使用 `impl Future`）？"
+answer.answer = "工具以异构集合中 `Box<dyn Tool>` 的形式存储，这要求对象安全性；provider 作为泛型参数使用，RPITIT 的零成本单态化更适合这种场景。"
+prompt.distractors = [
+  "`async_trait` 运行时更快，工具调用在热路径上而 provider 调用不在。",
+  "provider 返回非 `Send` 的 future，因此无法使用 `async_trait`。",
+  "RPITIT 稳定化太晚，`Tool` trait 赶不上，但 `Provider` 赶上了。",
+]
+context = """
+RPITIT 为每个 impl 生成唯一的 future 类型——零成本，但 trait 不再是对象安全的，因此 `Box<dyn Provider>` 无法编译。`ToolSet` 需要混合工具类型（`BashTool`、`ReadTool`、`WriteTool`……）的 `HashMap`，这强制使用 `Box<dyn Tool>`，因此需要对象安全性。`#[async_trait]` 将 `async fn` 重写为 `Pin<Box<dyn Future + Send>>`，以每次调用一次堆分配换取对象安全性。本章的"为什么两种 async trait 风格？"一节是这种分割的权威参考。
+"""
+id = "4e639fce-b1c9-46d0-a80a-f572584e3f8e"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "工具实现遇到文件不存在的情况，`call()` 应该返回什么？"
+answer.answer = "`Ok(format!(\"error: file not found: {path}\"))` —— 错误是一个*值*，而不是失败。"
+prompt.distractors = [
+  "`Err(anyhow!(\"file not found\"))` —— 传播错误始终是 Rust 的方式。",
+  "`panic!(\"file not found\")` —— agent 循环会捕获 panic。",
+  "`Ok(String::new())` —— 空字符串向 LLM 表示失败。",
+]
+context = """
+本章的"为什么错误是值而不是 `Err`"一节说得很明确：工具失败是对话的一部分。如果 `call()` 返回 `Err`，agent 的 `unwrap_or_else` 仍然会处理它，但更强的约定是返回 `Ok(\"error: ...\")` 让模型读到一条有意为之的描述性消息。`Err` 保留给真正不可恢复的情况，比如序列化 bug——而不是日常的"你请求的文件不存在"。空字符串是最糟糕的：LLM 无法将其与成功读取空文件区分开来。
+"""
+id = "9a729660-a6fd-4fdd-8c18-6b4a14451ebb"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "在 `EchoTool::call` 中，本章使用了 `args[\"text\"].as_str().unwrap_or(\"(no text)\")`。改写成 `args[\"text\"].as_str().unwrap()` 有什么缺点？"
+answer.answer = "它会在 LLM 输入格式错误时发生 panic，使 agent 崩溃。"
+prompt.distractors = [
+  "它会静默返回空字符串，LLM 无法将其与成功的 echo 区分开来。",
+  "它会迫使 `call()` 返回 `Err`，而 agent 循环将其视为不可恢复的错误。",
+  "它会阻塞异步运行时，因为 `unwrap` 是对 `Future` 的同步操作。",
+]
+context = """
+LLM 提供的参数是不可信的输入。模型可能幻觉出一个缺失字段或传入错误类型。`unwrap()` 会 panic 并终止 agent 任务；`unwrap_or(\"(no text)\")` 则优雅降级。本章的 EchoTool 演练特别指出了这一点："始终对 LLM 提供的参数保持防御性。"
+"""
+id = "a792e061-95b8-457d-8940-10b6d5c9b738"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `EchoTool` 将其 `ToolDefinition` 存储为 struct 字段，而不是在每次 `definition()` 调用时在内部构建它？"
+answer.answer = "`definition()` 返回 `&ToolDefinition`，因此该值必须比调用存活更长——它需要存在于工具拥有的某个地方。"
+prompt.distractors = [
+  "构建 `ToolDefinition` 代价昂贵，缓存它可以避免重复计算。",
+  "`ToolDefinition` 没有实现 `Clone`，因此无法按值返回。",
+  "`#[async_trait]` 宏不支持构建值的非 async 方法。",
+]
+context = """
+trait 签名为 `fn definition(&self) -> &ToolDefinition`。引用必须指向比借用存活更长的东西——从函数中返回 `&local_var` 无法编译。将定义存储在 `self.def` 中并返回 `&self.def` 是直接的解决方案。工具定义在工具的生命周期内也是固定的，因此在构造函数中构建一次自然符合数据的形态。
+"""
+id = "02c6c22a-823d-4dc8-a56e-f97f847eed19"

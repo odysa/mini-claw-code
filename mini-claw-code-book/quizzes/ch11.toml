@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does the chapter keep Glob and Grep as two separate tools instead of merging them into a single `SearchTool` with a `mode: \"files\" | \"content\"` parameter?"
+answer.answer = "Two tools with clear, distinct descriptions let the LLM match its intent to the right tool without a mode-decision step; smaller models reliably mis-set mode parameters."
+prompt.distractors = [
+  "Because `glob::Pattern` and `regex::Regex` cannot be held in the same struct due to trait bounds.",
+  "Because the OpenRouter API refuses to dispatch a tool whose parameter schema has a `oneOf` discriminator.",
+  "Because the `Tool` trait requires exactly one required parameter per tool.",
+]
+context = """
+Two tools with distinct purposes — "what files exist?" vs. "where is this content?" — map cleanly to the two questions a developer asks when navigating an unfamiliar codebase. A combined tool adds a decision layer that smaller models get wrong, and forces irrelevant parameters to appear in every call. Claude Code keeps them separate for the same reason.
+"""
+id = "a3cb921c-b4a6-4fce-b1bd-e01fda7c5d0d"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`search_file` is an `async fn` but `collect_files` is a plain sync `fn`. What is the design rationale for this split?"
+answer.answer = "`search_file` does blocking I/O (reading file contents), which benefits from yielding to the runtime; `collect_files` only reads directory metadata, which is fast, and keeping it sync avoids the complexity of boxing a recursive async function."
+prompt.distractors = [
+  "`tokio::fs::read_dir` is not available, so directory walking has to be sync.",
+  "Recursive async functions are disallowed by the Rust compiler, while recursive sync functions are allowed.",
+  "`collect_files` must be sync because it takes `&mut Vec<PathBuf>`, which cannot cross an `await` point.",
+]
+context = """
+The chapter's rule of thumb: async for I/O that could block, sync for fast metadata operations. Recursive async functions in Rust require `Pin<Box<dyn Future>>` or the `async_recursion` crate — a real cost that pays off only when the body does real I/O. Directory listing via `std::fs::read_dir` is cheap enough that sync is the right default.
+"""
+id = "37e23d23-aaaf-4b37-ac03-129114374deb"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "In `GrepTool::call`, the include pattern is compiled with `args.get(\"include\").and_then(|v| v.as_str()).map(|p| glob::Pattern::new(p)).transpose()?`. What does `.transpose()` do there?"
+answer.answer = "It converts `Option<Result<Pattern, _>>` into `Result<Option<Pattern>, _>`, so `?` can propagate a bad pattern error while still producing an `Option` for the absent case."
+prompt.distractors = [
+  "It reverses the order of the elements so the `?` sees the error variant first.",
+  "It unwraps the `Option`, panicking if no include pattern was supplied.",
+  "It converts a sync `Option` into a `Future<Option>` that can be `.await`ed.",
+]
+context = """
+`Option::transpose` flips `Option<Result<T, E>>` to `Result<Option<T>, E>`. The pattern `x.map(fallible_fn).transpose()?` reads as "if present, try the operation; if it fails, propagate; if absent, produce `None`." Without `transpose` you'd need a three-arm `match` for `Some(Ok)`, `Some(Err)`, and `None`.
+"""
+id = "8ec2bc0a-da9b-4457-9d81-99635d0a7aaa"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`collect_files` skips any directory whose name starts with what single character, to avoid walking into `.git`, `.cargo`, and similar trees?"
+answer.answer = "."
+prompt.distractors = [
+  "_",
+  "~",
+  "#",
+]
+context = """
+The guard `n.to_string_lossy().starts_with('.')` skips dot-prefixed directories entirely. Without it, a grep through a project directory would spend most of its time scanning `.git/objects` — thousands of binary blobs producing zero useful matches. Ripgrep-powered production tools achieve the same effect via `.gitignore` integration.
+"""
+id = "7fecb1ee-a643-4fb6-bcf3-6cfb90b70b85"

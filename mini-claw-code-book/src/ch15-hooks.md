@@ -438,6 +438,10 @@ The hook system completes the safety and control layer. The permission engine (C
 
 Chapter 16 -- Plan Mode -- ties together everything from Part III. Plan mode is a restricted execution mode where only read-only tools run. The agent can read files, search code, and reason about a task, but it cannot write, edit, or execute commands. The permission engine checks tool categories. Safety checks validate arguments. Hooks fire for observation. But nothing destructive happens. It is the ultimate guardrail: the agent plans, the user reviews, and only then does execution begin.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch15.toml}}
+
 ---
 
 [← Chapter 14: Safety Checks](./ch14-safety.md) · [Contents](./ch00-overview.md) · [Chapter 16: Plan Mode →](./ch16-plan-mode.md)

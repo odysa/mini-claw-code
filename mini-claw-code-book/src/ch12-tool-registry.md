@@ -401,6 +401,10 @@ Part III -- Safety & Control -- adds the guardrails that turn a working agent in
 
 The tools you built in Part II are the hands. Part III teaches the agent when to use them -- and when not to.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch12.toml}}
+
 ---
 
 [← Chapter 11: Search Tools](./ch11-search-tools.md) · [Contents](./ch00-overview.md) · [Chapter 13: Permission Engine →](./ch13-permissions.md)

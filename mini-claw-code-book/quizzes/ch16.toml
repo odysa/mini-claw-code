@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "During the plan phase, the LLM somehow emits a `write` tool call even though `write` is not in the filtered tool schema. What does `run_loop` do?"
+answer.answer = "Skips the write, pushes an error tool result telling the LLM `write` is not available in planning mode, and continues the loop."
+prompt.distractors = [
+  "Executes the write anyway because the tool is registered in the `ToolSet`.",
+  "Returns `Err` from `run_loop`, aborting both plan and execute phases.",
+  "Silently drops the tool call and produces no `ToolResult`, letting the next provider request run.",
+]
+context = """
+This is the second layer of defense-in-depth. Definition filtering (layer 1) removes the tool from the schema so the model has no reason to call it. The execution guard (layer 2) catches a call that slips through anyway and returns an error string so the model understands the constraint. Both layers must fail for a write to actually happen. `test_plan_plan_blocks_write_tool` asserts the file was not created on disk.
+"""
+id = "9a09986e-af81-4481-96ec-d24286cc27ac"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `run_loop` push a synthetic `ToolResult` (\"Plan submitted for review.\") when the model calls `exit_plan`?"
+answer.answer = "Because the message protocol requires every tool call to have a matching tool result; without one the next provider request would be malformed."
+prompt.distractors = [
+  "Because `exit_plan` is implemented as a real tool in the `ToolSet` and must return a result like any other tool.",
+  "Because the synthetic result is what signals `StopReason::Stop` to the outer caller.",
+  "Because the caller's approval message is read from this synthetic tool result in the next phase.",
+]
+context = """
+`exit_plan` is a virtual tool — a `ToolDefinition` with no `call()` behind it. Since the assistant message contains a `ToolCall` for it, the API contract demands a corresponding `ToolResult`. Skip the synthetic result and the next API call fails with a malformed request. `test_plan_exit_plan_tool` verifies this pairing.
+"""
+id = "1af0dc99-f719-4f04-ba56-05a560891bb6"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `plan()` share the same `&mut Vec<Message>` with `execute()` rather than each phase building its own history?"
+answer.answer = "So the execution phase enters with the full context from planning — the system prompt, analysis tool calls, and plan text are all visible to the model."
+prompt.distractors = [
+  "Because `StreamProvider::stream_chat` requires a singleton message vec shared across all calls.",
+  "Because `Vec<Message>` cannot be cloned, so the caller must reuse the same instance.",
+  "Because otherwise the caller would have to manually re-inject the plan system prompt on every execute call.",
+]
+context = """
+Continuity is what makes the two-phase pattern effective. The caller typically pushes `Message::user("Approved. Go ahead.")` between the phases, and the model sees the whole trace: planning prompt, user request, read-only analysis, plan, approval, and then executes with full context. `test_plan_message_continuity` verifies the history grows correctly across both phases.
+"""
+id = "5d4365fc-80cb-45ff-bdd4-1a22608a63c6"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`PlanAgent::read_only` is typed `HashSet<&'static str>` rather than `HashSet<String>`. What Rust property does using `&'static str` rely on?"
+answer.answer = "String literals have `'static` lifetime"
+prompt.distractors = [
+  "`HashSet` can only store `&str` references, never owned `String` values.",
+  "`'static` references are automatically cloned on every `contains` call, avoiding ownership issues.",
+  "String literals are reference-counted and dropped when the last `&'static str` goes out of scope.",
+]
+context = """
+Tool names like `"read"` and `"bash"` are string literals baked into the binary — they live for the entire program, which is exactly what `'static` means. Using `&'static str` avoids heap allocation and cloning for a set whose members are always compile-time-known. The trade-off is you cannot put dynamically generated strings in the set, but that would not make sense for tool names anyway.
+"""
+id = "7ea9c11a-e4da-4760-abb9-ce6a9ac67c94"

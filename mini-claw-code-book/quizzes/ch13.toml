@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`PermissionEngine::evaluate` runs three stages: session approvals, rules in order, then the default permission. What is the consequence of checking session approvals *first*, before rules?"
+answer.answer = "Once the user has approved a tool for the session, that approval wins even if a later rule would Deny it — session approvals are an override, not a suggestion."
+prompt.distractors = [
+  "Rules are never consulted for tools that have been called at least once before.",
+  "Session approvals automatically expire the first time a matching rule fires.",
+  "The default permission is checked before any rule that contains a glob wildcard.",
+]
+context = """
+Stage order encodes priority. Session approvals first means "the user already said yes — stop asking." If a Deny rule needed to win over an approval, the user could never trust a tool across a session. The test `test_permissions_session_allow` pins this ordering down.
+"""
+id = "dbfb1830-6018-45d6-934b-b743df7b65cb"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Given rules `[(\"bash\", Allow), (\"bash\", Deny)]` and no session approvals, what does `evaluate(\"bash\", _)` return, and why?"
+answer.answer = "`Allow`, because rules are evaluated in order and the first match wins — the Deny rule is never reached."
+prompt.distractors = [
+  "`Deny`, because Deny is more restrictive and takes precedence over Allow for safety.",
+  "`Ask`, because conflicting rules are treated as ambiguous and fall back to a prompt.",
+  "A compile error, because the engine rejects duplicate patterns at construction time.",
+]
+context = """
+First-match-wins is the whole point of ordered rules. The test `test_permissions_first_rule_wins` encodes exactly this scenario. If you want Deny to beat Allow, put the Deny rule first. This is the same model as iptables, AWS IAM explicit-allow-then-deny ordering, and .gitignore.
+"""
+id = "5688c47f-4aaf-41bf-91c8-8011cf2db775"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `PermissionRule::matches` use `glob::Pattern` instead of plain `==` on the tool name?"
+answer.answer = "So one rule can cover families of tools — e.g. `\"mcp__*\"` matches every MCP tool, or `\"file_*\"` matches every file-group tool — without enumerating them."
+prompt.distractors = [
+  "Because tool names are case-insensitive and only `glob::Pattern` ignores case.",
+  "Because `==` on `String` allocates, and glob matching is zero-allocation.",
+  "Because `glob::Pattern` is required for the `Tool` trait to be object-safe.",
+]
+context = """
+Glob patterns give coarse-grained control without listing every tool. `"*"` catches everything, `"mcp__*"` catches dynamic MCP registrations, `"bash"` catches just one. The fallback to exact string equality on an invalid pattern means a typo degrades gracefully to "match only this literal name." `test_permissions_glob_pattern` verifies the wildcard case.
+"""
+id = "e948d1a6-af17-4e84-ab80-13c77a3e594d"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Which `PermissionEngine` constructor creates an engine that approves every tool without prompting — the bypass-mode configuration?"
+answer.answer = "allow_all"
+prompt.distractors = [
+  "bypass",
+  "ask_by_default",
+  "allow_default",
+]
+context = """
+`PermissionEngine::allow_all()` constructs an engine with no rules and a default of `Permission::Allow`. Its counterpart, `ask_by_default(rules)`, is the standard interactive config where anything not covered by a rule prompts the user. `test_permissions_allow_all` confirms bypass mode returns `Allow` for every tool.
+"""
+id = "9a56b4a7-4bc6-4d56-9b86-63fc3fb6ac16"

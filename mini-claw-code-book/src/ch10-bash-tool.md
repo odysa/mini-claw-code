@@ -338,6 +338,10 @@ The bash tool is what makes a coding agent a *programmer* rather than a text edi
 
 In [Chapter 11: Search Tools](./ch11-search-tools.md) you will build the tools that help the agent navigate large codebases -- glob for finding files by pattern and grep for searching file contents. These read-only tools are the agent's eyes, complementing the hands (bash, write, edit) you have already built.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch10.toml}}
+
 ---
 
 [← Chapter 9: File Tools](./ch09-file-tools.md) · [Contents](./ch00-overview.md) · [Chapter 11: Search Tools →](./ch11-search-tools.md)

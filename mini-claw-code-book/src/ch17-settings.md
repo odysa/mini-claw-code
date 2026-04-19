@@ -593,6 +593,10 @@ This chapter built two subsystems that the rest of the agent depends on.
 
 Configuration tells the agent *how* to behave. Chapter 18 -- Project Instructions -- tells it *what* to know. The `instructions` field you saw in `Config` is just a string. The instruction system reads `CLAUDE.md` files from the project tree, merges them with user instructions, and injects them into the system prompt. Together, settings and instructions make the agent context-aware -- it adapts its behavior and knowledge to each project it works in.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch17.toml}}
+
 ---
 
 [← Chapter 16: Plan Mode](./ch16-plan-mode.md) · [Contents](./ch00-overview.md) · [Chapter 18: Project Instructions →](./ch18-instructions.md)

@@ -249,6 +249,10 @@ The agent sends the prompt to the LLM, the LLM calls `bash("ls")`, the agent exe
 
 That is the architecture. Everything else — streaming, permissions, plan mode, subagents — is built on top of this loop.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch03.toml}}
+
 ---
 
 [← Chapter 2: Your First Tool Call](./ch02-first-tool.md) · [Contents](./ch00-overview.md) · [Chapter 4: Messages & Types →](./ch04-messages-types.md)

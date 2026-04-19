@@ -508,6 +508,10 @@ Natural extensions to explore on your own:
 - **Subagents** -- spawning child agents with a filtered tool set for scoped
   subtasks.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch18.toml}}
+
 ---
 
 [← Chapter 17: Settings Hierarchy](./ch17-settings.md) · [Contents](./ch00-overview.md)

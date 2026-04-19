@@ -1,0 +1,51 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `SafeToolWrapper::call` return `Ok(\"error: safety check failed: ...\")` on a denial instead of `Err(...)`?"
+answer.answer = "Because a safety denial is a controlled rejection the LLM should see as a tool result, not a system-level error."
+prompt.distractors = [
+  "Because `anyhow::Result` does not let you construct an `Err` from a `String`.",
+  "Because returning `Err` would cause the agent loop to panic and exit.",
+  "Because the `Tool` trait only allows `Ok` values when `async_trait` is used.",
+]
+context = """
+The wrapper turns a block into content the LLM can read and react to — "I tried to write `.env`, got blocked, let me try something else." Returning `Err` would bubble up as an infrastructure failure rather than a tool output. `test_safety_wrapper_blocks_on_check_failure` pins this contract by asserting the `Ok("error: safety check failed ...")` string shape.
+"""
+id = "2186b34b-235b-474d-bb6d-e8405a4ce60f"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "The user sets permission mode to `allow_all` (bypass). A tool wrapped in `SafeToolWrapper` is called with `path = \".env\"`. What happens?"
+answer.answer = "The safety wrapper still blocks the call — `allow_all` only affects the permission engine, not the safety checks embedded in the tool."
+prompt.distractors = [
+  "The call succeeds because bypass mode disables every guard layer.",
+  "The call fails with an `Err` because the permission engine re-runs inside the wrapper.",
+  "The call succeeds because `ProtectedFileCheck` only fires in `ask` mode.",
+]
+context = """
+This is the whole point of defense-in-depth. The permission engine asks "should this tool run at all?" and the safety checks ask "is this specific invocation dangerous?" The safety wrapper is the floor that no permission configuration can lower — even with bypass, writes to `.env` stay blocked.
+"""
+id = "4164b91d-0d73-4aa9-b1e0-4a66ffdd59f8"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`PathValidator::validate_path` canonicalizes the path before the `starts_with` check. Why canonicalize instead of just checking the raw string prefix?"
+answer.answer = "Because canonicalization resolves `..` and symlinks, so crafted paths like `/project/../etc/passwd` cannot slip past the directory check."
+prompt.distractors = [
+  "Because `Path::starts_with` requires both operands to be canonicalized before it returns accurate results.",
+  "Because `std::fs` refuses to open any path that has not been canonicalized first.",
+  "Because canonicalization is required to convert `&str` arguments into `PathBuf`.",
+]
+context = """
+A raw prefix check would let `/project/../../etc/passwd` pass (it starts with `/project`), but canonicalization rewrites it to `/etc/passwd`, which then fails `starts_with("/project")`. `test_safety_path_traversal_blocked` is exactly this scenario.
+"""
+id = "a5eccac4-8608-4c9d-a6e7-d0bfa2a41d0e"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "In the starter, which tool name does `CommandFilter::check` actually inspect arguments for? (Other tools are passed through unchanged.)"
+answer.answer = "bash"
+prompt.distractors = ["write", "edit", "read"]
+context = """
+Each `SafetyCheck` decides which tools it applies to by matching on `tool_name`. `CommandFilter` fires only for `bash` — it extracts the `command` argument and checks it against the blocked glob patterns. For any other tool name it returns `Ok(())` so wrapping irrelevant tools with it is harmless. `test_safety_safety_check_ignores_bash` and `test_safety_command_filter_*` cover this dispatch behavior.
+"""
+id = "9b7f88ec-0a27-47f7-87fe-59417a98831e"

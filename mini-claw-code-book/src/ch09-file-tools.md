@@ -642,6 +642,10 @@ In [Chapter 10: Bash Tool](./ch10-bash-tool.md), you will build the most
 powerful (and most dangerous) tool in the agent's arsenal -- one that can run
 arbitrary shell commands.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch09.toml}}
+
 ---
 
 [← Chapter 8: System Prompt](./ch08-system-prompt.md) · [Contents](./ch00-overview.md) · [Chapter 10: Bash Tool →](./ch10-bash-tool.md)

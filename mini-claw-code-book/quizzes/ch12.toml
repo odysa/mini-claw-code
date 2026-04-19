@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "The `ToolSet` stores tools as `HashMap<String, Box<dyn Tool>>`. What is the practical reason for using a trait object (`Box<dyn Tool>`) instead of, say, an enum with one variant per tool?"
+answer.answer = "So new tools — including ones registered dynamically at runtime, like MCP tools — can be added without changing the `ToolSet` type or the agent's dispatch code."
+prompt.distractors = [
+  "Because `HashMap` values must implement `Copy`, and trait objects are the only way to satisfy that bound.",
+  "Because enums cannot be keyed by string, only by integer discriminant.",
+  "Because `async fn` in traits requires an enum to erase the return type.",
+]
+context = """
+Trait objects give name-based dispatch without an ever-growing enum. The agent loop does `tools.get(name)` and invokes `.call()` through the vtable — one pointer indirection, negligible next to the I/O or network cost of the call. Production agents like Claude Code exploit this for MCP tools that appear and disappear mid-session.
+"""
+id = "ff53a879-25ae-4bfc-8068-28738b5d74a3"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "In `test_simple_agent_unknown_tool`, the LLM hallucinates a tool named `\"imaginary_tool\"`. What does the agent do, and what is the design lesson?"
+answer.answer = "It pushes an error string like `\"error: unknown tool `imaginary_tool`\"` into the conversation as a `ToolResult` and lets the LLM recover on the next turn — unknown tools are recoverable errors, not panics."
+prompt.distractors = [
+  "It returns an `Err` from `agent.run()`, terminating the session so the user can reconfigure the tool set.",
+  "It silently retries the turn, hoping the LLM picks a valid tool the second time.",
+  "It registers a stub `imaginary_tool` on the fly so the conversation can continue.",
+]
+context = """
+Models hallucinate tool names, especially smaller ones with long tool lists. Treating this as a recoverable error — visible in the conversation — lets the LLM correct itself. Crashing or returning `Err` would be brittle and user-hostile. The test verifies the agent keeps going and the final text acknowledges the mistake.
+"""
+id = "574e9112-6488-4875-bff3-fc592e88eee0"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "The chapter describes a future category table: read-only tools (Read, Glob, Grep), write tools (Write, Edit), and destructive tools (Bash). Why isn't `EditTool` categorized as destructive even though it modifies files?"
+answer.answer = "Because file edits are recoverable — you can revert them with git — whereas destructive operations like `rm -rf /` or `git push --force` are not."
+prompt.distractors = [
+  "Because `EditTool` only modifies whitespace, which is not considered a real change.",
+  "Because edits require the `old_string` to appear exactly once, which guarantees they cannot be harmful.",
+  "Because the `Tool` trait's `is_destructive` flag defaults to `false` and `EditTool` does not override it.",
+]
+context = """
+Recoverability is the key axis. Read-only tools have no side effects. Write/Edit are not concurrent-safe (two writes to the same file race) but can be undone. Bash is the dangerous class — it can delete data, push bad code, or exfiltrate secrets. Chapter 13's permission engine uses exactly this distinction to decide which tools require user approval.
+"""
+id = "29dfee4f-b36b-4fed-9bc8-f3579efbec4c"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Which method on `ToolSet` does `SimpleAgent` call at the start of each loop iteration to collect the JSON schemas it must send to the LLM?"
+answer.answer = "definitions"
+prompt.distractors = [
+  "schemas",
+  "tools",
+  "list",
+]
+context = """
+`definitions()` returns `Vec<&ToolDefinition>` — every tool's name, description, and parameter schema. The LLM uses those schemas to decide when and how to call each tool. `get(name)` is the mirror method used on the way back in, during dispatch.
+"""
+id = "a35ea065-8d7d-4a22-b421-d58d6c883fc3"

@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `MockProvider` wrap its `VecDeque<AssistantTurn>` in a `Mutex`?"
+answer.answer = "Because `Provider::chat` takes `&self`, so mutating the queue requires interior mutability."
+prompt.distractors = [
+  "Because `VecDeque` is not thread-safe on its own and needs a `Mutex` to compile.",
+  "Because `tokio::spawn` requires every field of a provider to be a `Mutex`.",
+  "Because the `Provider` trait returns a `Future`, and futures must hold a `Mutex` to be `Send`.",
+]
+context = """
+The trait signature is `fn chat(&self, ...)`. Shared references can't mutate by default, so to pop from the queue we use interior mutability — `Mutex` here, though `RwLock` would also work. `VecDeque` itself compiles fine without a `Mutex`; the issue is the `&self` receiver.
+"""
+id = "34af39b0-0660-4e61-990d-6be26a33d9a8"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "The LLM returns an `AssistantTurn` with `stop_reason = StopReason::ToolUse`. What does the agent do next?"
+answer.answer = "Executes the tool calls in `tool_calls` and sends the results back to the provider."
+prompt.distractors = [
+  "Prints the `text` field to the user and ends the turn.",
+  "Discards the turn and re-prompts the LLM with the same messages.",
+  "Waits for the user to type a new prompt before continuing.",
+]
+context = """
+`StopReason::ToolUse` means the LLM wants tools run. `StopReason::Stop` means it's done and `text` holds the final answer. Chapter 3 builds the loop that handles both.
+"""
+id = "ddee0f0e-5f15-4afa-832f-6afa4d723f07"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Which method on `VecDeque` does `MockProvider::chat` call to return responses in FIFO order?"
+answer.answer = "pop_front"
+prompt.distractors = [
+  "pop_back",
+  "front",
+  "swap_remove_front",
+]
+context = """
+`pop_front` removes and returns the first element, giving FIFO order. `pop_back` would give LIFO. The test `test_mock_steps_through_sequence` verifies you picked the right end.
+"""
+id = "568cce2b-60e7-40a3-9343-a8030a563b24"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "A test gives `MockProvider` two canned responses, then calls `chat()` three times. What happens on the third call?"
+answer.answer = "It returns an `Err` because the queue is empty."
+prompt.distractors = [
+  "It returns the last response again (the queue wraps around).",
+  "It blocks forever, waiting for a new response to be pushed.",
+  "It returns an `AssistantTurn` with empty text and `StopReason::Stop`.",
+]
+context = """
+`pop_front` returns `None` when the queue is empty; we convert that into `anyhow::anyhow!("MockProvider: no more responses")`. The `test_mock_empty_responses_exhausted` test pins this behavior down.
+"""
+id = "4e79e40b-e38d-463a-b9c1-a5321c7776f7"

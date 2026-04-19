@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `WriteTool` call `tokio::fs::create_dir_all` on the path's parent before writing?"
+answer.answer = "So the LLM can write to a nested path like `src/handlers/auth/mod.rs` without first calling bash `mkdir -p`."
+prompt.distractors = [
+  "Because `tokio::fs::write` refuses to overwrite an existing file unless the parent directory was just created.",
+  "Because `create_dir_all` is required to obtain a file handle on Unix-like systems.",
+  "Because without it the `edit` tool cannot later find the file on disk.",
+]
+context = """
+Auto-creating parents saves a wasted tool-use round. A naive tool would fail with "No such file or directory," forcing the agent to call `bash("mkdir -p ...")` and retry. The `!parent.as_os_str().is_empty()` guard handles bare filenames like `"file.txt"` where `parent()` returns `Some("")` and `create_dir_all("")` would fail. `test_write_creates_dirs` pins this behavior down.
+"""
+id = "cacebf7e-5a3f-42b9-81c0-ed25b6ca3739"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`EditTool` counts how many times `old_string` appears and bails when the count is zero OR greater than one. Why reject multiple matches instead of just replacing the first one?"
+answer.answer = "Because the replacement would be ambiguous — the LLM has no way to signal which occurrence it meant, and silently editing the wrong one would corrupt the file."
+prompt.distractors = [
+  "Because `str::replacen` is only defined for unique substrings and would panic otherwise.",
+  "Because multiple matches usually mean the file is binary and cannot be safely edited.",
+  "Because Rust's borrow checker forbids mutating a `String` more than once per function call.",
+]
+context = """
+Zero matches means the model got the string wrong (stale content, missing whitespace). Multiple matches means the edit is ambiguous. Both are expected failure modes, not bugs. By refusing to guess, the tool forces the LLM to supply a more specific `old_string` — usually by adding surrounding context lines — so the edit is unambiguous. `test_edit_not_unique` verifies this.
+"""
+id = "44a482b7-b81e-4178-8d2c-f7b8faaccc31"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "What does the `anyhow` macro `bail!(\"...\")` expand to, conceptually?"
+answer.answer = "return Err(anyhow::anyhow!(\"...\"))"
+prompt.distractors = [
+  "panic!(anyhow::anyhow!(\"...\"))",
+  "Err(anyhow::anyhow!(\"...\"))?",
+  "return anyhow::anyhow!(\"...\")",
+]
+context = """
+`bail!` is shorthand for constructing an `anyhow::Error` and returning it as `Err`. It creates a new error on the spot, unlike `?` which propagates an existing one. The EditTool uses `bail!` for both "not found" and "not unique" cases because those are new errors, not wrapped I/O failures.
+"""
+id = "93459640-401f-4159-9328-6fbf2dd47e96"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "In the starter's simplified `Tool` trait, what happens when `call()` returns `Err(...)` from a tool like `EditTool`?"
+answer.answer = "The agent loop converts it into a string like `\"error: old_string not found in 'foo.rs'\"` and sends it back to the LLM as a tool result."
+prompt.distractors = [
+  "The agent panics, because `Err` from a tool is treated as a fatal protocol violation.",
+  "The agent silently drops the tool call and asks the LLM to try again without context.",
+  "The agent terminates the session and returns the error to the user who typed the prompt.",
+]
+context = """
+In `execute_tools`, `Err` is caught with `match` and formatted as `format!("error: {e}")`. The LLM sees that string as the tool result and can recover — typically by retrying with a corrected argument. Production agents like Claude Code distinguish recoverable tool-level errors from genuine I/O failures, but the starter keeps things simple by treating them the same way.
+"""
+id = "e91ba36b-acc3-463d-af3b-311c505422c2"

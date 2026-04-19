@@ -522,6 +522,10 @@ The provider layer decouples the agent from any specific LLM backend. `MockProvi
 
 Everything in this chapter is testable without a network. Next up in [Chapter 5b](./ch05b-openrouter-streaming.md), we plug these primitives into a real HTTP provider and wire the events channel through the agent loop.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch05a.toml}}
+
 ---
 
 [← Chapter 4: Messages & Types](./ch04-messages-types.md) · [Contents](./ch00-overview.md) · [Chapter 5b: OpenRouter & StreamingAgent →](./ch05b-openrouter-streaming.md)

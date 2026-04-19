@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "After a `StopReason::ToolUse` turn, `SimpleAgent::chat` must push messages in which order?"
+answer.answer = "First `Message::Assistant(turn)`, then one `Message::ToolResult { id, content }` per tool result, matching each result's `id` to the corresponding `ToolCall.id`."
+prompt.distractors = [
+  "First all `Message::ToolResult` entries, then `Message::Assistant(turn)` at the end so the model has the context below its last response.",
+  "Interleave them: `Assistant`, `ToolResult`, `Assistant`, `ToolResult`, one pair per tool call.",
+  "Order does not matter — the provider sorts messages by their `id` field before sending them to the LLM.",
+]
+context = """
+The OpenAI / Claude API contract requires that `tool_result` messages immediately follow the `assistant` message that generated the `tool_use` calls, and each result's `id` must match its call. Getting this wrong produces a 400 from the provider. The chapter's "Message history management" section traces the exact sequence: `[User] -> [Assistant with tool_calls] -> [ToolResult(s)] -> [Assistant with text]`.
+"""
+id = "5246c4f0-780d-40c5-a738-b08334930027"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `chat()` take `&mut Vec<Message>` from the caller instead of owning the history internally?"
+answer.answer = "It lets the caller drive multi-turn conversations, inspect the full history after each call, and persist it — without the agent having to expose getters or move ownership back and forth."
+prompt.distractors = [
+  "`async fn` bodies cannot own a `Vec` across await points due to the `Send` bound.",
+  "`Vec<Message>` is not `Clone`, so the agent cannot store a copy.",
+  "`&mut` is required because `MockProvider` mutates the message list in place.",
+]
+context = """
+This is a deliberate ownership choice covered in the "Rust concept: ownership and &mut Vec<Message>" box. Borrowing mutably gives the agent full write access during the call while leaving ownership with the caller. That matters for three things the chapter enumerates: multi-turn conversations (push a new `User` message and call `chat()` again), inspection after the call, and session persistence.
+"""
+id = "3728bf52-d11e-4a08-8f67-0118bd989bbb"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "If `execute_tools` receives a `ToolCall` whose `name` is not registered in the `ToolSet`, what does it put in the result string?"
+answer.answer = "error: unknown tool `<name>`"
+prompt.distractors = [
+  "tool not found: <name>",
+  "An empty string — the agent silently skips unknown tools.",
+  "It does not produce a result string; `execute_tools` returns `Err(anyhow!(\"unknown tool\"))` and the loop aborts.",
+]
+context = """
+The `match self.tools.get(&call.name)` falls through to `None => format!(\"error: unknown tool `{}`\", call.name)`. The agent never panics on a hallucinated tool name — it feeds the error back to the LLM, which can recover. `test_simple_agent_unknown_tool` locks this behavior in.
+"""
+id = "46205a72-e503-478c-97d5-0b4c341140fe"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `chat()` propagate provider errors with `?` while `execute_tools` swallows tool errors into the result string?"
+answer.answer = "Provider errors (network, auth, rate-limit) require human or system intervention; tool errors are part of the conversation — the LLM can read them and try a different approach."
+prompt.distractors = [
+  "`?` does not work inside the `match` arms, so tool errors cannot be propagated even if we wanted to.",
+  "`anyhow::Error` is not `Send`, so it cannot cross an `await` inside `execute_tools`.",
+  "Tool errors are always recoverable, but provider errors are always transient, so the agent retries them automatically.",
+]
+context = """
+The chapter's "Error handling philosophy" section frames this as two distinct strategies. Tool failure is normal — the LLM asked to read a file that does not exist, the bash command exited non-zero. Feeding the error back as a tool result is exactly how the model learns to adapt. Provider failure, by contrast, means the LLM is unreachable; the loop cannot make progress on its own. The boundary is intentional, not accidental.
+"""
+id = "7432232f-c0b2-481f-8942-04645ab8f8d5"

@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`InstructionLoader::discover` walks upward from the start directory and then calls `found.reverse()` before returning. Why reverse the order?"
+answer.answer = "So instructions are emitted root-first — general preferences appear before project-specific ones, and the most specific file appears last in the prompt."
+prompt.distractors = [
+  "So the most specific instruction file appears first, giving it the highest priority in the system prompt.",
+  "Because `Vec::reverse` is required for `starts_with` checks to work on `PathBuf` values.",
+  "So the prompt builder can pop files off the end of the vec in O(1).",
+]
+context = """
+The walk naturally collects files specific-to-general (cwd first, root last). LLMs read top-to-bottom, and later instructions tend to override earlier ones — same principle as CSS specificity. Reversing to root-first order means `/home/user/CLAUDE.md` sets broad preferences and `project/backend/CLAUDE.md` gets the final word. `test_instructions_discover_in_parent` exercises the multi-level walk.
+"""
+id = "8a0c29ca-5fa7-4e29-a249-fd5d603d7961"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why are instructions placed below the cache boundary (as a dynamic section) rather than above it with identity and safety?"
+answer.answer = "Because the set of discovered instruction files depends on the working directory, so the text changes between sessions even though any one CLAUDE.md rarely changes."
+prompt.distractors = [
+  "Because dynamic sections are processed faster than static sections by the provider.",
+  "Because CLAUDE.md files cannot be cached due to a limitation in the OpenRouter API.",
+  "Because putting instructions above the cache boundary would prevent the LLM from reading them.",
+]
+context = """
+The cache boundary separates "stable across every request" from "may change per session." The identity prompt is the same every time; the instructions depend on which directory you launched from. Cache what is stable, keep what varies fresh — this is the key takeaway of the chapter.
+"""
+id = "49fbce0f-3fe8-484a-b89b-9ee16bb4b21e"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`load()` returns `None` when a CLAUDE.md file exists but contains only whitespace. Why skip it instead of injecting an empty section?"
+answer.answer = "Because empty sections would waste context tokens and add noise without adding information for the LLM."
+prompt.distractors = [
+  "Because `SystemPromptBuilder` panics if a dynamic section has empty content.",
+  "Because empty files indicate a corrupted instruction file that should abort loading.",
+  "Because `std::fs::read_to_string` returns `None` for empty files.",
+]
+context = """
+Every section in the prompt costs tokens. An empty CLAUDE.md produces zero useful signal but still consumes a header and a separator. `load()` trims and checks for emptiness per-file, and returns `None` overall when nothing survives. `test_instructions_load_empty_file` pins this so callers can cleanly use `if let Some(inst) = loader.load(...)` to skip the section entirely.
+"""
+id = "5338c4e1-3de5-43fe-969b-36848a1f567a"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "In the instruction hierarchy, which source has the highest effective priority in the final system prompt — a file-discovered CLAUDE.md or `Config.instructions`?"
+answer.answer = "Config.instructions"
+prompt.distractors = [
+  "the root-most CLAUDE.md (e.g. `/home/user/CLAUDE.md`)",
+  "the cwd-level CLAUDE.md (the most specific file discovered)",
+  "whichever source is longer in characters",
+]
+context = """
+Both are dynamic sections, but `config_instructions` is added *after* `file_instructions` in the builder. Since the LLM reads top-to-bottom and later instructions tend to override earlier ones, the config string gets the final word. This matches the intent: CLAUDE.md files are shared team conventions, while `Config.instructions` is personal or session-specific overrides.
+"""
+id = "8c9c575c-1ac7-4d1b-8e29-c61eaebae127"

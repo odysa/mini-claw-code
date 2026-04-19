@@ -185,6 +185,10 @@ Later ([Chapter 5b](./ch05b-openrouter-streaming.md)) you'll see `OpenRouterProv
 
 An LLM is a function: `messages in → (text, tool_calls, stop_reason) out`. Everything else is plumbing.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch01.toml}}
+
 ---
 
 [← Contents](./ch00-overview.md) · [Chapter 2: Your First Tool Call →](./ch02-first-tool.md)

@@ -28,6 +28,10 @@ runs:
         curl -sSL "$MDBOOK_URL" | tar -xz -C bin
         MERMAID_URL=$(gh release view "$MERMAID_VERSION" --repo badboy/mdbook-mermaid --json assets --jq '.assets[] | select(.name | test("x86_64-unknown-linux-gnu.tar.gz$")) | .url')
         curl -sSL "$MERMAID_URL" | tar -xz -C bin
-        QUIZ_URL=$(gh release view "$QUIZ_VERSION" --repo cognitive-engineering-lab/mdbook-quiz --json assets --jq '.assets[] | select(.name | test("x86_64-unknown-linux-gnu_full.tar.gz$")) | .url')
+        # `_bare` (not `_full`) because the full variant compiles in Aquascope
+        # support and fails with "Aquascope failed to initialize" when no
+        # aquascope binary is on PATH. We do not use Aquascope — none of the
+        # quiz TOML files reference it — so bare is the right choice.
+        QUIZ_URL=$(gh release view "$QUIZ_VERSION" --repo cognitive-engineering-lab/mdbook-quiz --json assets --jq '.assets[] | select(.name | test("x86_64-unknown-linux-gnu_bare.tar.gz$")) | .url')
         curl -sSL "$QUIZ_URL" | tar -xz -C bin
         echo "$PWD/bin" >> $GITHUB_PATH

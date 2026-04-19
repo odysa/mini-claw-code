@@ -49,7 +49,7 @@
   <text x="384" y="265" class="f label" font-size="10" fill="#c15f3c">AGENT · YOUR LOOP</text>
   <text x="480" y="298" text-anchor="middle" class="f title" font-size="22">Your Agent</text>
   <line x1="410" y1="314" x2="550" y2="314" stroke="#f0e5d8" stroke-width="1"/>
-  <text x="480" y="336" text-anchor="middle" class="f mono body" font-size="12">while !done { call → execute }</text>
+  <text x="480" y="336" text-anchor="middle" class="f mono body" font-size="11">while !done: call &#8594; execute</text>
   <text x="480" y="354" text-anchor="middle" class="f sub" font-size="11">match on StopReason</text>
 
   <!-- ============ User (left) ============ -->
@@ -76,28 +76,28 @@
     <rect x="752" y="210" width="24" height="24" rx="6" fill="#f5e8dc"/>
     <text x="764" y="227" text-anchor="middle" class="f mono body" font-size="12" fill="#c15f3c">$_</text>
     <text x="790" y="218" class="f title" font-size="14">bash</text>
-    <text x="790" y="236" class="f sub" font-size="11">run shell commands</text>
+    <text x="790" y="236" class="f sub" font-size="10">run shell commands</text>
   </g>
   <g>
     <rect x="736" y="266" width="156" height="64" rx="12" fill="#faf9f5" stroke="#ece9de"/>
     <rect x="752" y="286" width="24" height="24" rx="6" fill="#f5e8dc"/>
     <path d="M 759 294 h 10 v 16 h -10 z M 769 294 l 4 4 v 12 h -4 z" fill="#c15f3c"/>
     <text x="790" y="294" class="f title" font-size="14">read</text>
-    <text x="790" y="312" class="f sub" font-size="11">read files</text>
+    <text x="790" y="312" class="f sub" font-size="10">read files</text>
   </g>
   <g>
     <rect x="736" y="342" width="156" height="64" rx="12" fill="#faf9f5" stroke="#ece9de"/>
     <rect x="752" y="362" width="24" height="24" rx="6" fill="#f5e8dc"/>
     <path d="M 759 370 h 10 v 16 h -10 z M 769 370 l 4 4 v 12 h -4 z M 762 376 h 5 M 762 380 h 5" stroke="#c15f3c" stroke-width="1" fill="#c15f3c"/>
     <text x="790" y="370" class="f title" font-size="14">write</text>
-    <text x="790" y="388" class="f sub" font-size="11">create files</text>
+    <text x="790" y="388" class="f sub" font-size="10">create files</text>
   </g>
   <g>
     <rect x="736" y="418" width="156" height="64" rx="12" fill="#faf9f5" stroke="#ece9de"/>
     <rect x="752" y="438" width="24" height="24" rx="6" fill="#f5e8dc"/>
     <path d="M 758 454 l 8 -8 l 4 4 l -8 8 z M 768 444 l 2 -2 l 4 4 l -2 2 z" fill="#c15f3c"/>
     <text x="790" y="446" class="f title" font-size="14">edit</text>
-    <text x="790" y="464" class="f sub" font-size="11">find &amp; replace</text>
+    <text x="790" y="464" class="f sub" font-size="10">find &amp; replace</text>
   </g>
 
   <!-- ============ Arrows ============ -->

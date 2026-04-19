@@ -23,63 +23,62 @@
   <text x="40" y="44" class="f label" font-size="10">ROADMAP</text>
   <text x="40" y="66" class="f title" font-size="16">Four parts. Eighteen chapters. One coherent agent.</text>
 
-  <!-- ============ 5 Phase cards ============ -->
-  <!-- Card layout: x = 20, 208, 396, 584, 772; width=168, height=130; y=108 -->
+  <!-- Card layout: width=180, gap=12, 5 cards, start x=6 -->
+  <!-- Cards at x = 6, 198, 390, 582, 774 -->
 
   <!-- Card 1: Start · Ch 1-3 -->
   <g filter="url(#soft)">
-    <rect x="20" y="108" width="168" height="130" rx="14" fill="#ffffff" stroke="#e8e6dc" stroke-width="1"/>
+    <rect x="6" y="108" width="180" height="130" rx="14" fill="#ffffff" stroke="#e8e6dc" stroke-width="1"/>
   </g>
-  <rect x="36" y="124" width="52" height="20" rx="10" fill="#f5e8dc"/>
-  <text x="62" y="138" text-anchor="middle" class="f label" font-size="10" fill="#c15f3c">CH 1&#8211;3</text>
-  <text x="36" y="176" class="f title" font-size="18">Start</text>
-  <text x="36" y="200" class="f sub" font-size="12">Mock · Read · Loop</text>
-  <text x="36" y="218" class="f sub" font-size="11">your first working agent</text>
+  <rect x="22" y="124" width="54" height="20" rx="10" fill="#f5e8dc"/>
+  <text x="49" y="138" text-anchor="middle" class="f label" font-size="10" fill="#c15f3c">CH 1&#8211;3</text>
+  <text x="22" y="176" class="f title" font-size="18">Start</text>
+  <text x="22" y="200" class="f sub" font-size="12">Mock &#183; Read &#183; Loop</text>
+  <text x="22" y="220" class="f sub" font-size="10">your first working agent</text>
 
   <!-- Card 2: Core · Ch 4-7 -->
   <g filter="url(#soft)">
-    <rect x="208" y="108" width="168" height="130" rx="14" fill="#ffffff" stroke="#e8e6dc" stroke-width="1"/>
+    <rect x="198" y="108" width="180" height="130" rx="14" fill="#ffffff" stroke="#e8e6dc" stroke-width="1"/>
   </g>
-  <rect x="224" y="124" width="52" height="20" rx="10" fill="#f0dcc4"/>
-  <text x="250" y="138" text-anchor="middle" class="f label" font-size="10" fill="#a84f2f">CH 4&#8211;7</text>
-  <text x="224" y="176" class="f title" font-size="18">Core</text>
-  <text x="224" y="200" class="f sub" font-size="12">Types · Provider · Loop</text>
-  <text x="224" y="218" class="f sub" font-size="11">streaming, events, ownership</text>
+  <rect x="214" y="124" width="54" height="20" rx="10" fill="#f0dcc4"/>
+  <text x="241" y="138" text-anchor="middle" class="f label" font-size="10" fill="#a84f2f">CH 4&#8211;7</text>
+  <text x="214" y="176" class="f title" font-size="18">Core</text>
+  <text x="214" y="200" class="f sub" font-size="12">Types &#183; Provider &#183; Loop</text>
+  <text x="214" y="220" class="f sub" font-size="10">streaming, events, ownership</text>
 
   <!-- Card 3: Prompt + Tools · Ch 8-12 -->
   <g filter="url(#soft)">
-    <rect x="396" y="108" width="168" height="130" rx="14" fill="#ffffff" stroke="#e8e6dc" stroke-width="1"/>
+    <rect x="390" y="108" width="180" height="130" rx="14" fill="#ffffff" stroke="#e8e6dc" stroke-width="1"/>
   </g>
-  <rect x="412" y="124" width="62" height="20" rx="10" fill="#e8cfb0"/>
-  <text x="443" y="138" text-anchor="middle" class="f label" font-size="10" fill="#8a4a23">CH 8&#8211;12</text>
-  <text x="412" y="176" class="f title" font-size="18">Prompt &amp; Tools</text>
-  <text x="412" y="200" class="f sub" font-size="12">Bash · File · Search</text>
-  <text x="412" y="218" class="f sub" font-size="11">the agent's hands and eyes</text>
+  <rect x="406" y="124" width="66" height="20" rx="10" fill="#e8cfb0"/>
+  <text x="439" y="138" text-anchor="middle" class="f label" font-size="10" fill="#8a4a23">CH 8&#8211;12</text>
+  <text x="406" y="176" class="f title" font-size="18">Prompt &amp; Tools</text>
+  <text x="406" y="200" class="f sub" font-size="12">Bash &#183; File &#183; Search</text>
+  <text x="406" y="220" class="f sub" font-size="10">the agent&#8217;s hands and eyes</text>
 
   <!-- Card 4: Safety · Ch 13-16 -->
   <g filter="url(#soft)">
-    <rect x="584" y="108" width="168" height="130" rx="14" fill="#ffffff" stroke="#e8e6dc" stroke-width="1"/>
+    <rect x="582" y="108" width="180" height="130" rx="14" fill="#ffffff" stroke="#e8e6dc" stroke-width="1"/>
   </g>
-  <rect x="600" y="124" width="62" height="20" rx="10" fill="#dde4c8"/>
-  <text x="631" y="138" text-anchor="middle" class="f label" font-size="10" fill="#55683a">CH 13&#8211;16</text>
-  <text x="600" y="176" class="f title" font-size="18">Safety</text>
-  <text x="600" y="200" class="f sub" font-size="12">Permissions · Hooks · Plan</text>
-  <text x="600" y="218" class="f sub" font-size="11">guardrails around the loop</text>
+  <rect x="598" y="124" width="70" height="20" rx="10" fill="#dde4c8"/>
+  <text x="633" y="138" text-anchor="middle" class="f label" font-size="10" fill="#55683a">CH 13&#8211;16</text>
+  <text x="598" y="176" class="f title" font-size="18">Safety</text>
+  <text x="598" y="200" class="f sub" font-size="12">Permissions &#183; Hooks &#183; Plan</text>
+  <text x="598" y="220" class="f sub" font-size="10">guardrails around the loop</text>
 
   <!-- Card 5: Config · Ch 17-18 -->
   <g filter="url(#soft)">
-    <rect x="772" y="108" width="168" height="130" rx="14" fill="#ffffff" stroke="#e8e6dc" stroke-width="1"/>
+    <rect x="774" y="108" width="180" height="130" rx="14" fill="#ffffff" stroke="#e8e6dc" stroke-width="1"/>
   </g>
-  <rect x="788" y="124" width="62" height="20" rx="10" fill="#dcdbcf"/>
-  <text x="819" y="138" text-anchor="middle" class="f label" font-size="10" fill="#5a5648">CH 17&#8211;18</text>
-  <text x="788" y="176" class="f title" font-size="18">Config</text>
-  <text x="788" y="200" class="f sub" font-size="12">Settings · Instructions</text>
-  <text x="788" y="218" class="f sub" font-size="11">CLAUDE.md, env, cost</text>
+  <rect x="790" y="124" width="70" height="20" rx="10" fill="#dcdbcf"/>
+  <text x="825" y="138" text-anchor="middle" class="f label" font-size="10" fill="#5a5648">CH 17&#8211;18</text>
+  <text x="790" y="176" class="f title" font-size="18">Config</text>
+  <text x="790" y="200" class="f sub" font-size="12">Settings &#183; Instructions</text>
+  <text x="790" y="220" class="f sub" font-size="10">CLAUDE.md, env, cost</text>
 
-  <!-- ============ Connectors between cards ============ -->
-  <!-- Arrows sit in the 20px gaps, y=173 (centered on card body) -->
-  <line x1="192" y1="173" x2="204" y2="173" stroke="#b8aea0" stroke-width="1.5" marker-end="url(#arr-muted)"/>
-  <line x1="380" y1="173" x2="392" y2="173" stroke="#b8aea0" stroke-width="1.5" marker-end="url(#arr-muted)"/>
-  <line x1="568" y1="173" x2="580" y2="173" stroke="#b8aea0" stroke-width="1.5" marker-end="url(#arr-muted)"/>
-  <line x1="756" y1="173" x2="768" y2="173" stroke="#b8aea0" stroke-width="1.5" marker-end="url(#arr-muted)"/>
+  <!-- Connectors in the 12px gaps at y=173 -->
+  <line x1="188" y1="173" x2="196" y2="173" stroke="#b8aea0" stroke-width="1.5" marker-end="url(#arr-muted)"/>
+  <line x1="380" y1="173" x2="388" y2="173" stroke="#b8aea0" stroke-width="1.5" marker-end="url(#arr-muted)"/>
+  <line x1="572" y1="173" x2="580" y2="173" stroke="#b8aea0" stroke-width="1.5" marker-end="url(#arr-muted)"/>
+  <line x1="764" y1="173" x2="772" y2="173" stroke="#b8aea0" stroke-width="1.5" marker-end="url(#arr-muted)"/>
 </svg>

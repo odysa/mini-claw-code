@@ -9,14 +9,11 @@
 </p>
 
 <p align="center">
-  <a href="https://odysa.github.io/mini-claw-code/">Read the Book</a> &middot;
-  <a href="https://odysa.github.io/mini-claw-code/zh/">中文版</a> &middot;
+  <a href="https://odysa.github.io/mini-claw-code/">Read the Book (EN)</a> &middot;
+  <a href="https://odysa.github.io/mini-claw-code/zh/">中文版 (Book)</a> &middot;
+  <a href="./README.zh.md">中文 README</a> &middot;
   <a href="#quick-start">Quick Start</a> &middot;
   <a href="#chapter-roadmap">Chapters</a>
-</p>
-
-<p align="center">
-  <a href="./README.zh.md">中文 README</a>
 </p>
 
 ---

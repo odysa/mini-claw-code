@@ -1,15 +1,21 @@
 # Chapter 9: File Tools
 
-> **File(s) to edit:** `src/tools/read.rs`, `src/tools/write.rs`, `src/tools/edit.rs`
+> **File(s) to edit:** `src/tools/write.rs`, `src/tools/edit.rs`
+> (the `TODO ch9:` stubs). `src/tools/read.rs` was completed back in
+> [Chapter 2](./ch02-first-tool.md) — this chapter revisits it as the
+> baseline and contrasts it with the design decisions that come with
+> writing and editing.
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_read_` (ReadTool), `cargo test -p mini-claw-code-starter test_write_` (WriteTool), `cargo test -p mini-claw-code-starter test_edit_` (EditTool)
 > **Estimated time:** 50 min
 
 ## Goal
 
-- Implement `ReadTool` so the agent can read file contents, giving the LLM visibility into the codebase.
+- Revisit `ReadTool` (built in Ch2) as the baseline and understand the
+  trade-offs of its minimal design vs. production tools that add
+  line-numbering and offset/limit.
 - Implement `WriteTool` with automatic parent directory creation so the agent can create new files without a separate `mkdir` step.
 - Implement `EditTool` with a uniqueness check so the agent can make surgical string replacements in existing files.
-- Understand why tool errors are returned as `Err(...)` in the starter (the agent loop converts them to messages the LLM can read and recover from).
+- Understand why tool errors are returned as `Err(...)` in the starter (the agent loop converts them to messages the LLM can read and recover from -- the detailed rationale is in [Chapter 6 §"Why tool errors never terminate the agent"](./ch06-tool-interface.md#why-tool-errors-never-terminate-the-agent)).
 
 A coding agent that cannot touch the filesystem is just a chatbot with delusions
 of grandeur. It can describe code changes, suggest fixes, explain algorithms --
@@ -59,20 +65,32 @@ sequenceDiagram
 
 ## 6.1 ReadTool
 
-Reading a file is the simplest operation, but there are design decisions that
-matter. A naive approach would dump the raw file contents and call it done. Our
-`ReadTool` does two things differently: it numbers every line, and it supports
-partial reads via offset and limit.
+`ReadTool` is the simplest of the file tools: it takes a path, reads the file
+with `tokio::fs::read_to_string`, and returns the raw contents as a string. No
+line numbering, no offset/limit, no transformation. That is what both the
+starter and the reference implementation (`mini-claw-code/src/tools/read.rs`)
+do -- we keep it deliberately minimal so the rest of the chapter (Write, Edit)
+has room to breathe.
 
-### Why line numbers?
+### Design discussion: why production agents add more
 
-When the LLM reads a file, it needs to reference specific locations for later
-edits. "Replace the string on line 42" is precise. "Replace the string
-somewhere around the middle of the function" is not. By formatting output like
-`cat -n` (tab-separated line numbers), we give the model an unambiguous
-coordinate system for the file. This becomes critical in the Edit tool, where
-the model needs to provide an exact string match -- line numbers help it locate
-and copy the right chunk.
+Production agents like Claude Code go further. Their read tool typically
+numbers every line (`cat -n` style) and supports partial reads via `offset` and
+`limit` parameters. Two reasons this matters in real systems:
+
+- **Line numbers give the LLM a coordinate system.** "Replace the string on
+  line 42" is precise. "Replace the string somewhere around the middle of the
+  function" is not. This becomes especially valuable for the Edit tool, where
+  the model has to produce an exact string to match and numbered lines help it
+  copy the right chunk.
+- **Offset/limit protects the context window.** A single 50k-line generated
+  file can blow past the model's context. Paginated reads let the LLM fetch
+  what it needs without burning the whole budget on one file.
+
+Neither of these appear in the starter *or* the reference implementation in
+this book -- they are extensions we point at but deliberately leave out so the
+core `Tool` implementation stays a dozen lines. Adding them yourself is one of
+the listed extensions at the end of the chapter.
 
 ### The starter stub
 
@@ -163,10 +181,10 @@ starter's `Tool` trait is simplified -- tools return plain strings on success.
 If the tool encounters an error (missing argument, I/O failure), it returns
 `Err(...)`. The agent loop converts errors to error messages that the LLM sees.
 
-**Possible extensions.** The reference implementation adds `offset` and `limit`
-parameters for partial reads, and formats output with tab-separated line numbers
-(like `cat -n`). These are useful for large files but not required for the
-starter. You could add them later as optional parameters.
+**Possible extensions.** A production-grade `ReadTool` would add `offset` and
+`limit` parameters for partial reads and format output with tab-separated line
+numbers (like `cat -n`). Neither is in this book's reference implementation;
+both are well-scoped exercises if you want to go further.
 
 ### What the output looks like
 
@@ -186,9 +204,10 @@ beta
 gamma
 ```
 
-This is the simplest approach. The reference implementation adds line numbers
+This is the simplest approach. Production tools extend it with line numbers
 and partial-read support, which are useful for large files and for giving the
-LLM precise line references for later edits.
+LLM precise line references for later edits -- see the design discussion
+above.
 
 ---
 
@@ -584,9 +603,16 @@ without reaching into individual modules.
 Run the file tool tests:
 
 ```bash
-cargo test -p mini-claw-code-starter test_read_  # ReadTool tests
-cargo test -p mini-claw-code-starter 'bash|write|edit'  # WriteTool, EditTool tests
+cargo test -p mini-claw-code-starter test_read_   # ReadTool
+cargo test -p mini-claw-code-starter test_write_  # WriteTool
+cargo test -p mini-claw-code-starter test_edit_   # EditTool
 ```
+
+Cargo test filters are substring matches, not regex, so you cannot OR them
+together into a single invocation. Run the three commands separately, or
+drop all three prefixes with a catch-all like
+`cargo test -p mini-claw-code-starter -- --test-threads=1` if you want to
+see everything at once.
 
 Here is what each test verifies:
 

@@ -1,8 +1,11 @@
 # Chapter 6: Tool Interface
 
-> **File(s) to edit:** `src/tools/read.rs`
-> **Test to run:** `cargo test -p mini-claw-code-starter test_read_`
-> **Estimated time:** 25 min
+> **File(s) to edit:** none — this chapter is a conceptual walkthrough of the
+> `Tool` trait. The hands-on `EchoTool` below is meant to be built from scratch
+> in a scratch file (or tried in the Rust playground); the starter does not
+> ship an `echo.rs` stub and the existing `test_read_*` tests from
+> [Chapter 2](./ch02-first-tool.md) are unaffected by anything you do here.
+> **Reading time:** 25 min
 
 ## Goal
 
@@ -80,15 +83,65 @@ This split is a deliberate design choice. If Rust stabilizes `dyn async fn` in t
 
 Note that in the `MockProvider` impl from [Chapter 5a](./ch05a-provider-foundations.md), we wrote `async fn chat(...)` directly. That works because Rust 1.75+ allows `async fn` in trait impls even when the trait signature uses the RPITIT form. The compiler desugars it correctly. You can do the same for `Tool` impls -- write `async fn call(...)` and the `#[async_trait]` macro handles the rest.
 
-## Why errors are values, not `Err`
+### Decision rule: which pattern for your next trait?
 
-When a tool fails -- a file doesn't exist, a command exits non-zero, an edit can't be applied -- we do **not** return `Err(...)`. Instead, we return `Ok(format!("error: {e}"))`.
+The question to ask about any *new* async trait is "do I need to store values
+of this trait with different concrete types in the same collection?" That
+single question decides it:
 
-Why? Because a tool failure is not an agent failure. If the LLM asks to read a file that doesn't exist, the correct behavior is to tell the LLM "error: file not found" and let it recover -- try a different path, ask the user, or move on. Returning `Err(...)` would bubble up through the agent loop and terminate the conversation.
+```
+                  Do you need Box<dyn MyTrait> anywhere?
+                                 │
+                 ┌──────────────┴───────────────┐
+                 ▼                              ▼
+               yes                              no
+                 │                              │
+                 ▼                              ▼
+   #[async_trait::async_trait]          trait MyTrait {
+   trait MyTrait: Send + Sync {            fn do_it(&self)
+       async fn do_it(&self)                 -> impl Future<...> + Send;
+         -> Result<...>;                  }
+   }                                      // callers use `impl MyTrait` or
+   // callers use Box<dyn MyTrait>        // generic `<T: MyTrait>` params
+```
 
-Reserve `Err(...)` for genuinely unrecoverable situations: a network failure talking to the LLM, a serialization bug, or a programming error. Tool-level "this didn't work" is always `Ok("error: ...")`.
+Concrete cues that push you toward `#[async_trait]`:
 
-This distinction will become critical in the next chapter when we build the agent loop. The `SimpleAgent` catches tool errors with `.unwrap_or_else(|e| format!("error: {e}"))` so the model sees the error and can adapt.
+- You want a `Vec<Box<dyn MyTrait>>`, `HashMap<K, Box<dyn MyTrait>>`, or
+  similar runtime-heterogeneous container. (This is what `ToolSet` does.)
+- You want to return `Box<dyn MyTrait>` from a function because callers do
+  not need to know the concrete type.
+- You want users to plug in new implementations at runtime (e.g. via a
+  dynamic registry or plugin system).
+
+Concrete cues that push you toward RPITIT:
+
+- Every caller knows the concrete implementation at compile time. A struct
+  like `SimpleAgent<P: Provider>` monomorphises once per provider.
+- Throughput matters enough that you care about avoiding one boxed-future
+  allocation per call.
+- The trait has lots of `async` methods and you do not want `async_trait` to
+  insert a `Box` around each one.
+
+For this book, every trait we define happens to fall cleanly on one side:
+`Provider` / `StreamProvider` / `SafetyCheck` are monomorphised through
+generic parameters (RPITIT); `Tool` / `HookHandler` / `InputHandler` get
+stored as `Box<dyn _>` in a heterogeneous collection (`#[async_trait]`).
+When you add a new trait in your own extensions, walk the question above
+and you will not have to think about it again.
+
+## Why tool errors never terminate the agent
+
+A tool failure is not an agent failure. If the LLM asks to read a file that does not exist, the right behaviour is to tell it "error: file not found" and let it recover -- try a different path, ask the user, or move on. A genuine `Err(...)` escaping to the top of the agent loop would instead *terminate* the conversation, which is almost never what we want.
+
+We get that behaviour by agreement between the `Tool` impl and the agent loop:
+
+1. **Tools** return `anyhow::Result<String>`. On failure they use `bail!("reason")` or `?`-propagation (`context.read_to_string(...).with_context(|| ...)?`). You will see `bail!` used heavily in the file tools in Chapter 9.
+2. **The agent loop** catches tool errors with `.unwrap_or_else(|e| format!("error: {e}"))` before packaging the result into a `Message::ToolResult`. The LLM always receives a string -- either the tool's success output or the formatted error.
+
+So from inside a tool you write idiomatic Rust (`?`, `bail!`, `anyhow::Context`); from the LLM's side every outcome looks like a string. The only failures that *do* escape the agent loop are genuinely unrecoverable ones -- network failure talking to the provider, a serialization bug, a panic -- none of which a tool implementation should produce on its own.
+
+You will see one small variation in Chapter 14: `SafeToolWrapper` catches its safety-check errors and returns `Ok("error: safety check failed: ...")` directly, rather than letting them propagate. This is equivalent (the agent loop would have formatted the `Err` the same way), but keeps the wrapper's error-handling self-contained when it is acting as a pre-filter.
 
 ## Hands-on: building an EchoTool
 

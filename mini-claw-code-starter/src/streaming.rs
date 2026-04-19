@@ -32,7 +32,7 @@ pub enum StreamEvent {
 
 /// Collects [`StreamEvent`]s into a complete [`AssistantTurn`].
 ///
-/// # Chapter 5: Provider & Streaming
+/// # Chapter 5a: Provider & Streaming Foundations
 ///
 /// The accumulator buffers text deltas and tool call fragments, then
 /// assembles them into a complete turn when `finish()` is called.
@@ -66,7 +66,7 @@ impl StreamAccumulator {
     ///   tool call at that index
     /// - `Done` → no-op
     pub fn feed(&mut self, _event: &StreamEvent) {
-        unimplemented!("TODO ch5: match on the StreamEvent and update text/tool_calls accordingly")
+        unimplemented!("TODO ch5a: match on the StreamEvent and update text/tool_calls accordingly")
     }
 
     /// Consume the accumulator and produce a complete [`AssistantTurn`].
@@ -79,7 +79,7 @@ impl StreamAccumulator {
     /// - stop_reason: ToolUse if tool_calls is non-empty, Stop otherwise
     /// - usage: None
     pub fn finish(self) -> AssistantTurn {
-        unimplemented!("TODO ch5: assemble buffered deltas into a complete AssistantTurn")
+        unimplemented!("TODO ch5a: assemble buffered deltas into a complete AssistantTurn")
     }
 }
 
@@ -126,7 +126,7 @@ struct DeltaFunction {
 
 /// Parse one SSE `data:` line into zero or more [`StreamEvent`]s.
 ///
-/// # Chapter 5: SSE Parsing
+/// # Chapter 5a: SSE Parsing
 ///
 /// Hints:
 /// - Strip the `data: ` prefix. If no prefix, return None.
@@ -138,7 +138,7 @@ struct DeltaFunction {
 ///   - If `function.arguments` is present and non-empty → `ToolCallDelta`
 /// - Return None if no events were produced
 pub fn parse_sse_line(_line: &str) -> Option<Vec<StreamEvent>> {
-    unimplemented!("TODO ch5: strip 'data: ' prefix, handle [DONE], parse JSON into StreamEvents")
+    unimplemented!("TODO ch5a: strip 'data: ' prefix, handle [DONE], parse JSON into StreamEvents")
 }
 
 // ---------------------------------------------------------------------------
@@ -162,7 +162,7 @@ pub trait StreamProvider: Send + Sync {
 /// A mock streaming provider that wraps [`MockProvider`] and synthesizes
 /// [`StreamEvent`]s from each canned response.
 ///
-/// # Chapter 5: MockStreamProvider
+/// # Chapter 5a: MockStreamProvider
 ///
 /// Wraps a MockProvider. When `stream_chat` is called:
 /// 1. Call inner.chat() to get the complete turn
@@ -196,7 +196,7 @@ impl StreamProvider for MockStreamProvider {
         _tools: &[&ToolDefinition],
         _tx: mpsc::UnboundedSender<StreamEvent>,
     ) -> anyhow::Result<AssistantTurn> {
-        unimplemented!("TODO ch5: fetch a canned turn and synthesize StreamEvents over tx")
+        unimplemented!("TODO ch5a: fetch a canned turn and synthesize StreamEvents over tx")
     }
 }
 
@@ -253,7 +253,7 @@ impl<P: StreamProvider> StreamingAgent<P> {
         _events: mpsc::UnboundedSender<AgentEvent>,
     ) -> anyhow::Result<String> {
         unimplemented!(
-            "TODO ch5: implement the streaming agent loop (stream → forward deltas → tools)"
+            "TODO ch5b: implement the streaming agent loop (stream → forward deltas → tools)"
         )
     }
 }

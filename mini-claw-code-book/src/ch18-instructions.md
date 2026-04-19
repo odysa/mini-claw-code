@@ -1,47 +1,52 @@
-# Chapter 18: Project Instructions
+# Chapter 18: Project Instructions & Context Management
 
-> **File(s) to edit:** `src/instructions.rs`, `src/context.rs`
-> **Tests to run:** `cargo test -p mini-claw-code-starter instructions` (InstructionLoader), `cargo test -p mini-claw-code-starter context_manager` (context integration)
+> **File(s) to edit:** `src/context.rs`
+> **Tests to run:** `cargo test -p mini-claw-code-starter instructions` (InstructionLoader), `cargo test -p mini-claw-code-starter context_manager` (ContextManager)
 > **Estimated time:** 40 min
 
-In Chapter 8 you built the `InstructionLoader`, which discovers CLAUDE.md files
-by walking up the filesystem. This chapter discusses how a production agent
-would connect that loader to a prompt assembly pipeline using types like
-`SystemPromptBuilder` and `PromptSection`. These types are conceptual -- the
-starter does not include them. The starter's `InstructionLoader` (in
-`src/instructions.rs`) is the concrete piece you built; the builder and section
-types shown here illustrate the architecture of the reference implementation.
+This chapter closes the loop on two pieces that keep an agent running over a
+long session:
+
+- **`InstructionLoader`** (built in Chapter 8) discovers CLAUDE.md files by
+  walking up the filesystem. We revisit it here to see how its output gets
+  injected into the conversation at session start.
+- **`ContextManager`** (new in this chapter) keeps the conversation inside the
+  model's context window by summarising old turns once the token budget is
+  exceeded. This is the piece you fill in.
 
 In Chapter 17 you added `Config`, a layered settings hierarchy. One of its
-fields is `instructions: Option<String>` -- custom text that the user can put
-in a TOML config file and have injected into the system prompt.
+fields is `instructions: Option<String>` -- custom text the user can put in a
+TOML config file and have injected into the system prompt.
 
-This chapter connects all three. It is the chapter where your agent becomes
-*project-aware* -- where launching the agent from `/home/user/project/backend`
-produces a different system prompt than launching it from `/home/user/other`.
-The pieces were already built. Now they form a pipeline.
+This chapter wires all three together. It is the chapter where your agent
+becomes *project-aware* (launching from `/home/user/project/backend` picks up
+different CLAUDE.md files than `/home/user/other`) and *session-durable* (a
+20-turn debugging session does not hit the context wall).
 
 ```bash
 cargo test -p mini-claw-code-starter instructions  # InstructionLoader
-cargo test -p mini-claw-code-starter context_manager  # SystemPromptBuilder, context
+cargo test -p mini-claw-code-starter context_manager  # ContextManager
 ```
 
 ## Goal
 
-- Connect the `InstructionLoader` (from Chapter 8) to `SystemPromptBuilder` so discovered CLAUDE.md files become dynamic prompt sections.
-- Wire `Config.instructions` as a second dynamic section that gets the final word in the prompt.
-- Verify that the instruction pipeline is directory-aware -- launching from different directories produces different system prompts.
-- Ensure instructions stay below the cache boundary so the agent always uses fresh instructions while caching the stable prompt prefix.
+- Understand how `InstructionLoader` output and `Config.instructions` get injected as system messages at session start.
+- Implement `ContextManager::record` so token usage from each turn accumulates into a running total.
+- Implement `ContextManager::compact` so that once the budget is exceeded, the middle of the message history is replaced by an LLM-generated summary while the system prompt and the most recent messages are preserved intact.
+- Understand why the system prompt (which includes discovered CLAUDE.md content) must survive compaction unchanged -- it is the one message the LLM needs on every turn.
 
 ---
 
-## The instruction pipeline
+## The session-level pipeline
 
-Here is the complete flow, from files on disk to tokens in the prompt:
+Here is the complete flow. At session start instructions are discovered and
+pushed into the message history. During the session the `ContextManager`
+watches token usage and compacts the middle of that history once the budget
+is exceeded.
 
 ```
   ┌─────────────────────────────┐
-  │  Filesystem                 │
+  │  Filesystem                 │      (at session start)
   │                             │
   │  /home/user/CLAUDE.md       │──┐
   │  /home/user/project/        │  │
@@ -54,35 +59,49 @@ Here is the complete flow, from files on disk to tokens in the prompt:
               ▼
   ┌─────────────────────────────┐
   │  InstructionLoader::load()  │
-  │                             │
-  │  Reads each file, skips     │
-  │  empty ones, joins with     │
-  │  headers and --- separators │
+  │  concatenates with headers  │
+  │  and --- separators         │
   └─────────────────────────────┘
               │
               ▼
   ┌─────────────────────────────┐
-  │  SystemPromptBuilder        │
-  │                             │
-  │  STATIC:                    │
-  │    identity                 │
-  │    safety                   │
-  │  ──── CACHE BOUNDARY ────── │
-  │  DYNAMIC:                   │
-  │    environment              │
-  │    file_instructions  ◄─────│── from InstructionLoader
-  │    config_instructions ◄────│── from Config.instructions
+  │  messages[0] = System(      │      (injected once, never edited)
+  │    "# Instructions from ... │
+  │     <concatenated CLAUDE>"  │
+  │  )                          │
   └─────────────────────────────┘
               │
-              ▼
-        System prompt string
+              ▼  (agent loop: User → Assistant → ToolResult → ...)
+              │
+  ┌─────────────────────────────┐
+  │  ContextManager             │      (runs after every turn)
+  │                             │
+  │  .record(usage)             │  ← accumulate input + output tokens
+  │  .should_compact()          │  ← tokens_used >= max_tokens?
+  │                             │
+  │  On trigger:                │
+  │    keep  messages[0]        │  ← the system/instructions message
+  │    ask   provider to        │
+  │          summarise middle   │  ← LLM call with the old transcript
+  │    keep  last N messages    │
+  │                             │
+  │  Result: short history,     │
+  │  same system prompt.        │
+  └─────────────────────────────┘
 ```
 
-File-based instructions and config-based instructions are both dynamic
-sections. They depend on which directory the agent is launched from and which
-config files are loaded, both of which change between sessions. Static sections
--- identity, safety, tool schemas -- stay above the cache boundary where they
-belong.
+Two points to notice.
+
+**Instructions are stable within a session.** They are loaded once, become the
+first system message, and are never rewritten. Launch from a different
+directory and you get a different `messages[0]`, but once a session has
+started the instruction content is fixed. Users generally do not edit
+CLAUDE.md mid-chat.
+
+**Context management is session-level, not prompt-level.** Compaction does not
+splice new sections into a "system prompt"; it rewrites the message history
+by summarising the middle. The system prompt (which carries your instructions)
+is deliberately excluded from compaction -- it is always the anchor.
 
 ---
 
@@ -269,118 +288,176 @@ The wiring code uses `if let Some(instructions) = loader.load(...)` to condition
 
 ## Wiring it together
 
-Here is how the three systems -- `InstructionLoader`, `SystemPromptBuilder`,
-and `Config` -- would combine into a single prompt assembly. Note that
-`SystemPromptBuilder` and `PromptSection` are conceptual types from the
-reference implementation; the starter does not include them. This example
-illustrates the architecture pattern:
+Session startup is where `InstructionLoader` meets `Config.instructions`. Both
+end up as system messages at the head of the conversation. In code:
 
 ```rust
-fn build_prompt(cwd: &str, config: &Config) -> String {
-    let mut builder = SystemPromptBuilder::new()
-        .static_section(PromptSection::new(
-            "identity",
-            "You are a coding agent. You help users with software engineering \
-             tasks using the tools available to you.",
-        ))
-        .static_section(PromptSection::new(
-            "safety",
-            "Be careful not to introduce security vulnerabilities. \
-             Prioritize writing safe, secure, and correct code.",
-        ))
-        .dynamic_section(PromptSection::new(
-            "environment",
-            format!("Working directory: {cwd}"),
-        ));
+let loader = InstructionLoader::default_files();
+let mut messages: Vec<Message> = Vec::new();
 
-    // File-based instructions (CLAUDE.md files)
-    let loader = InstructionLoader::default_files();
-    if let Some(instructions) = loader.load(Path::new(cwd)) {
-        builder = builder.dynamic_section(
-            PromptSection::new("file_instructions", instructions),
-        );
-    }
+// File-based instructions (CLAUDE.md, root-first).
+if let Some(instructions) = loader.load(Path::new(cwd)) {
+    messages.push(Message::System(instructions));
+}
 
-    // Config-based instructions
-    if let Some(ref inst) = config.instructions {
-        builder = builder.dynamic_section(
-            PromptSection::new("config_instructions", inst.clone()),
-        );
-    }
-
-    builder.build()
+// Config-based instructions get the last word.
+if let Some(ref inst) = config.instructions {
+    messages.push(Message::System(inst.clone()));
 }
 ```
 
-The order of `dynamic_section` calls determines the order in the prompt:
+`Message::System` is the variant we have been using throughout the book for
+the agent's instructions. Both sources become system messages at the head of
+the history, in priority order: global → project → subdirectory → config. The
+LLM reads them top-down, so later messages override earlier ones when they
+disagree.
 
-1. Environment info (working directory)
-2. File instructions (CLAUDE.md files, root-first)
-3. Config instructions (from config.toml)
+For this book we do not maintain a separate structured "prompt builder" that
+tracks identity / safety / environment / instructions as named sections. A
+production agent like Claude Code does: see the sidebar below for the shape
+of that design. What matters for the rest of this chapter is that the
+instructions are now sitting at the start of `messages`, and that the agent
+loop never touches them again.
 
-This is deliberate. Environment context comes first so the LLM knows where it
-is working. File instructions provide project conventions. Config instructions
-get the last word.
+### Sidebar: prompt builders in production agents (conceptual)
 
-### The cache boundary in practice
+Claude Code and similar agents separate the system prompt into named sections
+-- identity, safety, tool schemas, environment, instructions -- and split the
+list across a **cache boundary**. Everything above the boundary is stable
+across turns and can be marked cacheable by the provider; everything below
+can change and is re-sent each turn.
 
-A provider that supports prompt caching sends `builder.static_prompt()` with
-a cache control header and `builder.dynamic_prompt()` fresh on each request.
-For a project with two CLAUDE.md files and config instructions, the prompt
-looks like:
+Schematically (this is not in the starter):
 
-```text
-# identity                              ─┐
-You are a coding agent...                │ static_prompt()
-                                         │ (cached)
-# safety                                │
-Be careful not to introduce...          ─┘
-
-# environment                           ─┐
-Working directory: /home/user/project    │
-                                         │
-# file_instructions                      │ dynamic_prompt()
-# Instructions from /home/user/CLAUDE.md │ (fresh each request)
-                                         │
-Use American English.                    │
-                                         │
----                                      │
-                                         │
-# Instructions from .../project/CLAUDE.md│
-                                         │
-Run tests with `cargo test`.             │
-                                         │
-# config_instructions                    │
-Always explain your reasoning.          ─┘
+```
+# identity, safety, tool schemas       ← cached prefix, stable across turns
+# ──── cache boundary ─────────
+# environment, instructions            ← dynamic suffix, may change
 ```
 
-The static half is processed once and cached. The dynamic half -- which
-includes all instructions -- is reprocessed on each API call. This is the
-right split. Instructions can change if the user edits a CLAUDE.md file
-mid-session, and the agent should pick up those changes.
+This design wins real cost and latency: long stable prefixes are processed
+once and reused. The starter does not model it explicitly because our
+`Message::System` messages already live in a single list; provider-side
+caching (when implemented) can key off the prefix of that list.
+
+For the rest of the chapter we focus on what the starter *does* model:
+keeping the conversation short enough to fit in the context window as the
+session runs long. That job belongs to `ContextManager`.
 
 ---
 
-## Section ordering and section count
+## `ContextManager`: the compaction algorithm
 
-The `SystemPromptBuilder` tracks the total number of sections across both
-lists:
+The starter's `ContextManager` lives in `src/context.rs`. It has three
+responsibilities:
+
+1. **Track token usage** (`record`): add the input + output tokens from each
+   provider turn to a running counter.
+2. **Decide when to act** (`should_compact`): return `true` once the counter
+   hits the configured budget.
+3. **Rewrite history when asked** (`compact`): collapse old messages into a
+   single LLM-generated summary while preserving the anchors.
+
+### The struct
 
 ```rust
-pub fn section_count(&self) -> usize {
-    self.static_sections.len() + self.dynamic_sections.len()
+pub struct ContextManager {
+    max_tokens: u64,
+    preserve_recent: usize,
+    tokens_used: u64,
 }
 ```
 
-For a prompt with identity, safety, environment, file instructions, and config
-instructions, that is 5 sections: 2 static + 3 dynamic. The test suite
-verifies this count to ensure no sections are accidentally dropped during
-assembly.
+Two knobs, one piece of state.
 
-The count is also useful for debugging. If `section_count()` returns 2 when
-you expected 5, you know the instruction loading failed to find any files.
-The first thing to check when the agent misbehaves is whether the system
-prompt contains what you think it contains.
+- `max_tokens` — the soft limit. When `tokens_used` reaches it, compaction
+  triggers. Set this comfortably below the model's hard context limit so there
+  is room for the next turn to complete before you shrink.
+- `preserve_recent` — how many trailing messages survive compaction untouched.
+  These carry the immediate conversational context -- the last user turn, the
+  tool call you just made, the tool result you are about to reason about.
+  Summarising them would break the next turn.
+- `tokens_used` — the running total, updated by `record` after every provider
+  call.
+
+### Recording and triggering
+
+`record` is tiny -- it just accumulates:
+
+```rust
+pub fn record(&mut self, usage: &TokenUsage) {
+    self.tokens_used += usage.input_tokens + usage.output_tokens;
+}
+```
+
+And `should_compact` compares against the budget:
+
+```rust
+pub fn should_compact(&self) -> bool {
+    self.tokens_used >= self.max_tokens
+}
+```
+
+The agent loop calls `record` after each provider turn and then
+`maybe_compact`, which only invokes `compact` when the threshold is reached.
+In practice this means compaction is rare: most turns are under budget and do
+nothing.
+
+### Compaction: head + summary + tail
+
+`compact` splits the message history into three slices:
+
+```
+messages = [ head        | middle        | recent          ]
+           <-- keep ---->|<-- summarise->|<-- keep intact ->
+```
+
+- **head** — the leading `Message::System` (if present). This is where the
+  CLAUDE.md-derived instructions live. Always preserved.
+- **middle** — everything between head and the last `preserve_recent`
+  messages. This is what gets summarised.
+- **recent** — the last `preserve_recent` messages. Always preserved.
+
+The middle is rendered as a compact transcript (`"User: ..."`,
+`"Assistant: ..."`, `"  [tool: name]"`, `"  Tool result: <preview>"`), sent to
+the provider with a short instruction ("Summarise in 2-3 sentences,
+preserving key facts and decisions"), and the result becomes a single synthetic
+system message: `Message::System("[Conversation summary]: ...")`.
+
+The reconstructed vector is `[head, summary, ...recent]`. A 40-message
+conversation collapses to roughly 1 + 1 + `preserve_recent` messages.
+
+### The /= 3 token reset
+
+After compaction we cannot know exactly how many tokens the new history uses
+without re-tokenising. But we know the new history is much shorter than the
+old one, so continuing to accumulate against the pre-compaction total would
+trigger another compaction immediately. A rough proxy:
+
+```rust
+self.tokens_used /= 3;
+```
+
+Empirically, compacting a long history down to `[system, summary, N recent]`
+reduces token count by roughly 3–5×. Dividing by 3 is a conservative estimate
+that keeps the agent running until the real token count climbs back to the
+budget. A more precise implementation would re-count tokens from the new
+`messages` vector; the proxy is good enough for the starter and keeps the
+code simple.
+
+### Why summarise instead of truncate?
+
+The obvious alternative is to drop old messages outright. That is cheap (no
+extra LLM call) but loses information. If the user said "use snake_case
+throughout" on turn 3 and you drop it on turn 40, the agent forgets. A
+summary preserves the decisions and facts from the dropped range at the cost
+of one extra LLM roundtrip per compaction. Since compactions are rare, the
+tradeoff favours the summary.
+
+Why a *system* message for the summary rather than a user or assistant one?
+Because the summary is meta-context, not something either speaker said. System
+framing tells the LLM "this is background, not an active speaking turn",
+which matches how it is meant to be used.
 
 ---
 
@@ -421,12 +498,12 @@ Run the tests:
 
 ```bash
 cargo test -p mini-claw-code-starter instructions  # InstructionLoader
-cargo test -p mini-claw-code-starter context_manager  # SystemPromptBuilder, context
+cargo test -p mini-claw-code-starter context_manager  # ContextManager
 ```
 
-Note: InstructionLoader tests are in `instructions` (V1 instructions chapter).
-SystemPromptBuilder and context integration tests are in `context_manager` (V1
-context management chapter).
+Note: InstructionLoader tests live in `instructions` (built in Chapter 8 and
+revisited here). ContextManager tests live in `context_manager` (added in
+this chapter).
 
 Key InstructionLoader tests (`instructions`):
 
@@ -450,38 +527,35 @@ Key context tests (`context_manager`):
 
 ## Key takeaway
 
-Instructions are always dynamic. Even though CLAUDE.md files rarely change, the *set* of files depends on the working directory. Keeping them below the cache boundary ensures the agent adapts to each project while caching the stable identity and safety prompts above.
+Instructions are injected once at session start and compaction runs on demand
+mid-session. The system message at `messages[0]` is the anchor: it carries the
+instructions that differentiate this project from any other, and it survives
+every compaction unchanged so the agent never loses its grounding.
 
 ---
 
 ## Recap
 
-This chapter connected three systems that were built independently:
+This chapter connected three pieces:
 
 - **`InstructionLoader`** discovers CLAUDE.md files by walking up the
-  filesystem and loads them into a single string with headers and separators.
-  Files are ordered root-first so that global preferences appear before
-  project-specific rules.
+  filesystem and concatenates them root-first with headers and separators.
+  Global preferences come first, subdirectory overrides come last.
 
-- **`SystemPromptBuilder`** separates static sections (identity, safety) from
-  dynamic sections (environment, instructions). The static half is cacheable.
-  The dynamic half is fresh each request.
+- **`Config.instructions`** supplies an optional second block of instructions
+  from the layered config built in Chapter 17. It gets appended after the
+  file-based block, so it has the final word.
 
-- **`Config.instructions`** provides an additional source of instructions from
-  the config hierarchy. Config instructions are added as the last dynamic
-  section, giving them the highest effective priority.
+- **`ContextManager`** tracks token usage and compacts the middle of the
+  message history into an LLM-generated summary when the budget is exceeded.
+  It preserves the leading system message (your instructions) and the trailing
+  `preserve_recent` messages (your current conversational context).
 
-The pipeline is: discover files on disk, load and concatenate them, inject as
-a dynamic section, optionally add config instructions as a second dynamic
-section, build the final prompt. The result is a system prompt that adapts to
-whichever directory the agent is launched from.
-
-The key insight is that **instructions are always dynamic**. Even though
-CLAUDE.md files might not change often, they depend on the working directory
--- launching from a different location discovers different files. Keeping them
-below the cache boundary ensures the agent always uses the correct instructions
-for the current session, while the stable parts of the prompt (identity, safety,
-tool schemas) stay cached.
+The startup pipeline is: discover instruction files, build a `Message::System`
+with their concatenated content, optionally append another `Message::System`
+from `Config.instructions`, then run the normal agent loop. After every
+provider turn the loop calls `record` and `maybe_compact`; in a short session
+compaction never fires, in a long one it fires as many times as needed.
 
 ---
 
@@ -499,8 +573,10 @@ Natural extensions to explore on your own:
   agent itself.
 - **Token and cost tracking** -- instrumenting the provider to aggregate
   per-session token usage and surface it in the TUI.
-- **Context compaction** -- summarizing old messages when the conversation
-  approaches the model's context limit.
+- **Smarter compaction** -- our `ContextManager` uses a single summary pass
+  and a rough `/= 3` token reset. Production-grade alternatives include hierarchical
+  summaries (summary of summaries) and re-tokenising the new history for an
+  exact count.
 - **Sessions and resume** -- serializing the message history to disk so a
   conversation can be paused and resumed.
 - **MCP (Model Context Protocol)** -- loading tools from external MCP servers

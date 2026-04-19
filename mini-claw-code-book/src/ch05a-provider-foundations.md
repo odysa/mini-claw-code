@@ -1,12 +1,19 @@
 # Chapter 5a: Provider & Streaming Foundations
 
-> **File(s) to edit:** `src/mock.rs`, `src/streaming.rs` (everything *except* `StreamingAgent`)
-> **Tests to run:** `cargo test -p mini-claw-code-starter test_mock_` and `cargo test -p mini-claw-code-starter test_streaming_parse_sse_ test_streaming_accumulator_`
+> **File(s) to edit:** `src/streaming.rs` — every stub tagged `TODO ch5a:`
+> (everything *except* `StreamingAgent`, which is Ch5b's).
+>
+> `src/mock.rs` already carries the `MockProvider` stubs you filled in
+> [Chapter 1](./ch01-first-llm-call.md); this chapter leans on that work but
+> does not re-fill it. If you skipped ahead from Ch1, go back and finish the
+> `TODO ch1:` stubs first.
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_mock_` and `cargo test -p mini-claw-code-starter test_streaming_parse_ test_streaming_accumulator_`
 > **Estimated time:** 35 min
 
 ## Goal
 
-- Implement `MockProvider` so tests can script exact LLM responses without network calls.
+- Revisit `MockProvider` (built in Ch1) as the canonical example of the
+  `Provider` trait, and use it to motivate the streaming siblings below.
 - Implement `parse_sse_line` so we can turn a single SSE line into `StreamEvent`s.
 - Implement `StreamAccumulator` so a stream of deltas reassembles into a complete `AssistantTurn`.
 - Implement `MockStreamProvider` so UI-facing code can be tested without a real HTTP connection.
@@ -490,7 +497,7 @@ The `StreamAccumulator` and `PartialToolCall` are in `src/streaming.rs`. Fill in
 
 ```bash
 cargo test -p mini-claw-code-starter test_mock_
-cargo test -p mini-claw-code-starter test_streaming_parse_sse_
+cargo test -p mini-claw-code-starter test_streaming_parse_
 cargo test -p mini-claw-code-starter test_streaming_accumulator_
 ```
 
@@ -501,11 +508,11 @@ cargo test -p mini-claw-code-starter test_streaming_accumulator_
 - **`test_mock_mock_returns_text`** — scripts a single text response and verifies `chat()` returns it
 - **`test_mock_mock_exhausted`** — calls `chat()` on an empty queue and verifies it returns an error
 
-**`test_streaming_parse_sse_`** (SSE parser):
+**`test_streaming_parse_`** (SSE parser):
 
-- **`test_streaming_parse_sse_text_delta`** — feeds a `data:` line with text content and verifies a `TextDelta` event is produced
-- **`test_streaming_parse_sse_done`** — feeds `data: [DONE]` and verifies a `Done` event is produced
-- **`test_streaming_parse_sse_non_data`** — feeds a non-data line like `event: ping` and verifies `None` is returned
+- **`test_streaming_parse_text_delta`** — feeds a `data:` line with text content and verifies a `TextDelta` event is produced
+- **`test_streaming_parse_done`** — feeds `data: [DONE]` and verifies a `Done` event is produced
+- **`test_streaming_parse_non_data_lines`** — feeds a non-data line like `event: ping` and verifies `None` is returned
 
 **`test_streaming_accumulator_`** (stream reassembly):
 

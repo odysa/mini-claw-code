@@ -3,7 +3,7 @@ use crate::types::{Message, Provider, TokenUsage};
 /// Manages conversation context by compacting old messages when the token
 /// budget is exceeded.
 ///
-/// # Chapter 18: Project Instructions
+/// # Chapter 18: Project Instructions & Context Management
 pub struct ContextManager {
     max_tokens: u64,
     preserve_recent: usize,

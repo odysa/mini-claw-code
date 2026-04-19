@@ -183,6 +183,25 @@ let agent = SimpleAgent::new(provider)
 
 ### The loop: `chat()`
 
+### Aside: who decides `Stop` vs `ToolUse`?
+
+The model does. `StopReason` is not a value we compute from the response; it is
+a field the LLM API returns *describing what the model did*. When the model
+emitted plain text and stopped, the API reports `stop` (or `end_turn`). When
+the model emitted one or more tool-call blocks and paused expecting the
+caller to run them, the API reports `tool_use` (OpenAI calls it
+`tool_calls`). Our `StopReason` enum is just a thin translation of that API
+field into a Rust type; the decision is baked into the model's generation.
+
+Practically, the model decides in a single forward pass: once it begins
+writing a tool-call block, most providers force the response to terminate on
+that block and return `tool_use` to the caller. It does *not* produce text
+and then choose whether to call a tool as a separate step. This is why the
+loop below looks so simple -- we never have to second-guess the stop reason,
+we just dispatch on it.
+
+---
+
 This is `single_turn` generalized into a loop. Instead of calling the provider twice and returning, it keeps going until `StopReason::Stop`:
 
 ```rust

@@ -318,12 +318,27 @@ a real tool. It does not exist in the `ToolSet`. It has no `call()` method. It
 is a `ToolDefinition` with a name and description, injected into the plan
 phase's tool list so the model sees it as an option.
 
-Why not just rely on `StopReason::Stop`? Because some models are reluctant to
-stop when they see tools available. They will keep calling tools in a loop,
-gathering more information, never committing to a plan. The `exit_plan` tool
-gives the model an explicit action it can take to say "I have enough
-information, here is my plan." It is a social contract expressed as a tool
-schema.
+Why not just rely on `StopReason::Stop`? In principle you could: tell the
+model "when you are done planning, emit your plan as plain text and stop."
+In practice this fights against two behaviours baked into most instruction-tuned
+models.
+
+1. **When tools are visible, models keep using them.** Present a model with
+   `read`, `glob`, `grep`, and a user prompt, and it will happily spend ten
+   turns exploring the codebase before producing any narrative output. There
+   is no natural stopping gradient -- one more `grep` is always plausible.
+   Without a deliberate stopping signal, the plan phase drags on.
+2. **Plain-text stops are easy to mistake for partial work.** A model that
+   ends a turn with "Next, I need to check how X is wired" is signalling
+   "I am still working" even when `stop_reason == Stop`. The caller cannot
+   easily distinguish a finished plan from a mid-thought pause.
+
+`exit_plan` sidesteps both problems. It is a tool the model must *actively
+choose to call*, which reads as an explicit commitment ("I am ready"). It
+carries the plan text as its argument, so the plan and the stop signal arrive
+in the same structured message. And because it lives in the same tool-call
+slot the model is already used to, the behaviour composes naturally with the
+rest of the loop. It is a social contract expressed as a tool schema.
 
 When the model calls `exit_plan`, the loop detects it by name, pushes the
 assistant message, finds the call's ID, and pushes a synthetic `ToolResult`

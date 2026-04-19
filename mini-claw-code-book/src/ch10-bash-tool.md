@@ -14,7 +14,7 @@ The bash tool is the most powerful tool in a coding agent. It is also the most d
 
 This power is what makes a coding agent useful. An agent that can only read and write files is a fancy text editor. An agent that can run arbitrary shell commands is a programmer. It can try things, see what happens, and iterate -- the same workflow a human developer follows. Claude Code's bash tool is its most-used tool by far, accounting for the majority of all tool invocations in a typical session.
 
-In this chapter you will build the `BashTool`. It takes a command string, runs it in a bash subprocess with a timeout, and returns the combined output. The implementation is straightforward -- the hard part is everything we deliberately leave out. There is no sandboxing, no command filtering, no permission checking. The LLM can run anything. Chapters 13-16 add the safety rails. For now, we build the engine and trust the driver.
+In this chapter you will build the `BashTool`. It takes a command string, runs it in a bash subprocess, and returns the combined output. (A timeout is shown later as an extension.) The implementation is straightforward -- the hard part is everything we deliberately leave out. There is no sandboxing, no command filtering, no permission checking. The LLM can run anything. Chapters 13-16 add the safety rails. For now, we build the engine and trust the driver.
 
 ## How the BashTool processes a command
 

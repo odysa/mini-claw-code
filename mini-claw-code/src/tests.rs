@@ -15,6 +15,7 @@ mod plan_agent;
 mod read;
 mod safety;
 mod simple_agent;
+mod simple_agent_with_tools;
 mod single_turn;
 mod streaming;
 mod subagent;

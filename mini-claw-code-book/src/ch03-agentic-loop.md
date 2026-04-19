@@ -13,6 +13,20 @@ Implement two things:
 1. **`single_turn()`** — handle one prompt with at most one round of tool calls
 2. **`SimpleAgent`** — wrap `single_turn` in a loop that keeps going until the LLM is done
 
+### What's in scope for Ch3 (and what isn't)
+
+When you open `src/agent.rs` you'll see five `unimplemented!()` stubs. Only four of them are Chapter 3's job:
+
+| Stub                      | Chapter | Notes                                               |
+|---------------------------|---------|-----------------------------------------------------|
+| `single_turn`             | Ch3     | one prompt, at most one tool round                  |
+| `SimpleAgent::execute_tools` | Ch3  | look up each tool, collect `(id, content)` pairs    |
+| `SimpleAgent::push_results`  | Ch3  | push `Assistant` turn, then one `ToolResult` each   |
+| `SimpleAgent::chat`       | Ch3     | the main agent loop                                 |
+| `SimpleAgent::run_with_history` | Ch7 | events-based loop; **leave stubbed** for now      |
+
+The `run_with_history` / `run_with_events` pair is for Chapter 7 (`AgentEvent`-driven execution). No Ch3 test calls them, so the `unimplemented!()` there will not panic during `test_simple_agent_`. Ignore them until Chapter 7 introduces the events model.
+
 ## The core idea
 
 Every coding agent — Claude Code, Cursor, Aider — is this loop:

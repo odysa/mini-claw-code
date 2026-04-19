@@ -112,17 +112,23 @@ impl<P: Provider> SimpleAgent<P> {
     ///
     /// Like `chat()` but takes ownership of messages and sends AgentEvents
     /// through the channel instead of printing. Returns the full message history.
+    ///
+    /// **Not needed for Chapter 3.** Leave this stub alone until Chapter 7,
+    /// when events-based agent loops are introduced. No Ch3 test exercises it.
     pub async fn run_with_history(
         &self,
         _messages: Vec<Message>,
         _events: mpsc::UnboundedSender<AgentEvent>,
     ) -> Vec<Message> {
         unimplemented!(
-            "TODO ch3: like chat() but emit AgentEvents on each turn; return final history"
+            "TODO ch7: like chat() but emit AgentEvents on each turn; return final history"
         )
     }
 
     /// Run the agent loop, sending events through the channel.
+    ///
+    /// Already implemented — delegates to `run_with_history`, which is a
+    /// Ch7 stub. Not exercised by Ch3 tests.
     pub async fn run_with_events(&self, prompt: &str, events: mpsc::UnboundedSender<AgentEvent>) {
         let messages = vec![Message::User(prompt.to_string())];
         self.run_with_history(messages, events).await;
@@ -130,7 +136,7 @@ impl<P: Provider> SimpleAgent<P> {
 
     /// Run the agent loop, accumulating into the provided message history.
     ///
-    /// # Chapter 7: The Agentic Loop (Deep Dive) — multi-turn chat
+    /// # Chapter 3: The Agentic Loop — the main loop
     ///
     /// This is `run()` adapted for multi-turn conversation:
     /// 1. The caller pushes `Message::User(…)` before calling

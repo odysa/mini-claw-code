@@ -1,7 +1,7 @@
 # Chapter 5a: Provider & Streaming Foundations
 
 > **File(s) to edit:** `src/mock.rs`, `src/streaming.rs` (everything *except* `StreamingAgent`)
-> **Tests to run:** `cargo test -p mini-claw-code-starter test_mock_` and `cargo test -p mini-claw-code-starter test_streaming_parse_sse_ test_streaming_accumulator_`
+> **Tests to run:** `cargo test -p mini-claw-code-starter test_mock_` and `cargo test -p mini-claw-code-starter test_streaming_parse_ test_streaming_accumulator_`
 > **Estimated time:** 35 min
 
 ## Goal
@@ -490,7 +490,7 @@ The `StreamAccumulator` and `PartialToolCall` are in `src/streaming.rs`. Fill in
 
 ```bash
 cargo test -p mini-claw-code-starter test_mock_
-cargo test -p mini-claw-code-starter test_streaming_parse_sse_
+cargo test -p mini-claw-code-starter test_streaming_parse_
 cargo test -p mini-claw-code-starter test_streaming_accumulator_
 ```
 
@@ -501,11 +501,11 @@ cargo test -p mini-claw-code-starter test_streaming_accumulator_
 - **`test_mock_mock_returns_text`** — scripts a single text response and verifies `chat()` returns it
 - **`test_mock_mock_exhausted`** — calls `chat()` on an empty queue and verifies it returns an error
 
-**`test_streaming_parse_sse_`** (SSE parser):
+**`test_streaming_parse_`** (SSE parser):
 
-- **`test_streaming_parse_sse_text_delta`** — feeds a `data:` line with text content and verifies a `TextDelta` event is produced
-- **`test_streaming_parse_sse_done`** — feeds `data: [DONE]` and verifies a `Done` event is produced
-- **`test_streaming_parse_sse_non_data`** — feeds a non-data line like `event: ping` and verifies `None` is returned
+- **`test_streaming_parse_text_delta`** — feeds a `data:` line with text content and verifies a `TextDelta` event is produced
+- **`test_streaming_parse_done`** — feeds `data: [DONE]` and verifies a `Done` event is produced
+- **`test_streaming_parse_non_data_lines`** — feeds a non-data line like `event: ping` and verifies `None` is returned
 
 **`test_streaming_accumulator_`** (stream reassembly):
 

@@ -1,15 +1,31 @@
 # Chapter 7: The Agentic Loop (Deep Dive)
 
-> **File(s) to edit:** `src/agent.rs`
-> **Tests to run:** `cargo test -p mini-claw-code-starter test_single_turn_` (single_turn), `cargo test -p mini-claw-code-starter test_simple_agent_` (SimpleAgent)
+> **File(s) to edit:** `src/agent.rs` — only the `run_with_history` stub is
+> new in this chapter. `single_turn`, `execute_tools`, and `chat` were
+> implemented back in [Chapter 3](./ch03-agentic-loop.md); this chapter is a
+> deep-dive walkthrough of the loop you already built, plus a thin new
+> event-emitting variant.
+> **Tests to run:** the same Chapter 3 tests still apply
+> (`cargo test -p mini-claw-code-starter test_single_turn_`,
+> `cargo test -p mini-claw-code-starter test_simple_agent_`); there is no
+> dedicated test in the starter for `run_with_history` — verify it manually by
+> running the example in [Chapter 5b](./ch05b-openrouter-streaming.md) and
+> watching the event stream.
 > **Estimated time:** 45 min
 
 ## Goal
 
-- Implement the `SimpleAgent` struct with `chat()` that loops calling the provider and executing tools until `StopReason::Stop`.
-- Implement `execute_tools()` so that tool errors become result strings (not panics), allowing the LLM to recover from mistakes.
-- Implement `run_with_events()` so that a UI can observe the agent loop in real time via an event channel.
-- Understand message ordering: why `Message::Assistant` must be pushed before `Message::ToolResult` values.
+- Revisit `SimpleAgent::chat` from Chapter 3 with a careful walk-through of
+  the control flow, the message ordering, and the edge cases. You are not
+  reimplementing it -- you are understanding what you already wrote.
+- Revisit `execute_tools` and make sure you know *why* tool errors become
+  result strings rather than propagating -- the rationale links back to the
+  agreement explained in [Chapter 6](./ch06-tool-interface.md).
+- Implement the one *new* piece: `run_with_history`, an event-emitting variant
+  of the main loop that sends an `AgentEvent` after every turn so a UI layer
+  (built in later chapters) can observe progress.
+- Understand message ordering: why `Message::Assistant` must be pushed before
+  the matching `Message::ToolResult` values.
 
 This is the chapter where everything clicks.
 

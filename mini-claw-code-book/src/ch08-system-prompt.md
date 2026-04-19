@@ -39,9 +39,9 @@ Implement `InstructionLoader` in `src/instructions.rs` so that:
 
 ```mermaid
 flowchart TD
-    A[InstructionLoader::discover] -->|walks upward| B[/home/user/CLAUDE.md]
-    A -->|walks upward| C[/home/user/project/CLAUDE.md]
-    A -->|starts here| D[/home/user/project/backend/CLAUDE.md]
+    A[InstructionLoader::discover] -->|walks upward| B["/home/user/CLAUDE.md"]
+    A -->|walks upward| C["/home/user/project/CLAUDE.md"]
+    A -->|starts here| D["/home/user/project/backend/CLAUDE.md"]
     B --> E[Reverse to root-first order]
     C --> E
     D --> E

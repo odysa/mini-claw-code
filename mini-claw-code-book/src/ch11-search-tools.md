@@ -30,14 +30,13 @@ flowchart TD
     Edit -->|confirmation| LLM
 ```
 
-> **Note:** The starter (`mini-claw-code-starter`) does not include stubs for
-> GlobTool or GrepTool. These are extension tools -- if you want to add them,
-> you will create `src/tools/glob.rs` and `src/tools/grep.rs` from scratch and
-> register them in `src/tools/mod.rs`. The reference implementation
-> (`mini-claw-code`) has complete implementations you can study.
->
-> This chapter walks through the design and implementation so you understand the
-> patterns, whether or not you choose to build them.
+> **Note:** Search tools are extensions in this book -- neither the starter
+> (`mini-claw-code-starter`) nor the reference implementation (`mini-claw-code`)
+> ships a `GlobTool` or `GrepTool`. If you want to add them, you will create
+> `src/tools/glob.rs` and `src/tools/grep.rs` from scratch and register them
+> in `src/tools/mod.rs`. The complete reference code for both tools is
+> reproduced inline below -- treat this chapter as an annotated implementation
+> walkthrough rather than a stub-filling exercise.
 
 ## Two tools, two questions
 
@@ -411,16 +410,19 @@ Our versions skip all of this. We use the `glob` crate instead of ripgrep, we ha
 
 ## Tests
 
-Since GlobTool and GrepTool are extensions not included in the starter, there
-are no tests for this chapter in the starter. The tests below live in the
-reference implementation (`mini-claw-code`). If you add these tools to your
-starter, you can run them with:
+Since GlobTool and GrepTool are extensions, neither the starter nor the
+reference implementation ships tests for them. The assertions below describe
+the test cases *you* would add alongside the tool code if you build these out
+yourself -- they are the contract the tools should satisfy. Once you have
+copied the tool code into `mini-claw-code-starter/src/tools/` and written
+these tests, you can run them with:
 
+<!-- book-filter-check: skip-block -->
 ```bash
-cargo test -p mini-claw-code grep
+cargo test -p mini-claw-code-starter grep
 ```
 
-Here is what each test in the reference implementation verifies:
+Recommended test cases:
 
 ### GlobTool tests
 

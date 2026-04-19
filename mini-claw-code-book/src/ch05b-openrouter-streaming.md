@@ -13,6 +13,29 @@
 
 If anything below assumes `parse_sse_line` or `StreamAccumulator` exists — it does, because you implemented it in 5a.
 
+### Sidebar: tokio concurrency for Go devs
+
+If Go is your native async language, here is the translation table you need
+before reading the streaming code. Everything in this chapter rests on these
+five primitives; skip this box if you already think in `tokio`.
+
+| Go                                      | Tokio                                        | Notes                                                                                                                     |
+|-----------------------------------------|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------|
+| `go func() { ... }()`                   | `tokio::spawn(async { ... })`                 | Both fire-and-forget. `tokio::spawn` returns a `JoinHandle` you can `await` later if you care about the result.           |
+| `ch := make(chan T, n)`                 | `let (tx, rx) = tokio::sync::mpsc::channel::<T>(n)` | Bounded channel. For `unbounded_channel()` use `mpsc::unbounded_channel()` -- analogous to a channel with infinite buffer. |
+| `ch <- v`                               | `tx.send(v).await`                            | Async send in Tokio (awaits when buffer full). The unbounded variant uses `tx.send(v)` with no `.await`.                  |
+| `v, ok := <-ch`                         | `let Some(v) = rx.recv().await { ... }`       | `recv` returns `None` when *all* senders are dropped (equivalent to `close(ch)` + drain).                                 |
+| `close(ch)`                             | drop every `tx` clone                         | Tokio has no explicit `close`. When the last sender is dropped, receivers see `None` and loops exit.                      |
+| `wg.Add(1); wg.Wait()`                  | `handle.await` (or `tokio::join!`, `try_join!`) | A `JoinHandle` is like a single-goroutine WaitGroup. Multiple handles: `tokio::join!(h1, h2)` runs them concurrently.    |
+| `select { case <-a: case <-b: }`        | `tokio::select! { _ = a => ..., _ = b => ... }` | Direct analogue. Loses on non-disjoint branches unless you use `biased;`.                                                 |
+
+One non-obvious point specific to this chapter: we signal "the stream is
+over" by *dropping the sender*. There is no explicit close call. The receiver
+task observes `rx.recv().await == None` and exits its loop. If you forget to
+drop the sender (for example by holding it inside an `Arc` that outlives the
+producer), the receiver hangs forever -- this is one of the deadlock
+patterns that [§"Why not just `rx.recv()` in the main loop?"](#why-not-just-rxrecv-in-the-main-loop) walks through.
+
 ---
 
 ## OpenRouterProvider

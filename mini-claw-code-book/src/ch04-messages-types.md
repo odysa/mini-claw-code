@@ -275,12 +275,11 @@ Some parameters need richer schemas -- enums, arrays, nested objects. `param_raw
 }), true)
 ```
 
-**Implement `ToolDefinition`** in `src/types.rs`, then verify:
-
-```bash
-cargo test -p mini-claw-code-starter test_mock_tool_definition_builder
-cargo test -p mini-claw-code-starter test_mock_tool_definition_optional_param
-```
+**Implement `ToolDefinition`** in `src/types.rs`. There are no dedicated
+unit tests for the builder itself in the starter -- its correctness is
+exercised indirectly by every tool's `_definition` test (for example
+`test_read_read_definition` in `tests/read.rs`). Making `cargo build -p mini-claw-code-starter`
+succeed is the practical check here.
 
 ---
 
@@ -363,9 +362,10 @@ A few design points:
 - **`definitions()`** collects all schemas into a `Vec` that the provider sends to the LLM at the start of each turn.
 - **`Box<dyn Tool>`** is the trait object that makes heterogeneous storage possible. The `'static` bound on `push`/`with` ensures the tool lives long enough.
 
-```bash
-cargo test -p mini-claw-code-starter test_mock_toolset_empty
-```
+`ToolSet` has no dedicated test of its own in the starter -- it is exercised
+by the `test_single_turn_*` suite (Chapter 3) and `test_multi_tool_*` suite
+(Chapter 12), both of which construct real `ToolSet`s and assert their
+definitions are rendered correctly.
 
 ---
 
@@ -383,8 +383,12 @@ pub struct TokenUsage {
 
 The starter uses a simplified `TokenUsage` with just input and output token counts. It is stored as `Option<TokenUsage>` in `AssistantTurn` -- mock providers in tests set it to `None`, while the real `OpenRouterProvider` populates it from the API response.
 
+The `Default` impl is covered by `test_cost_tracker_token_usage_default` in
+`tests/cost_tracker.rs` (used again in Chapter 17). If you want to run it in
+isolation:
+
 ```bash
-cargo test -p mini-claw-code-starter test_mock_token_usage_default
+cargo test -p mini-claw-code-starter test_cost_tracker_token_usage_default
 ```
 
 ---

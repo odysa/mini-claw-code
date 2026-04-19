@@ -33,3 +33,6 @@ jobs:
 
       - name: Tests (starter — expected to fail until learner fills in stubs)
         run: cargo test -p mini-claw-code-starter || true
+
+      - name: Book test-filter check (fail on zero-match filters)
+        run: cargo run -p mini-claw-code-xtask --quiet -- book-filter-check

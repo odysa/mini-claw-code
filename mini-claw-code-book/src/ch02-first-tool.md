@@ -50,11 +50,21 @@ Two methods:
 - **`definition()`** returns the JSON schema that tells the LLM what this tool does and what arguments it takes
 - **`call()`** executes the tool and returns a string result
 
-### Why `#[async_trait]` instead of plain `async fn`?
+### Why `#[async_trait]` on `Tool` — and not on `Provider`?
 
-The short version: tools are stored heterogeneously as `Box<dyn Tool>`, which requires object safety. `async fn` in traits breaks object safety; `#[async_trait]` boxes the returned future so dynamic dispatch works. The `Provider` trait uses a different style (RPITIT) because it is always used as a generic parameter, never as `dyn Provider`.
+You'll see this split throughout the book, so it's worth owning the one-liner now:
 
-The full trade-off -- object safety vs zero-cost, boxing vs inference -- is explained once in [Why two async trait styles?](./ch06-tool-interface.md#async-styles). Every async trait in this book picks one side or the other.
+- **`Tool` uses `#[async_trait]`** because we store tools heterogeneously in `Box<dyn Tool>` (a `ReadTool` and a `BashTool` coexist in one `HashMap`). `Box<dyn …>` requires *object safety*, and a plain `async fn` in a trait is not object-safe — it returns an anonymous future type the compiler can't erase. The `#[async_trait]` macro rewrites `async fn call(&self, …)` into `fn call(&self, …) -> Pin<Box<dyn Future + Send + '_>>`, which is. One heap allocation per call, which is nothing next to the I/O the tool is about to do.
+- **`Provider` uses RPITIT** (return-position `impl Trait` in traits, stable since Rust 1.75) because we only ever hold it as a generic parameter — `SimpleAgent<P: Provider>` — never as `dyn Provider`. Without object safety to preserve, we get the zero-cost version: no boxing, no allocation, the compiler monomorphizes a unique future type per impl.
+
+The two-line mnemonic:
+
+```text
+stored as Box<dyn T>           → #[async_trait]  (boxed future, object-safe)
+used as a generic P: Trait     → RPITIT          (zero-cost, not object-safe)
+```
+
+That's the whole trade-off. [Chapter 6](./ch06-tool-interface.md#async-styles) reprises it with the full `Provider` signature side-by-side once you've seen both traits in use.
 
 ## The implementation
 

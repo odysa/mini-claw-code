@@ -23,7 +23,7 @@ Here is the entire agent lifecycle in one sentence: **prompt the LLM, check if i
 
 That is it. The `SimpleAgent` implements this loop. It owns three things:
 
-1. A **provider** -- the LLM backend (from Chapter 5)
+1. A **provider** -- the LLM backend (from [Chapter 5a](./ch05a-provider-foundations.md) / [5b](./ch05b-openrouter-streaming.md))
 2. A **tool set** -- the registered tools (from Chapter 6)
 3. A **config** -- safety limits and behavior knobs
 

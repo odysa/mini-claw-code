@@ -6,6 +6,23 @@
 
 Before building an agent, you need to talk to an LLM. In this chapter you will implement a `MockProvider` — a fake LLM that returns canned responses. No API key, no HTTP, no network. Just the protocol.
 
+## The nouns
+
+Before any code, a one-line glossary of the types you'll meet in chapters 1–3. They're all already defined in `src/types.rs` — this list is just so the names aren't strangers. Chapter 4 is the deep dive; for now, a sentence each is enough:
+
+| Type              | What it is                                                         |
+|-------------------|--------------------------------------------------------------------|
+| `Message`         | Enum of conversation entries: `System`, `User`, `Assistant`, `ToolResult`, `Attachment`, `Progress`. |
+| `AssistantTurn`   | What the LLM returns: optional `text`, a `Vec<ToolCall>`, a `StopReason`, optional `TokenUsage`. |
+| `StopReason`      | `Stop` (the LLM is done) or `ToolUse` (it wants to call tools).     |
+| `ToolCall`        | LLM's request to call a tool: `id`, `name`, JSON `arguments`.       |
+| `ToolDefinition`  | JSON-Schema description of a tool, sent to the LLM so it knows what's available. |
+| `Tool`            | Trait with `definition()` and `call()` — implement it to give the agent a new capability. |
+| `ToolSet`         | A `HashMap<String, Box<dyn Tool>>` for dispatching tool calls by name. |
+| `Provider`        | Trait with one `chat()` method — the abstraction over "an LLM that responds to messages." |
+
+If any of these feel fuzzy later, come back here. Chapter 4 rebuilds all of them from scratch with full commentary.
+
 ## Goal
 
 Implement `MockProvider` so that:
@@ -162,7 +179,7 @@ cargo test -p mini-claw-code-starter test_mock_
 
 You implemented the `Provider` trait — the interface every LLM backend must satisfy. The `MockProvider` is your testing workhorse. Every test in this entire course uses it instead of calling a real API.
 
-Later (Chapter 5) you'll see `OpenRouterProvider`, which makes real HTTP calls. But the trait is the same. Swap the provider, and the rest of the code doesn't change.
+Later ([Chapter 5b](./ch05b-openrouter-streaming.md)) you'll see `OpenRouterProvider`, which makes real HTTP calls. But the trait is the same. Swap the provider, and the rest of the code doesn't change.
 
 ## Key takeaway
 

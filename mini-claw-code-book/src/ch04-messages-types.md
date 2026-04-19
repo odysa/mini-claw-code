@@ -413,7 +413,7 @@ A blanket impl lets `Arc<P>` also be a `Provider`, which is needed later for sha
 impl<P: Provider> Provider for Arc<P> { ... }
 ```
 
-We will implement the `MockProvider` and `OpenRouterProvider` in Chapter 5.
+We implement the `MockProvider` in [Chapter 5a](./ch05a-provider-foundations.md) and the `OpenRouterProvider` in [Chapter 5b](./ch05b-openrouter-streaming.md).
 
 ---
 
@@ -458,4 +458,4 @@ None of these types do anything on their own -- they are the nouns of the system
 
 ---
 
-[← Chapter 3: The Agentic Loop](./ch03-agentic-loop.md) · [Contents](./ch00-overview.md) · [Chapter 5: Provider & Streaming →](./ch05-provider-streaming.md)
+[← Chapter 3: The Agentic Loop](./ch03-agentic-loop.md) · [Contents](./ch00-overview.md) · [Chapter 5a: Provider & Streaming Foundations →](./ch05a-provider-foundations.md)

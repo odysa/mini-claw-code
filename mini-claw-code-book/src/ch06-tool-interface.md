@@ -78,7 +78,7 @@ Tool:     stored in Box<dyn>    -> #[async_trait] (boxed future, object-safe)
 
 This split is a deliberate design choice. If Rust stabilizes `dyn async fn` in the future, we could drop `async_trait` entirely. Until then, the two-strategy approach gives us the best of both worlds.
 
-Note that in the `MockProvider` impl from Chapter 5, we wrote `async fn chat(...)` directly. That works because Rust 1.75+ allows `async fn` in trait impls even when the trait signature uses the RPITIT form. The compiler desugars it correctly. You can do the same for `Tool` impls -- write `async fn call(...)` and the `#[async_trait]` macro handles the rest.
+Note that in the `MockProvider` impl from [Chapter 5a](./ch05a-provider-foundations.md), we wrote `async fn chat(...)` directly. That works because Rust 1.75+ allows `async fn` in trait impls even when the trait signature uses the RPITIT form. The compiler desugars it correctly. You can do the same for `Tool` impls -- write `async fn call(...)` and the `#[async_trait]` macro handles the rest.
 
 ## Why errors are values, not `Err`
 
@@ -213,4 +213,4 @@ In the next chapter we build the `SimpleAgent` -- the loop that ties providers a
 
 ---
 
-[← Chapter 5: Provider & Streaming](./ch05-provider-streaming.md) · [Contents](./ch00-overview.md) · [Chapter 7: The Agentic Loop (Deep Dive) →](./ch07-query-engine.md)
+[← Chapter 5b: OpenRouter & StreamingAgent](./ch05b-openrouter-streaming.md) · [Contents](./ch00-overview.md) · [Chapter 7: The Agentic Loop (Deep Dive) →](./ch07-query-engine.md)

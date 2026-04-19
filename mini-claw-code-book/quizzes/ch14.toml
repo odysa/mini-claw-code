@@ -41,9 +41,10 @@ A raw prefix check would let `/project/../../etc/passwd` pass (it starts with `/
 id = "a5eccac4-8608-4c9d-a6e7-d0bfa2a41d0e"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "In the starter, which tool name does `CommandFilter::check` actually inspect arguments for? (Other tools are passed through unchanged.)"
 answer.answer = "bash"
+prompt.distractors = ["write", "edit", "read"]
 context = """
 Each `SafetyCheck` decides which tools it applies to by matching on `tool_name`. `CommandFilter` fires only for `bash` — it extracts the `command` argument and checks it against the blocked glob patterns. For any other tool name it returns `Ok(())` so wrapping irrelevant tools with it is harmless. `test_safety_safety_check_ignores_bash` and `test_safety_command_filter_*` cover this dispatch behavior.
 """

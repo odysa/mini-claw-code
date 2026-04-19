@@ -27,9 +27,14 @@ When `stop_reason == ToolUse` the model often emits only `ToolCall` entries with
 id = "2af8f714-6df9-4615-afb9-d867b281763d"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "In `ToolSet::push`, the name used as the `HashMap` key comes from a single source of truth. Which method/field on the tool provides that name?"
 answer.answer = "definition().name"
+prompt.distractors = [
+  "name()",
+  "schema().id",
+  "type_name::<Self>()",
+]
 context = """
 `push` calls `tool.definition().name.to_string()` to derive the key, so the registry name and the schema name can never drift. `test_mock_toolset_empty` and the broader toolset tests rely on this single source of truth.
 """

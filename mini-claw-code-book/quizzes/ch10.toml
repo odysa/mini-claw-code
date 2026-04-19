@@ -41,9 +41,14 @@ Blocking a thread inside an async runtime means other futures on that thread can
 id = "3901b8e9-cca0-4d4f-acc2-42b649ee826d"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "Which method on a `std::process::Output` (or `tokio::process::Output`) gives you the raw bytes of the process's standard error stream?"
 answer.answer = "stderr"
+prompt.distractors = [
+  "stdout",
+  "status",
+  "err_bytes",
+]
 context = """
 `output.stderr` and `output.stdout` are both `Vec<u8>`. `BashTool` passes them through `String::from_utf8_lossy` before concatenating because command output is not guaranteed to be valid UTF-8 — `from_utf8_lossy` replaces bad bytes rather than failing.
 """

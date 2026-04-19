@@ -41,9 +41,14 @@ Every section in the prompt costs tokens. An empty CLAUDE.md produces zero usefu
 id = "5338c4e1-3de5-43fe-969b-36848a1f567a"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "In the instruction hierarchy, which source has the highest effective priority in the final system prompt — a file-discovered CLAUDE.md or `Config.instructions`?"
 answer.answer = "Config.instructions"
+prompt.distractors = [
+  "the root-most CLAUDE.md (e.g. `/home/user/CLAUDE.md`)",
+  "the cwd-level CLAUDE.md (the most specific file discovered)",
+  "whichever source is longer in characters",
+]
 context = """
 Both are dynamic sections, but `config_instructions` is added *after* `file_instructions` in the builder. Since the LLM reads top-to-bottom and later instructions tend to override earlier ones, the config string gets the final word. This matches the intent: CLAUDE.md files are shared team conventions, while `Config.instructions` is personal or session-specific overrides.
 """

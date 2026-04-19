@@ -27,9 +27,14 @@ Indexing a `serde_json::Value` with a missing key returns `Value::Null` (not a p
 id = "b0ebf485-6303-43e7-b0e0-7bb24471b9c4"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "When you build a `ToolDefinition` with `.param(\"path\", \"string\", \"...\", true)`, which JSON Schema key receives the parameter name because `required` is `true`?"
 answer.answer = "required"
+prompt.distractors = [
+  "properties",
+  "additionalProperties",
+  "requiredProperties",
+]
 context = """
 The builder pushes `\"path\"` onto the `required` array in the parameters schema (`{\"type\": \"object\", \"properties\": {...}, \"required\": [...]}`). Passing `false` would add the property but skip the `required` push. `test_read_read_definition` inspects this JSON.
 """

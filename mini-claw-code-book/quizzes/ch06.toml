@@ -27,9 +27,14 @@ The chapter's "Why errors are values, not `Err`" section is explicit: tool failu
 id = "9a729660-a6fd-4fdd-8c18-6b4a14451ebb"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "Inside `EchoTool::call`, the chapter uses `args[\"text\"].as_str().unwrap_or(\"(no text)\")`. What would be the downside of writing `args[\"text\"].as_str().unwrap()` instead?"
 answer.answer = "It would panic on malformed LLM input, crashing the agent."
+prompt.distractors = [
+  "It would silently return an empty string, which the LLM cannot distinguish from a successful echo.",
+  "It would force `call()` to return `Err`, which the agent loop treats as an unrecoverable error.",
+  "It would block the async runtime because `unwrap` is a synchronous operation on a `Future`.",
+]
 context = """
 LLM-provided arguments are not trusted input. A model can hallucinate a missing field or pass the wrong type. `unwrap()` would panic and take down the agent task; `unwrap_or(\"(no text)\")` degrades gracefully. The chapter's EchoTool walk-through specifically calls this out: "Always be defensive with LLM-provided arguments."
 """

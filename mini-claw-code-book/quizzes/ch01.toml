@@ -27,9 +27,14 @@ context = """
 id = "ddee0f0e-5f15-4afa-832f-6afa4d723f07"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "Which method on `VecDeque` does `MockProvider::chat` call to return responses in FIFO order?"
 answer.answer = "pop_front"
+prompt.distractors = [
+  "pop_back",
+  "front",
+  "swap_remove_front",
+]
 context = """
 `pop_front` removes and returns the first element, giving FIFO order. `pop_back` would give LIFO. The test `test_mock_steps_through_sequence` verifies you picked the right end.
 """

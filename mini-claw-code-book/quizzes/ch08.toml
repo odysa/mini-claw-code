@@ -27,9 +27,14 @@ Cache hits require a byte-identical prefix. If any character in the cached regio
 id = "612bcca7-4f5e-4816-9478-d383e0225dcd"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "What does `InstructionLoader::load()` return when no CLAUDE.md files are found anywhere on the walk?"
 answer.answer = "None"
+prompt.distractors = [
+  "Some(String::new())",
+  "Err(anyhow!(\"no CLAUDE.md found\"))",
+  "Some(\"(no instructions)\".to_string())",
+]
 context = """
 `load()` returns `Option<String>` precisely so the caller can distinguish "no instructions at all" from "instructions were found." The test `test_instructions_instruction_loader_no_files` pins this down. The caller then skips appending an instructions section to the system prompt rather than inserting an empty block.
 """

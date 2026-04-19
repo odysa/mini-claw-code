@@ -27,9 +27,14 @@ OpenAI-style streaming can emit `ToolCallDelta` events for call 0 and call 1 int
 id = "0786fed0-9a0b-4bfb-a7b7-f7e733032524"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "`parse_sse_line` returns `Some(vec![StreamEvent::Done])` when it sees exactly which payload after stripping `data: `?"
 answer.answer = "[DONE]"
+prompt.distractors = [
+  "{\"done\": true}",
+  "END",
+  "\\n\\n",
+]
 context = """
 The OpenAI SSE convention is a literal `data: [DONE]` line terminating the stream. `parse_sse_line` strips the `data: ` prefix, compares the remainder to `\"[DONE]\"`, and emits `StreamEvent::Done`. `test_streaming_parse_sse_done` locks this in.
 """

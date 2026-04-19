@@ -27,9 +27,14 @@ This is a deliberate ownership choice covered in the "Rust concept: ownership an
 id = "3728bf52-d11e-4a08-8f67-0118bd989bbb"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "If `execute_tools` receives a `ToolCall` whose `name` is not registered in the `ToolSet`, what does it put in the result string?"
 answer.answer = "error: unknown tool `<name>`"
+prompt.distractors = [
+  "tool not found: <name>",
+  "An empty string — the agent silently skips unknown tools.",
+  "It does not produce a result string; `execute_tools` returns `Err(anyhow!(\"unknown tool\"))` and the loop aborts.",
+]
 context = """
 The `match self.tools.get(&call.name)` falls through to `None => format!(\"error: unknown tool `{}`\", call.name)`. The agent never panics on a hallucinated tool name — it feeds the error back to the LLM, which can recover. `test_simple_agent_unknown_tool` locks this behavior in.
 """

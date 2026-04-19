@@ -41,9 +41,10 @@ Rule of thumb: reach for `tokio::sync::Mutex` only when you must hold the lock a
 id = "a07c6de4-8304-49b6-8aa5-28cceb473f32"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "`ShellHook` runs an external command and interprets its exit code. What exit code causes the hook to return `HookAction::Block`?"
 answer.answer = "non-zero"
+prompt.distractors = ["exactly 0", "exactly 1", "any negative exit code"]
 context = """
 Exit code 0 means "all good, continue." Any non-zero exit causes `ShellHook` to return `Block`, capturing stderr as the reason. This mirrors Claude Code's JSON-configured hooks: the shell signals its decision through its exit status, so any existing script (`cargo fmt --check`, a linter, an audit command) plugs in without modification.
 """

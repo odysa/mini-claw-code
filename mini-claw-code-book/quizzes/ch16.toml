@@ -41,9 +41,14 @@ Continuity is what makes the two-phase pattern effective. The caller typically p
 id = "5d4365fc-80cb-45ff-bdd4-1a22608a63c6"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "`PlanAgent::read_only` is typed `HashSet<&'static str>` rather than `HashSet<String>`. What Rust property does using `&'static str` rely on?"
 answer.answer = "String literals have `'static` lifetime"
+prompt.distractors = [
+  "`HashSet` can only store `&str` references, never owned `String` values.",
+  "`'static` references are automatically cloned on every `contains` call, avoiding ownership issues.",
+  "String literals are reference-counted and dropped when the last `&'static str` goes out of scope.",
+]
 context = """
 Tool names like `"read"` and `"bash"` are string literals baked into the binary — they live for the entire program, which is exactly what `'static` means. Using `&'static str` avoids heap allocation and cloning for a set whose members are always compile-time-known. The trade-off is you cannot put dynamically generated strings in the set, but that would not make sense for tool names anyway.
 """

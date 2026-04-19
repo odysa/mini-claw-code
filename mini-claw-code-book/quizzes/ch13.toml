@@ -41,9 +41,14 @@ Glob patterns give coarse-grained control without listing every tool. `"*"` catc
 id = "e948d1a6-af17-4e84-ab80-13c77a3e594d"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "Which `PermissionEngine` constructor creates an engine that approves every tool without prompting — the bypass-mode configuration?"
 answer.answer = "allow_all"
+prompt.distractors = [
+  "bypass",
+  "ask_by_default",
+  "allow_default",
+]
 context = """
 `PermissionEngine::allow_all()` constructs an engine with no rules and a default of `Permission::Allow`. Its counterpart, `ask_by_default(rules)`, is the standard interactive config where anything not covered by a rule prompts the user. `test_permissions_allow_all` confirms bypass mode returns `Allow` for every tool.
 """

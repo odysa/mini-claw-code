@@ -27,9 +27,14 @@ context = """
 id = "5c70a56e-e73c-4bf9-8656-5529fe48bc63"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "In the SSE parsing loop, what role does the `buffer: String` play — in one short phrase?"
 answer.answer = "It reassembles SSE lines across arbitrary HTTP chunk boundaries."
+prompt.distractors = [
+  "It caches the entire SSE response so it can be replayed if the connection drops.",
+  "It holds the parsed `StreamEvent` values until the forwarder is ready to consume them.",
+  "It decodes gzip-compressed chunks before they are passed to `serde_json`.",
+]
 context = """
 `resp.chunk()` hands you bytes in whatever pieces TCP delivered — a single SSE line can be split across two chunks, or one chunk can contain several lines. The `buffer` accumulates raw text and the inner `while let Some(pos) = buffer.find('\\n')` loop pulls complete lines off the front. This is the classic line-oriented protocol pattern the chapter highlights in step 3.
 """

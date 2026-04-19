@@ -41,9 +41,14 @@ This is a deliberate attack-surface reduction. A CI pipeline setting `MINI_CLAW_
 id = "466c9af9-5b12-4384-8c04-d0d7c3f045c4"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "`ConfigLoader::load_file` returns `Option<ConfigOverlay>` and silently returns `None` when the file is missing. Why is \"file not found\" treated as the normal case rather than as an error?"
 answer.answer = "Because most users and projects will not have a config file, so a missing file should fall through to defaults, not stop the agent."
+prompt.distractors = [
+  "Because `std::fs::read_to_string` cannot distinguish a missing file from a permission error, so all I/O failures must be treated uniformly.",
+  "Because `toml::from_str` panics on `NotFound` errors, so the loader has to swallow them before deserialization runs.",
+  "Because returning `Err` from `load_file` would force every layer in the merge chain to be wrapped in its own `Result`, bloating the API.",
+]
 context = """
 `.ok()?` on both `read_to_string` and `toml::from_str` converts any failure into `None`, so the layer is skipped and the merge continues. `test_config_load_nonexistent_path` pins this: loading a bogus path does not panic, it just yields `None`. A production tool might log a warning on parse failures, but missing files are absolutely not errors.
 """

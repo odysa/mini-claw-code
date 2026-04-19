@@ -27,9 +27,14 @@ LLMs hallucinate tool names. The loop converts an unknown tool (and any `Err` fr
 id = "9bdcb422-94b9-492c-9cac-1f10b20a12a9"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "Inside `SimpleAgent::chat`, which `StopReason` variant causes the `loop { }` to `return` the final text?"
 answer.answer = "Stop"
+prompt.distractors = [
+  "ToolUse",
+  "EndTurn",
+  "Done",
+]
 context = """
 `StopReason::Stop` is the termination condition — the LLM is done, `turn.text` holds the answer, and the loop returns. `StopReason::ToolUse` instead runs `execute_tools` / `push_results` and continues iterating. `test_simple_agent_three_turn_loop` exercises three rounds before the loop finally sees `Stop`.
 """

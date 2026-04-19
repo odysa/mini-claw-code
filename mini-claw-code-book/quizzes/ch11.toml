@@ -41,9 +41,14 @@ context = """
 id = "8ec2bc0a-da9b-4457-9d81-99635d0a7aaa"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "`collect_files` skips any directory whose name starts with what single character, to avoid walking into `.git`, `.cargo`, and similar trees?"
 answer.answer = "."
+prompt.distractors = [
+  "_",
+  "~",
+  "#",
+]
 context = """
 The guard `n.to_string_lossy().starts_with('.')` skips dot-prefixed directories entirely. Without it, a grep through a project directory would spend most of its time scanning `.git/objects` — thousands of binary blobs producing zero useful matches. Ripgrep-powered production tools achieve the same effect via `.gitignore` integration.
 """

@@ -27,9 +27,14 @@ Zero matches means the model got the string wrong (stale content, missing whites
 id = "44a482b7-b81e-4178-8d2c-f7b8faaccc31"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "What does the `anyhow` macro `bail!(\"...\")` expand to, conceptually?"
 answer.answer = "return Err(anyhow::anyhow!(\"...\"))"
+prompt.distractors = [
+  "panic!(anyhow::anyhow!(\"...\"))",
+  "Err(anyhow::anyhow!(\"...\"))?",
+  "return anyhow::anyhow!(\"...\")",
+]
 context = """
 `bail!` is shorthand for constructing an `anyhow::Error` and returning it as `Err`. It creates a new error on the spot, unlike `?` which propagates an existing one. The EditTool uses `bail!` for both "not found" and "not unique" cases because those are new errors, not wrapped I/O failures.
 """

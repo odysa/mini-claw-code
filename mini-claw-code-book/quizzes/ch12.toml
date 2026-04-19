@@ -41,9 +41,14 @@ Recoverability is the key axis. Read-only tools have no side effects. Write/Edit
 id = "29dfee4f-b36b-4fed-9bc8-f3579efbec4c"
 
 [[questions]]
-type = "ShortAnswer"
+type = "MultipleChoice"
 prompt.prompt = "Which method on `ToolSet` does `SimpleAgent` call at the start of each loop iteration to collect the JSON schemas it must send to the LLM?"
 answer.answer = "definitions"
+prompt.distractors = [
+  "schemas",
+  "tools",
+  "list",
+]
 context = """
 `definitions()` returns `Vec<&ToolDefinition>` — every tool's name, description, and parameter schema. The LLM uses those schemas to decide when and how to call each tool. `get(name)` is the mirror method used on the way back in, during dispatch.
 """

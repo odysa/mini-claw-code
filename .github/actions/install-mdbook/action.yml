@@ -1,0 +1,37 @@
+name: Install mdBook toolchain
+description: >
+  Fetch the `mdbook`, `mdbook-mermaid`, and `mdbook-quiz` prebuilt linux
+  binaries and put them on $PATH. Single source of truth so book-build jobs
+  in any workflow stay in sync -- adding a new preprocessor only changes one
+  file.
+
+  Versions are pinned. `mdbook-quiz` 0.4.0 is the only working release and
+  it was built against mdbook 0.4.x; `mdbook` 0.5.x changed the preprocessor
+  JSON format so `mdbook-quiz` cannot parse its input. We therefore pin
+  `mdbook` to the last 0.4.x release and `mdbook-mermaid` to the last 0.4-era
+  release so everything stays compatible. Bump when a new `mdbook-quiz` ships
+  that supports newer mdbook.
+
+runs:
+  using: composite
+  steps:
+    - name: Fetch prebuilt binaries
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        MDBOOK_VERSION: v0.4.52
+        MERMAID_VERSION: v0.15.0
+        QUIZ_VERSION: v0.4.0
+      run: |
+        mkdir -p bin
+        MDBOOK_URL=$(gh release view "$MDBOOK_VERSION" --repo rust-lang/mdBook --json assets --jq '.assets[] | select(.name | test("x86_64-unknown-linux-gnu.tar.gz$")) | .url')
+        curl -sSL "$MDBOOK_URL" | tar -xz -C bin
+        MERMAID_URL=$(gh release view "$MERMAID_VERSION" --repo badboy/mdbook-mermaid --json assets --jq '.assets[] | select(.name | test("x86_64-unknown-linux-gnu.tar.gz$")) | .url')
+        curl -sSL "$MERMAID_URL" | tar -xz -C bin
+        # `_bare` (not `_full`) because the full variant compiles in Aquascope
+        # support and fails with "Aquascope failed to initialize" when no
+        # aquascope binary is on PATH. We do not use Aquascope — none of the
+        # quiz TOML files reference it — so bare is the right choice.
+        QUIZ_URL=$(gh release view "$QUIZ_VERSION" --repo cognitive-engineering-lab/mdbook-quiz --json assets --jq '.assets[] | select(.name | test("x86_64-unknown-linux-gnu_bare.tar.gz$")) | .url')
+        curl -sSL "$QUIZ_URL" | tar -xz -C bin
+        echo "$PWD/bin" >> $GITHUB_PATH

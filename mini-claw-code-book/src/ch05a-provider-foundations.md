@@ -1,12 +1,19 @@
 # Chapter 5a: Provider & Streaming Foundations
 
-> **File(s) to edit:** `src/mock.rs`, `src/streaming.rs` (everything *except* `StreamingAgent`)
+> **File(s) to edit:** `src/streaming.rs` — every stub tagged `TODO ch5a:`
+> (everything *except* `StreamingAgent`, which is Ch5b's).
+>
+> `src/mock.rs` already carries the `MockProvider` stubs you filled in
+> [Chapter 1](./ch01-first-llm-call.md); this chapter leans on that work but
+> does not re-fill it. If you skipped ahead from Ch1, go back and finish the
+> `TODO ch1:` stubs first.
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_mock_` and `cargo test -p mini-claw-code-starter test_streaming_parse_ test_streaming_accumulator_`
 > **Estimated time:** 35 min
 
 ## Goal
 
-- Implement `MockProvider` so tests can script exact LLM responses without network calls.
+- Revisit `MockProvider` (built in Ch1) as the canonical example of the
+  `Provider` trait, and use it to motivate the streaming siblings below.
 - Implement `parse_sse_line` so we can turn a single SSE line into `StreamEvent`s.
 - Implement `StreamAccumulator` so a stream of deltas reassembles into a complete `AssistantTurn`.
 - Implement `MockStreamProvider` so UI-facing code can be tested without a real HTTP connection.

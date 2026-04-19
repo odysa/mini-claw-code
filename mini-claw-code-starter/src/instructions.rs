@@ -25,7 +25,7 @@ impl InstructionLoader {
     /// - Reverse at the end so root-level files come first.
     pub fn discover(&self, _start_dir: &Path) -> Vec<PathBuf> {
         unimplemented!(
-            "TODO ch18: walk upward from start_dir collecting matching files, return root-first"
+            "TODO ch8: walk upward from start_dir collecting matching files, return root-first"
         )
     }
 
@@ -37,7 +37,7 @@ impl InstructionLoader {
     /// - Format each section: "# Instructions from {path}\n\n{content}".
     /// - Join sections with "\n\n---\n\n". Return `None` if nothing loaded.
     pub fn load(&self, _start_dir: &Path) -> Option<String> {
-        unimplemented!("TODO ch18: read each discovered file and concatenate with headers")
+        unimplemented!("TODO ch8: read each discovered file and concatenate with headers")
     }
 
     /// Build a system prompt section from discovered instructions.
@@ -46,7 +46,7 @@ impl InstructionLoader {
     /// telling the model these are auto-loaded project instructions.
     pub fn system_prompt_section(&self, _start_dir: &Path) -> Option<String> {
         unimplemented!(
-            "TODO ch18: wrap the loaded instruction text with a preamble for the system prompt"
+            "TODO ch8: wrap the loaded instruction text with a preamble for the system prompt"
         )
     }
 }

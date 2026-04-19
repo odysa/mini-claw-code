@@ -24,4 +24,4 @@
 - [Chapter 15: Hooks](./ch15-hooks.md)
 - [Chapter 16: Plan Mode](./ch16-plan-mode.md)
 - [Chapter 17: Settings Hierarchy](./ch17-settings.md)
-- [Chapter 18: Project Instructions](./ch18-instructions.md)
+- [Chapter 18: Project Instructions & Context Management](./ch18-instructions.md)

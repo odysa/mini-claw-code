@@ -64,10 +64,103 @@ The `skip_serializing_if` annotations keep the JSON clean — `tools` is omitted
 
 ### Conversion helpers
 
-Two `impl` methods on `OpenRouterProvider` translate between our internal types and the API format:
+Two `impl` methods on `OpenRouterProvider` translate between our internal
+types and the API format. `convert_messages` handles the four `Message`
+variants:
 
-- **`convert_messages`** maps each `Message` variant to its OpenAI role. `System` and `User` are straightforward. `Assistant` carries optional `tool_calls` (with arguments serialized back to a JSON string via `.to_string()`). `ToolResult` becomes `role: "tool"` with `tool_call_id` linking it to the original call. `Attachment` is injected as a `system` message since the OpenAI format has no native attachment role. `Progress` is silently dropped — it is UI-only.
-- **`convert_tools`** wraps each `ToolDefinition` in the OpenAI function-calling envelope: `{ "type": "function", "function": { "name", "description", "parameters" } }`.
+```rust
+pub(crate) fn convert_messages(messages: &[Message]) -> Vec<ApiMessage> {
+    let mut out = Vec::new();
+    for msg in messages {
+        match msg {
+            Message::System(text) => out.push(ApiMessage {
+                role: "system".into(),
+                content: Some(text.clone()),
+                tool_calls: None,
+                tool_call_id: None,
+            }),
+            Message::User(text) => out.push(ApiMessage {
+                role: "user".into(),
+                content: Some(text.clone()),
+                tool_calls: None,
+                tool_call_id: None,
+            }),
+            Message::Assistant(turn) => out.push(ApiMessage {
+                role: "assistant".into(),
+                content: turn.text.clone(),
+                tool_calls: if turn.tool_calls.is_empty() {
+                    None
+                } else {
+                    Some(
+                        turn.tool_calls
+                            .iter()
+                            .map(|c| ApiToolCall {
+                                id: c.id.clone(),
+                                type_: "function".into(),
+                                function: ApiFunction {
+                                    name: c.name.clone(),
+                                    arguments: c.arguments.to_string(),
+                                },
+                            })
+                            .collect(),
+                    )
+                },
+                tool_call_id: None,
+            }),
+            Message::ToolResult { id, content } => out.push(ApiMessage {
+                role: "tool".into(),
+                content: Some(content.clone()),
+                tool_calls: None,
+                tool_call_id: Some(id.clone()),
+            }),
+        }
+    }
+    out
+}
+```
+
+Four details worth pausing on:
+
+- **`System` and `User` are symmetric.** Same shape, different role string.
+  Everything else (`tool_calls`, `tool_call_id`) is `None`.
+- **`Assistant` is the variant with the nuance.** The `text` field maps
+  directly to `content`, but the tool calls have to be reserialised.
+  `c.arguments` is a `serde_json::Value`; the OpenAI API wants it as a
+  JSON *string*, so we call `.to_string()` to turn the `Value` back into
+  text. Emitting an empty `tool_calls: []` array makes some providers
+  reject the request as malformed, so we send `None` instead.
+- **`ToolResult` becomes `role: "tool"`.** This is the variant that ties
+  a result back to its originating call via `tool_call_id`. Without that
+  id the provider cannot associate the result with the call, and the
+  next response is usually an error.
+- **No default branch.** Every `Message` variant is handled explicitly. If
+  you add a new variant in Chapter 4, the match will fail to compile here
+  until you decide how it should serialise — which is the behaviour we
+  want.
+
+`convert_tools` is simpler: wrap each `ToolDefinition` in the OpenAI
+function-calling envelope.
+
+```rust
+pub(crate) fn convert_tools(tools: &[&ToolDefinition]) -> Vec<ApiTool> {
+    tools
+        .iter()
+        .map(|t| ApiTool {
+            type_: "function",
+            function: ApiToolDef {
+                name: t.name,
+                description: t.description,
+                parameters: t.parameters.clone(),
+            },
+        })
+        .collect()
+}
+```
+
+The envelope is a fixed shape: `{ "type": "function", "function": { name,
+description, parameters } }`. Every OpenAI-compatible provider expects
+exactly this, and our `ToolDefinition` was designed in Ch4 specifically
+so this mapping is a one-liner.
 
 ### The provider struct
 
@@ -84,43 +177,189 @@ The struct holds a reusable `reqwest::Client`, the API key, model name, and base
 
 ### Non-streaming `Provider` impl
 
-The `Provider` impl builds a `ChatRequest` with `stream: false`, POSTs it to `/chat/completions`, and deserializes the response into `ChatResponse`. A `parse_assistant` helper converts the API's `Choice` into our `AssistantTurn`, mapping `finish_reason: "tool_calls"` to `StopReason::ToolUse` and parsing tool call arguments from JSON strings into `Value`.
+The non-streaming path is the simpler one: one POST, one JSON response, one
+`AssistantTurn` returned. Here it is end to end:
+
+```rust
+impl Provider for OpenRouterProvider {
+    async fn chat(
+        &self,
+        messages: &[Message],
+        tools: &[&ToolDefinition],
+    ) -> anyhow::Result<AssistantTurn> {
+        let body = ChatRequest {
+            model: &self.model,
+            messages: Self::convert_messages(messages),
+            tools: Self::convert_tools(tools),
+            stream: false,
+        };
+
+        let resp: ChatResponse = self
+            .client
+            .post(format!("{}/chat/completions", self.base_url))
+            .bearer_auth(&self.api_key)
+            .json(&body)
+            .send()
+            .await
+            .context("request failed")?
+            .error_for_status()
+            .context("API returned error status")?
+            .json()
+            .await
+            .context("failed to parse response")?;
+
+        let choice = resp.choices.into_iter().next().context("no choices")?;
+
+        let tool_calls = choice
+            .message
+            .tool_calls
+            .unwrap_or_default()
+            .into_iter()
+            .map(|tc| {
+                let arguments =
+                    serde_json::from_str(&tc.function.arguments).unwrap_or(Value::Null);
+                ToolCall {
+                    id: tc.id,
+                    name: tc.function.name,
+                    arguments,
+                }
+            })
+            .collect();
+
+        let stop_reason = match choice.finish_reason.as_deref() {
+            Some("tool_calls") => StopReason::ToolUse,
+            _ => StopReason::Stop,
+        };
+
+        let usage = resp.usage.map(|u| TokenUsage {
+            input_tokens: u.prompt_tokens.unwrap_or(0),
+            output_tokens: u.completion_tokens.unwrap_or(0),
+        });
+
+        Ok(AssistantTurn {
+            text: choice.message.content,
+            tool_calls,
+            stop_reason,
+            usage,
+        })
+    }
+}
+```
+
+Three decisions to notice:
+
+- **`error_for_status()` turns HTTP 4xx/5xx into an `Err`.** Otherwise a
+  403 from OpenRouter would deserialize whatever body came back as if it
+  were a `ChatResponse` and fail confusingly later.
+- **Tool-call arguments arrive as a JSON *string*, not a `Value`.** The
+  OpenAI spec puts `"arguments": "{\"path\":\"foo.rs\"}"` in the wire
+  format. We parse it back into a `Value` ourselves; on a parse failure
+  we fall back to `Value::Null` so a malformed `arguments` field does
+  not abort the whole turn.
+- **`stop_reason` is a straight mapping of `finish_reason`.** Only
+  `"tool_calls"` becomes `ToolUse`; everything else (`"stop"`,
+  `"length"`, null, missing) becomes `Stop`. This matches the "the model
+  decides" story from [Chapter 3's aside](./ch03-agentic-loop.md#aside-who-decides-stop-vs-tooluse) -- we are just translating the model's own stop signal.
 
 ### Streaming `StreamProvider` impl
 
-The `StreamProvider` impl is the heart of the streaming architecture. It sends the same request with `stream: true`, then processes the chunked HTTP response. Here is the core loop (abbreviated):
+The streaming path is the same request shape with `stream: true`, but
+instead of a single JSON body we read a chunked HTTP response and parse
+it as Server-Sent Events. Here is the complete impl:
 
 ```rust
-let mut acc = StreamAccumulator::new();
-let mut buffer = String::new();
+impl crate::streaming::StreamProvider for OpenRouterProvider {
+    async fn stream_chat(
+        &self,
+        messages: &[Message],
+        tools: &[&ToolDefinition],
+        tx: tokio::sync::mpsc::UnboundedSender<crate::streaming::StreamEvent>,
+    ) -> anyhow::Result<AssistantTurn> {
+        use crate::streaming::{StreamAccumulator, parse_sse_line};
 
-while let Some(chunk) = resp.chunk().await? {
-    buffer.push_str(&String::from_utf8_lossy(&chunk));
-    while let Some(pos) = buffer.find('\n') {
-        let line = buffer[..pos].trim_end_matches('\r').to_string();
-        buffer = buffer[pos + 1..].to_string();
-        if line.is_empty() { continue; }
-        if let Some(events) = parse_sse_line(&line) {
-            for event in events {
-                acc.feed(&event);
-                let _ = tx.send(event);
+        let body = ChatRequest {
+            model: &self.model,
+            messages: Self::convert_messages(messages),
+            tools: Self::convert_tools(tools),
+            stream: true,
+        };
+
+        let mut resp = self
+            .client
+            .post(format!("{}/chat/completions", self.base_url))
+            .bearer_auth(&self.api_key)
+            .json(&body)
+            .send()
+            .await
+            .context("request failed")?
+            .error_for_status()
+            .context("API returned error status")?;
+
+        let mut acc = StreamAccumulator::new();
+        let mut buffer = String::new();
+
+        while let Some(chunk) = resp.chunk().await.context("failed to read chunk")? {
+            buffer.push_str(&String::from_utf8_lossy(&chunk));
+
+            while let Some(newline_pos) = buffer.find('\n') {
+                let line = buffer[..newline_pos].trim_end_matches('\r').to_string();
+                buffer = buffer[newline_pos + 1..].to_string();
+
+                if line.is_empty() {
+                    continue;
+                }
+
+                if let Some(events) = parse_sse_line(&line) {
+                    for event in events {
+                        acc.feed(&event);
+                        let _ = tx.send(event);
+                    }
+                }
             }
         }
+
+        Ok(acc.finish())
     }
 }
-Ok(acc.finish())
 ```
 
 Walk through it:
 
-1. **Same request, but `stream: true`.** The API returns a chunked HTTP response instead of a single JSON body.
-2. **Read raw byte chunks.** `resp.chunk()` returns `Option<Bytes>` — the HTTP body arrives in arbitrary-sized pieces that do not align with SSE event boundaries.
-3. **Buffer and split on newlines.** TCP chunks can split an SSE line in the middle. The `buffer` accumulates raw text, and the inner `while` loop extracts complete lines. This is classic line-oriented protocol parsing — you accumulate bytes and consume lines as they become available.
-4. **Parse each line.** `parse_sse_line` converts a `data:` line into `StreamEvent`s. Blank lines and non-data lines are skipped.
-5. **Feed both the accumulator and the channel.** The accumulator builds the final `AssistantTurn`; the channel delivers events to the UI in real-time.
-6. **Return the assembled message.** Once the stream ends (`resp.chunk()` returns `None`), the accumulator has collected everything, and `finish()` produces the `AssistantTurn`.
+1. **Same request, but `stream: true`.** The API returns a chunked HTTP
+   response instead of a single JSON body. The request construction and
+   auth are identical to the non-streaming path; this is exactly what we
+   want from an abstraction called "streaming".
+2. **Read raw byte chunks.** `resp.chunk()` returns `Option<Bytes>` — the
+   HTTP body arrives in arbitrary-sized pieces that do not align with SSE
+   event boundaries. A single `chunk` could be a partial line, several
+   lines, or multiple events crammed together.
+3. **Buffer and split on newlines.** TCP chunks can split an SSE line in
+   the middle. The `buffer` accumulates raw text, and the inner `while`
+   loop extracts complete lines. This is classic line-oriented protocol
+   parsing — you accumulate bytes and consume lines as they become
+   available. Notice the inner loop keeps going until no more complete
+   lines remain in the buffer, then we wait for the next chunk.
+4. **Parse each line.** `parse_sse_line` (from 5a) converts a `data:` line
+   into `StreamEvent`s. Blank lines (SSE event separators) and non-data
+   lines (comments, keep-alives) return `None` and are skipped.
+5. **Feed both the accumulator and the channel.** For every event, the
+   accumulator updates its internal state (building the eventual
+   `AssistantTurn`) and the channel delivers the same event to the UI in
+   real-time. The `let _ = tx.send(event)` deliberately discards a send
+   error: if the receiver has been dropped (e.g. the forwarder task has
+   exited because the main loop cancelled), we still want to finish
+   consuming the stream so the underlying HTTP connection can be cleanly
+   released.
+6. **Return the assembled message.** Once the stream ends (`resp.chunk()`
+   returns `None`), the accumulator has collected everything, and
+   `finish()` produces the final `AssistantTurn`. At this point `tx` is
+   dropped (the function is returning), which closes the channel and
+   signals the forwarder task to exit — exactly the termination flow the
+   `StreamingAgent` section below depends on.
 
-This dual-path design (accumulator + channel) is how Claude Code handles streaming too. The UI renders tokens as they arrive, but the agent loop sees a clean, complete response.
+This dual-path design (accumulator + channel) is how Claude Code handles
+streaming too. The UI renders tokens as they arrive, but the agent loop
+sees a clean, complete response — no bespoke partial-state handling.
 
 ### Your task
 
@@ -284,6 +523,55 @@ Step-by-step:
 A single-task approach — "call `stream_chat`, then drain `rx`" — deadlocks. `stream_chat` does not return until the stream is fully consumed; with an unbounded channel full of events and nobody reading, the provider keeps writing forever (technically fine, but nothing gets rendered until the end). A *bounded* channel with that approach would block the provider on `tx.send().await`, which would block `stream_chat`, which would never return. Either way the UI sees no tokens until the turn is over — defeating the point of streaming.
 
 The forwarder pattern decouples the two halves: the provider's writer side and the UI's reader side both make progress independently.
+
+### The working pattern, end to end
+
+Here is the same flow drawn once, after the deadlock is fixed. Four Rust
+tasks, three edges that matter: the provider writes `tx`, the forwarder
+pulls `rx` and re-emits onto `events`, and the main loop awaits on
+`stream_chat`'s return value for control flow. Termination is purely
+drop-based: when `stream_chat` returns, it drops `tx`; `rx.recv()` then
+yields `None`; the forwarder loop exits; `handle.await` unblocks.
+
+```mermaid
+sequenceDiagram
+    participant M as Main loop
+    participant F as Forwarder task
+    participant P as stream_chat
+    participant U as UI (events rx)
+
+    M->>M: let (tx, rx) = mpsc::unbounded_channel::<StreamEvent>()
+    M->>F: tokio::spawn(forwarder(rx, events))
+    M->>P: provider.stream_chat(messages, tools, tx).await
+    Note over P: holds the tx sender;<br/>writes events as they arrive
+    P-->>F: tx.send(TextDelta) (many)
+    F-->>U: events.send(AgentEvent::TextDelta)
+    P-->>F: tx.send(ToolCallStart / Delta / Done)
+    F-->>U: events.send(...)
+    P-->>M: returns AssistantTurn (drops tx here)
+    Note over F: rx.recv() now returns None,<br/>forwarder loop exits naturally
+    F-->>M: JoinHandle resolves
+    M->>M: match turn.stop_reason { Stop => ..., ToolUse => ... }
+```
+
+Three invariants keep this alive:
+
+1. **The provider owns the sender.** Only `stream_chat` holds a `tx` — the
+   main loop hands it over and does not keep a clone. When `stream_chat`
+   returns, the last `tx` is dropped, which closes the channel.
+2. **The forwarder owns the receiver.** It runs in its own spawned task so
+   the receiver can make progress *while* `stream_chat` is still writing.
+   No one else calls `rx.recv()`.
+3. **The main loop awaits both.** First `stream_chat`, then the forwarder's
+   `JoinHandle`. Awaiting the handle is what prevents the main loop from
+   leaking a half-finished forwarder into the next iteration of the agent
+   loop.
+
+If any one of these three breaks — a stray `tx` clone held by the main
+loop, the forwarder running inline on the main task, or the main loop
+skipping the handle await — you get a subtle variant of the deadlock
+above. This is why the pattern is worth learning once and reaching for
+any time you need streaming I/O bridged into a step-wise decision loop.
 
 ### Your task
 

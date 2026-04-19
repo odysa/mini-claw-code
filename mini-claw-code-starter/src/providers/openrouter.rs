@@ -87,7 +87,7 @@ struct ResponseMessage {
 
 /// An HTTP provider that talks to OpenRouter (or any OpenAI-compatible API).
 ///
-/// # Chapter 5: Provider & Streaming — HTTP backend
+/// # Chapter 5b: OpenRouter & StreamingAgent — HTTP backend
 ///
 /// Your task: Implement the constructor methods and the Provider trait.
 /// The serde types above handle serialization — you write the logic.
@@ -141,21 +141,21 @@ impl OpenRouterProvider {
     ///   Set tool_calls to None (not Some(vec![])) when empty.
     /// - ToolResult -> role: "tool", content: Some(content.clone()), tool_call_id: Some(id.clone())
     pub(crate) fn convert_messages(_messages: &[Message]) -> Vec<ApiMessage> {
-        unimplemented!("TODO ch5: map each Message variant to an ApiMessage")
+        unimplemented!("TODO ch5b: map each Message variant to an ApiMessage")
     }
 
     /// Convert our ToolDefinition types to the API's tool format.
     ///
     /// Each tool becomes: { type: "function", function: { name, description, parameters } }
     pub(crate) fn convert_tools(_tools: &[&ToolDefinition]) -> Vec<ApiTool> {
-        unimplemented!("TODO ch5: wrap each ToolDefinition in an ApiTool with type=function")
+        unimplemented!("TODO ch5b: wrap each ToolDefinition in an ApiTool with type=function")
     }
 }
 
 impl crate::streaming::StreamProvider for OpenRouterProvider {
     /// Stream a chat request using SSE.
     ///
-    /// # Chapter 5: Provider & Streaming — SSE
+    /// # Chapter 5b: OpenRouter & StreamingAgent — SSE
     ///
     /// Hints:
     /// 1. Build ChatRequest with stream: true
@@ -172,7 +172,7 @@ impl crate::streaming::StreamProvider for OpenRouterProvider {
         _tx: tokio::sync::mpsc::UnboundedSender<crate::streaming::StreamEvent>,
     ) -> anyhow::Result<AssistantTurn> {
         unimplemented!(
-            "TODO ch5: POST with stream=true, split SSE lines, parse each, feed the accumulator and send events"
+            "TODO ch5b: POST with stream=true, split SSE lines, parse each, feed the accumulator and send events"
         )
     }
 }
@@ -197,7 +197,7 @@ impl Provider for OpenRouterProvider {
         _tools: &[&ToolDefinition],
     ) -> anyhow::Result<AssistantTurn> {
         unimplemented!(
-            "TODO ch5: POST /chat/completions with bearer auth, parse ChatResponse, build AssistantTurn"
+            "TODO ch5b: POST /chat/completions with bearer auth, parse ChatResponse, build AssistantTurn"
         )
     }
 }

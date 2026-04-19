@@ -1,15 +1,21 @@
 # Chapter 9: File Tools
 
-> **File(s) to edit:** `src/tools/read.rs`, `src/tools/write.rs`, `src/tools/edit.rs`
+> **File(s) to edit:** `src/tools/write.rs`, `src/tools/edit.rs`
+> (the `TODO ch9:` stubs). `src/tools/read.rs` was completed back in
+> [Chapter 2](./ch02-first-tool.md) — this chapter revisits it as the
+> baseline and contrasts it with the design decisions that come with
+> writing and editing.
 > **Tests to run:** `cargo test -p mini-claw-code-starter test_read_` (ReadTool), `cargo test -p mini-claw-code-starter test_write_` (WriteTool), `cargo test -p mini-claw-code-starter test_edit_` (EditTool)
 > **Estimated time:** 50 min
 
 ## Goal
 
-- Implement `ReadTool` so the agent can read file contents, giving the LLM visibility into the codebase.
+- Revisit `ReadTool` (built in Ch2) as the baseline and understand the
+  trade-offs of its minimal design vs. production tools that add
+  line-numbering and offset/limit.
 - Implement `WriteTool` with automatic parent directory creation so the agent can create new files without a separate `mkdir` step.
 - Implement `EditTool` with a uniqueness check so the agent can make surgical string replacements in existing files.
-- Understand why tool errors are returned as `Err(...)` in the starter (the agent loop converts them to messages the LLM can read and recover from).
+- Understand why tool errors are returned as `Err(...)` in the starter (the agent loop converts them to messages the LLM can read and recover from -- the detailed rationale is in [Chapter 6 §"Why tool errors never terminate the agent"](./ch06-tool-interface.md#why-tool-errors-never-terminate-the-agent)).
 
 A coding agent that cannot touch the filesystem is just a chatbot with delusions
 of grandeur. It can describe code changes, suggest fixes, explain algorithms --

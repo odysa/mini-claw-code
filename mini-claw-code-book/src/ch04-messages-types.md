@@ -1,19 +1,25 @@
 # Chapter 4: Messages & Types
 
-> **File(s) to edit:** `src/types.rs` (pre-filled in starter)
-> **Test to run:** `cargo test -p mini-claw-code-starter test_mock_`
+> **File(s) to edit:** none — `src/types.rs` is pre-filled in the starter.
+> This chapter is a study-only deep dive into the type system you have
+> already been using.
+> **Test to run:** `cargo test -p mini-claw-code-starter test_mock_` still
+> passes after this chapter (and did before) because the actual
+> implementation work is in `src/mock.rs`, which you filled in
+> [Chapter 1](./ch01-first-llm-call.md). The tests exercise the shapes
+> defined in `types.rs`, which is why we connect them here.
 > **Estimated time:** 20 min (study only)
 
 ## Goal
 
-- Define the `Message` enum with four variants (`System`, `User`, `Assistant`, `ToolResult`) so that every conversation participant has a typed representation.
-- Implement the `ToolDefinition` builder so that tools can describe their JSON Schema parameters without hand-writing JSON.
-- Implement `ToolSet` so that the agent can register and look up tools by name at runtime.
-- Define the `Provider` trait using RPITIT so that any LLM backend can be swapped in without changing agent code.
+- Understand how the `Message` enum's four variants (`System`, `User`, `Assistant`, `ToolResult`) give every conversation participant a typed representation.
+- Understand the `ToolDefinition` builder pattern and why tools describe their JSON Schema parameters at construction time rather than hand-writing JSON.
+- Understand `ToolSet` as the runtime registry that lets the agent dispatch tool calls by name.
+- Understand the `Provider` trait's RPITIT signature and why it leaves room for any LLM backend to drop in without changing agent code.
 
 Every coding agent is, at its core, a loop over a conversation. The user speaks, the model replies, tools produce results, and those results go back to the model. Before we can build that loop, we need a type system that represents every participant and every kind of payload in the conversation.
 
-In this chapter you will implement the foundational types that the rest of the codebase depends on. By the end, `cargo test -p mini-claw-code-starter test_mock_` should pass.
+This chapter walks through the foundational types that the rest of the codebase depends on. Nothing here needs to be written by you -- `src/types.rs` is complete in the starter. Read for comprehension; the hands-on work resumes in Chapter 5a.
 
 ## How the types connect
 

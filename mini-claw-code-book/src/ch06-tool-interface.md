@@ -83,6 +83,53 @@ This split is a deliberate design choice. If Rust stabilizes `dyn async fn` in t
 
 Note that in the `MockProvider` impl from [Chapter 5a](./ch05a-provider-foundations.md), we wrote `async fn chat(...)` directly. That works because Rust 1.75+ allows `async fn` in trait impls even when the trait signature uses the RPITIT form. The compiler desugars it correctly. You can do the same for `Tool` impls -- write `async fn call(...)` and the `#[async_trait]` macro handles the rest.
 
+### Decision rule: which pattern for your next trait?
+
+The question to ask about any *new* async trait is "do I need to store values
+of this trait with different concrete types in the same collection?" That
+single question decides it:
+
+```
+                  Do you need Box<dyn MyTrait> anywhere?
+                                 │
+                 ┌──────────────┴───────────────┐
+                 ▼                              ▼
+               yes                              no
+                 │                              │
+                 ▼                              ▼
+   #[async_trait::async_trait]          trait MyTrait {
+   trait MyTrait: Send + Sync {            fn do_it(&self)
+       async fn do_it(&self)                 -> impl Future<...> + Send;
+         -> Result<...>;                  }
+   }                                      // callers use `impl MyTrait` or
+   // callers use Box<dyn MyTrait>        // generic `<T: MyTrait>` params
+```
+
+Concrete cues that push you toward `#[async_trait]`:
+
+- You want a `Vec<Box<dyn MyTrait>>`, `HashMap<K, Box<dyn MyTrait>>`, or
+  similar runtime-heterogeneous container. (This is what `ToolSet` does.)
+- You want to return `Box<dyn MyTrait>` from a function because callers do
+  not need to know the concrete type.
+- You want users to plug in new implementations at runtime (e.g. via a
+  dynamic registry or plugin system).
+
+Concrete cues that push you toward RPITIT:
+
+- Every caller knows the concrete implementation at compile time. A struct
+  like `SimpleAgent<P: Provider>` monomorphises once per provider.
+- Throughput matters enough that you care about avoiding one boxed-future
+  allocation per call.
+- The trait has lots of `async` methods and you do not want `async_trait` to
+  insert a `Box` around each one.
+
+For this book, every trait we define happens to fall cleanly on one side:
+`Provider` / `StreamProvider` / `SafetyCheck` are monomorphised through
+generic parameters (RPITIT); `Tool` / `HookHandler` / `InputHandler` get
+stored as `Box<dyn _>` in a heterogeneous collection (`#[async_trait]`).
+When you add a new trait in your own extensions, walk the question above
+and you will not have to think about it again.
+
 ## Why tool errors never terminate the agent
 
 A tool failure is not an agent failure. If the LLM asks to read a file that does not exist, the right behaviour is to tell it "error: file not found" and let it recover -- try a different path, ask the user, or move on. A genuine `Err(...)` escaping to the top of the agent loop would instead *terminate* the conversation, which is almost never what we want.

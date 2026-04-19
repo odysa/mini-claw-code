@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `WriteTool` 在写入之前调用 `tokio::fs::create_dir_all`？"
+answer.answer = "这样 LLM 就可以写入像 `src/handlers/auth/mod.rs` 这样的嵌套路径，而无需先调用 bash 的 `mkdir -p`。"
+prompt.distractors = [
+  "因为 `tokio::fs::write` 除非刚刚创建了父目录，否则拒绝覆盖已有文件。",
+  "因为在类 Unix 系统上获取文件句柄需要 `create_dir_all`。",
+  "因为没有它，`edit` 工具就无法在磁盘上找到该文件。",
+]
+context = """
+自动创建父目录避免了浪费一次工具调用轮次。一个朴素的工具会因"No such file or directory"而失败，迫使 agent 调用 `bash(\"mkdir -p ...\")` 后重试。`!parent.as_os_str().is_empty()` 守卫处理了像 `\"file.txt\"` 这样的裸文件名，此时 `parent()` 返回 `Some("")`，而对 `create_dir_all("")` 的调用会失败。`test_write_creates_dirs` 锁定了这一行为。
+"""
+id = "cacebf7e-5a3f-42b9-81c0-ed25b6ca3739"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`EditTool` 统计 `old_string` 出现的次数，当次数为零或大于一时都会报错。为什么要拒绝多次匹配而不仅仅替换第一个？"
+answer.answer = "因为替换会产生歧义——LLM 无法表明它想替换哪一个，而悄悄编辑了错误的那个会损坏文件。"
+prompt.distractors = [
+  "因为 `str::replacen` 只为唯一子字符串定义，否则会 panic。",
+  "因为多次匹配通常意味着文件是二进制的，无法安全编辑。",
+  "因为 Rust 的借用检查器禁止每次函数调用对 `String` 进行多次修改。",
+]
+context = """
+零次匹配意味着模型得到的字符串有误（内容过时、空白字符缺失）。多次匹配意味着编辑存在歧义。两者都是预期的失败模式，而非 bug。通过拒绝猜测，工具迫使 LLM 提供更具体的 `old_string`——通常是添加更多上下文行——使编辑变得明确无误。`test_edit_not_unique` 验证了这一点。
+"""
+id = "44a482b7-b81e-4178-8d2c-f7b8faaccc31"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`anyhow` 宏 `bail!(\"...\")` 在概念上展开为什么？"
+answer.answer = "return Err(anyhow::anyhow!(\"...\"))"
+prompt.distractors = [
+  "panic!(anyhow::anyhow!(\"...\"))",
+  "Err(anyhow::anyhow!(\"...\"))?",
+  "return anyhow::anyhow!(\"...\")",
+]
+context = """
+`bail!` 是构建 `anyhow::Error` 并将其作为 `Err` 返回的简写。它是在原地创建一个新错误，不同于 `?` 传播已有错误。`EditTool` 对"未找到"和"不唯一"两种情况都使用 `bail!`，因为这些是新错误，而非被包装的 I/O 失败。
+"""
+id = "93459640-401f-4159-9328-6fbf2dd47e96"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "在 starter 的简化 `Tool` trait 中，当 `EditTool` 等工具的 `call()` 返回 `Err(...)` 时会发生什么？"
+answer.answer = "agent 循环将其转换为类似 `\"error: old_string not found in 'foo.rs'\"` 的字符串，并作为工具结果发送回 LLM。"
+prompt.distractors = [
+  "agent 发生 panic，因为工具返回的 `Err` 被视为致命的协议违规。",
+  "agent 静默丢弃工具调用，并要求 LLM 在没有上下文的情况下重试。",
+  "agent 终止会话，并将错误返回给输入 prompt 的用户。",
+]
+context = """
+在 `execute_tools` 中，`Err` 通过 `match` 捕获，并格式化为 `format!(\"error: {e}\")`。LLM 将该字符串作为工具结果看到，可以自行恢复——通常通过用更正后的参数重试。生产级 agent（如 Claude Code）会区分可恢复的工具级错误和真正的 I/O 失败，但 starter 为了简化而以相同方式处理它们。
+"""
+id = "e91ba36b-acc3-463d-af3b-311c505422c2"

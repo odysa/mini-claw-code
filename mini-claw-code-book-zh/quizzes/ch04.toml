@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `Message::ToolResult` 除了 `content` 之外还携带一个 `id: String` 字段？"
+answer.answer = "这样当一次轮次请求多个工具时，模型可以将每个结果与其所对应的 `ToolCall` 关联起来。"
+prompt.distractors = [
+  "因为 `id` 是工具输出的文件路径，用于磁盘缓存。",
+  "因为 `serde_json` 要求每个枚举变体都有 `id` 字段才能正确往返序列化。",
+  "因为 agent 在派发时使用 `id` 作为 `ToolSet` `HashMap` 的键。",
+]
+context = """
+一次助手轮次可以并发请求多个工具调用，结果可能以任意顺序返回。`id` 将每个 `Message::ToolResult` 与特定的 `ToolCall.id` 对应起来，这样 LLM 就知道哪个结果属于哪个请求。`ToolSet` 中的工具查找使用的是 `ToolCall.name`，而不是 `id`。
+"""
+id = "c17fcea0-6ba1-4a44-9ce0-74518d0fdea4"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`AssistantTurn::text` 是 `Option<String>` 而非 `String`。`None` 的情况代表什么？"
+answer.answer = "模型仅生成了工具调用，没有任何可读文本，因此暂时没有内容可以显示。"
+prompt.distractors = [
+  "provider 未能解析响应——`None` 是错误哨兵值。",
+  "模型达到了上下文窗口限制，将回复截断为空。",
+  "`ToolResult` 在助手消息之前追加，覆盖了文本内容。",
+]
+context = """
+当 `stop_reason == ToolUse` 时，模型通常只发出 `ToolCall` 条目，没有附带的描述文字。将 `text` 建模为 `Option<String>` 可以捕获这种区别，而不依赖空字符串作为哨兵。错误通过 `anyhow::Result` 传播，而非 `None`。
+"""
+id = "2af8f714-6df9-4615-afb9-d867b281763d"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "在 `ToolSet::push` 中，用作 `HashMap` 键的名称来自单一真实来源。工具上哪个方法/字段提供了该名称？"
+answer.answer = "definition().name"
+prompt.distractors = [
+  "name()",
+  "schema().id",
+  "type_name::<Self>()",
+]
+context = """
+`push` 调用 `tool.definition().name.to_string()` 来派生键，因此注册名与 schema 名永远不会出现偏差。`test_mock_toolset_empty` 及更广泛的 toolset 测试依赖于这一单一真实来源。
+"""
+id = "6d360425-bc59-410d-98ac-1fe45b5e42a1"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`ToolDefinition` 的构建器方法（`param`、`param_raw`、构造函数）都按值获取 `mut self` 并返回 `Self`。Rust 的哪个特性使这种链式调用零成本？"
+answer.answer = "移动语义：每次调用消耗 struct 并返回修改后的值，无需克隆或引用计数。"
+prompt.distractors = [
+  "`ToolDefinition` 上的 `#[derive(Copy)]`，让编译器可以在调用间廉价复制 struct。",
+  "Rust 的垃圾收集器复用已丢弃的构建器帧以避免分配。",
+  "`mut self` 关键字在底层自动创建 `Rc<RefCell<Self>>`。",
+]
+context = """
+按值接收 `self` 的构建器会编译为对单个栈槽的原地修改。`ToolDefinition` 不是 `Copy`（它拥有一个 `serde_json::Value`），Rust 也没有 GC；链式调用是廉价的，因为所有权只是依次传递。`ToolSet::new().with(...).with(...)` 和 `SimpleAgent::new(...).tool(...)` 使用的是相同的模式。
+"""
+id = "ac54909e-4e24-4aef-8013-96820e250101"

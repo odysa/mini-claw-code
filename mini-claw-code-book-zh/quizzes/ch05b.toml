@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "在 `StreamingAgent::chat` 中，为什么每次循环迭代开始时都创建一个*全新的* `mpsc::unbounded_channel`，而不是在循环前创建一次？"
+answer.answer = "当 `stream_chat` 返回时丢弃 `stream_tx` 是通知转发器任务结束的信号；重用 channel 会让转发器永远保持活跃。"
+prompt.distractors = [
+  "`tokio::sync::mpsc` channel 每个实例只能传递一条消息，因此每轮都需要新建一个。",
+  "重用 channel 会导致内存泄漏，因为旧事件永远不会被垃圾回收。",
+  "每轮使用不同的事件类型，因此 channel 的泛型参数必须重新特化。",
+]
+context = """
+转发器任务在 `stream_rx.recv().await` 上循环；只有当所有发送者都被丢弃时，该调用才返回 `None`。当 `stream_chat` 返回时，它丢弃了本地副本 `stream_tx`，关闭 channel 并让转发器退出。如果将 channel 提升到循环外，第一轮结束后外部的 `stream_tx` 仍然存活，转发器就会永远等待。本章中的专门说明指出了这一点："每轮创建新的 `mpsc::unbounded_channel()`……丢弃 `stream_tx` 是转发器知道本轮结束的方式。"
+"""
+id = "c81c5c3a-57cd-4921-9b58-d543d009d518"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "如果在 `stream_chat` 返回后跳过 `forwarder.await` 会发生什么？"
+answer.answer = "最后几个 `TextDelta` 可能在 agent 发出 `Done` 之前尚未到达 UI，而且转发器内部发生的任何 panic 都会静默丢失。"
+prompt.distractors = [
+  "`stream_tx` channel 未关闭，导致下一轮死锁。",
+  "`tokio` 在前一个任务被 await 之前拒绝生成新任务，导致循环挂起。",
+  "provider 的 HTTP 连接保持打开，泄漏文件描述符。",
+]
+context = """
+`stream_chat` 返回会关闭 channel，使转发器的循环退出——但这个退出是异步发生的。如果不 await `JoinHandle`，主任务会抢先执行，可能在转发器刷新最后几个 `TextDelta` 之前就发出 `AgentEvent::Done`。本章将此称为"经典的'最后几个 token 丢失'bug。"Await 还能捕获转发器内部的 panic。
+"""
+id = "5c70a56e-e73c-4bf9-8656-5529fe48bc63"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "在 SSE 解析循环中，`buffer: String` 起什么作用——用一句简短的话来说？"
+answer.answer = "它跨任意 HTTP 块边界重新组装 SSE 行。"
+prompt.distractors = [
+  "它缓存整个 SSE 响应，以便在连接断开时重放。",
+  "它保存已解析的 `StreamEvent` 值，直到转发器准备好消费它们。",
+  "它在将块传递给 `serde_json` 之前解码 gzip 压缩的块。",
+]
+context = """
+`resp.chunk()` 以 TCP 传输的任意片段交给你字节——一个 SSE 行可能被分割到两个块中，或者一个块可能包含多行。`buffer` 累积原始文本，内部的 `while let Some(pos) = buffer.find('\\n')` 循环从前端取出完整行。这是本章强调的经典面向行协议模式（步骤 3）。
+"""
+id = "9fd1f856-feec-49d6-8f2b-e3b5145eb02e"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `StreamingAgent::chat` 只将 `StreamEvent::TextDelta` 过滤到 UI channel，而丢弃 `ToolCallStart`、`ToolCallDelta` 和 `Done`？"
+answer.answer = "这些事件描述的是低级流语法；UI 需要的是 agent 级别的 `AgentEvent`，而 agent 在轮次组装完成后会发出自己的 `ToolCall`/`Done`。"
+prompt.distractors = [
+  "`ToolCallStart` 和 `ToolCallDelta` 是 provider 内部的，无法通过 `mpsc` channel 发送。",
+  "转发它们会导致累加器重复计算 token。",
+  "UI channel 的类型为 `mpsc::UnboundedSender<String>`，因此非文本事件无法编译通过。",
+]
+context = """
+两个 channel 使用不同的词汇表（本章"两个 channel 及其解决的问题"一节）。`StreamEvent` 是原始流语法；`AgentEvent` 才是 UI 关心的。agent 等到它组装好 `AssistantTurn` 后，才为每个工具调用发出一个 `AgentEvent::ToolCall`——其中携带 UI 实际渲染的 `tool_summary`。转发原始工具 delta 会造成信息重复，并将 provider 级别的细节泄漏到 UI 中。
+"""
+id = "64dc2fcf-829f-425c-828f-c6631750115e"

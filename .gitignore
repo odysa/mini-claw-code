@@ -2,5 +2,7 @@
 .env
 mini-claw-code-book/book/
 mini-claw-code-book/src/quiz/
+mini-claw-code-book-zh/book/
+mini-claw-code-book-zh/src/quiz/
 .DS_Store
 *.tape

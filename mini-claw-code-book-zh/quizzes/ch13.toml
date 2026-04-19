@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`PermissionEngine::evaluate` 分三个阶段运行：会话批准、按顺序检查规则，然后是默认权限。*先*检查会话批准（在规则之前）的后果是什么？"
+answer.answer = "一旦用户批准了某个工具的会话使用，该批准就会生效，即使后续规则会拒绝它——会话批准是覆盖，而非建议。"
+prompt.distractors = [
+  "规则对之前至少被调用过一次的工具永远不会被查阅。",
+  "每当匹配的规则触发时，会话批准自动过期。",
+  "在包含 glob 通配符的任何规则之前，先检查默认权限。",
+]
+context = """
+阶段顺序编码了优先级。会话批准优先意味着"用户已经说了'是'——停止追问。"如果拒绝规则需要凌驾于批准之上，用户就永远无法在会话中信任一个工具。测试 `test_permissions_session_allow` 锁定了这一顺序。
+"""
+id = "dbfb1830-6018-45d6-934b-b743df7b65cb"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "给定规则 `[(\"bash\", Allow), (\"bash\", Deny)]` 且没有会话批准，`evaluate(\"bash\", _)` 返回什么，为什么？"
+answer.answer = "`Allow`，因为规则按顺序求值，第一个匹配获胜——Deny 规则从未被到达。"
+prompt.distractors = [
+  "`Deny`，因为 Deny 限制性更强，出于安全考虑优先于 Allow。",
+  "`Ask`，因为冲突规则被视为模糊，回退到提示用户。",
+  "编译错误，因为引擎在构建时拒绝重复模式。",
+]
+context = """
+第一匹配获胜是有序规则的全部意义。测试 `test_permissions_first_rule_wins` 精确编码了这种场景。如果你想让 Deny 击败 Allow，就把 Deny 规则放在前面。这与 iptables、AWS IAM 显式允许-后拒绝顺序以及 .gitignore 的模型相同。
+"""
+id = "5688c47f-4aaf-41bf-91c8-8011cf2db775"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `PermissionRule::matches` 使用 `glob::Pattern` 而不是对工具名称进行普通的 `==` 比较？"
+answer.answer = "这样一条规则就可以覆盖一族工具——例如 `\"mcp__*\"` 匹配每个 MCP 工具，`\"file_*\"` 匹配每个文件组工具——而无需逐一列举。"
+prompt.distractors = [
+  "因为工具名称是大小写不敏感的，只有 `glob::Pattern` 会忽略大小写。",
+  "因为 `String` 上的 `==` 会分配内存，而 glob 匹配是零分配的。",
+  "因为 `glob::Pattern` 是 `Tool` trait 具备对象安全性所必需的。",
+]
+context = """
+Glob 模式提供粗粒度控制，无需列出每个工具。`\"*\"` 匹配所有工具，`\"mcp__*\"` 匹配动态 MCP 注册，`\"bash\"` 只匹配一个。对无效模式回退到精确字符串相等意味着拼写错误会优雅降级为"只匹配这个字面名称"。`test_permissions_glob_pattern` 验证了通配符情况。
+"""
+id = "e948d1a6-af17-4e84-ab80-13c77a3e594d"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "哪个 `PermissionEngine` 构造函数创建了一个无需提示即批准每个工具的引擎——即旁路模式配置？"
+answer.answer = "allow_all"
+prompt.distractors = [
+  "bypass",
+  "ask_by_default",
+  "allow_default",
+]
+context = """
+`PermissionEngine::allow_all()` 构造了一个没有规则且默认为 `Permission::Allow` 的引擎。它的对应物 `ask_by_default(rules)` 是标准的交互式配置，未被规则覆盖的工具调用都会提示用户。`test_permissions_allow_all` 确认旁路模式对每个工具都返回 `Allow`。
+"""
+id = "9a56b4a7-4bc6-4d56-9b86-63fc3fb6ac16"

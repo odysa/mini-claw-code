@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`InstructionLoader::discover` 从起始目录向上遍历，然后在返回之前调用 `found.reverse()`。为什么要反转顺序？"
+answer.answer = "这样指令就以根优先的顺序发出——通用偏好出现在项目特定偏好之前，而最具体的文件最后出现在 prompt 中。"
+prompt.distractors = [
+  "这样最具体的指令文件出现在最前面，赋予其在系统 prompt 中最高的优先级。",
+  "因为 `Vec::reverse` 是对 `PathBuf` 值进行 `starts_with` 检查所必需的。",
+  "这样 prompt 构建器就可以以 O(1) 的效率从 vec 末端弹出文件。",
+]
+context = """
+遍历自然地以具体到通用的顺序（先是当前工作目录，最后是根目录）收集文件。LLM 自上而下阅读，而后续指令往往覆盖前面的——原理与 CSS 特异性相同。反转为根优先顺序意味着 `/home/user/CLAUDE.md` 设置宽泛的偏好，而 `project/backend/CLAUDE.md` 拥有最终发言权。`test_instructions_discover_in_parent` 演练了多层遍历。
+"""
+id = "8a0c29ca-5fa7-4e29-a249-fd5d603d7961"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么指令放置在缓存边界以下（作为动态部分），而不是与身份和安全信息一起放在边界以上？"
+answer.answer = "因为发现的指令文件集依赖于工作目录，所以即使某个 CLAUDE.md 文件本身很少变化，文本也会在不同会话之间发生变化。"
+prompt.distractors = [
+  "因为动态部分由 provider 比静态部分处理得更快。",
+  "因为由于 OpenRouter API 的限制，CLAUDE.md 文件无法被缓存。",
+  "因为将指令放在缓存边界以上会阻止 LLM 读取它们。",
+]
+context = """
+缓存边界将"跨每次请求稳定"与"每个会话可能变化"分开。身份 prompt 每次都是相同的；指令取决于你从哪个目录启动。缓存稳定的内容，保持变化的内容新鲜——这是本章的核心要点。
+"""
+id = "49fbce0f-3fe8-484a-b89b-9ee16bb4b21e"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "当 CLAUDE.md 文件存在但只包含空白字符时，`load()` 返回 `None`。为什么跳过它而不是注入一个空节？"
+answer.answer = "因为空节会浪费上下文 token 并增加噪声，却不会为 LLM 增加任何信息。"
+prompt.distractors = [
+  "因为如果动态节有空内容，`SystemPromptBuilder` 会 panic。",
+  "因为空文件表示指令文件损坏，应该中止加载。",
+  "因为 `std::fs::read_to_string` 对空文件返回 `None`。",
+]
+context = """
+prompt 中的每个节都消耗 token。空的 CLAUDE.md 产生零有用信号，但仍然消耗一个标头和一个分隔符。`load()` 逐文件进行 trim 和空检查，当没有内容存活时整体返回 `None`。`test_instructions_load_empty_file` 锁定了这一点，这样调用者可以干净地使用 `if let Some(inst) = loader.load(...)` 来完全跳过该节。
+"""
+id = "5338c4e1-3de5-43fe-969b-36848a1f567a"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "在指令层次结构中，哪个来源在最终系统 prompt 中具有最高的有效优先级——通过文件发现的 CLAUDE.md 还是 `Config.instructions`？"
+answer.answer = "Config.instructions"
+prompt.distractors = [
+  "最根层的 CLAUDE.md（例如 `/home/user/CLAUDE.md`）",
+  "当前工作目录层的 CLAUDE.md（发现的最具体文件）",
+  "字符数更多的来源",
+]
+context = """
+两者都是动态节，但 `config_instructions` 在构建器中被添加在 `file_instructions` *之后*。由于 LLM 自上而下阅读，而后续指令往往覆盖前面的，配置字符串拥有最终发言权。这符合设计意图：CLAUDE.md 文件是共享的团队约定，而 `Config.instructions` 是个人或会话特定的覆盖。
+"""
+id = "8c9c575c-1ac7-4d1b-8e29-c61eaebae127"

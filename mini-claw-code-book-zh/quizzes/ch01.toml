@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `MockProvider` 要将其 `VecDeque<AssistantTurn>` 包装在 `Mutex` 中？"
+answer.answer = "因为 `Provider::chat` 接收 `&self`，所以对队列的修改需要内部可变性。"
+prompt.distractors = [
+  "因为 `VecDeque` 本身不是线程安全的，需要 `Mutex` 才能编译通过。",
+  "因为 `tokio::spawn` 要求 provider 的每个字段都是 `Mutex`。",
+  "因为 `Provider` trait 返回 `Future`，而 future 必须持有 `Mutex` 才能是 `Send`。",
+]
+context = """
+trait 签名为 `fn chat(&self, ...)`。共享引用默认不能修改，因此要从队列中弹出元素，需要使用内部可变性——这里用 `Mutex`，当然 `RwLock` 也可以。`VecDeque` 本身没有 `Mutex` 也能编译；问题在于 `&self` 接收者。
+"""
+id = "34af39b0-0660-4e61-990d-6be26a33d9a8"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "LLM 返回的 `AssistantTurn` 中 `stop_reason = StopReason::ToolUse`，agent 接下来会做什么？"
+answer.answer = "执行 `tool_calls` 中的工具调用，并将结果发送回 provider。"
+prompt.distractors = [
+  "将 `text` 字段打印给用户并结束本轮。",
+  "丢弃本轮并用相同的消息重新向 LLM 发起请求。",
+  "等待用户输入新的 prompt 后再继续。",
+]
+context = """
+`StopReason::ToolUse` 表示 LLM 希望运行工具。`StopReason::Stop` 则表示已完成，`text` 中保存最终答案。第 3 章将构建处理这两种情况的循环。
+"""
+id = "ddee0f0e-5f15-4afa-832f-6afa4d723f07"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`MockProvider::chat` 调用 `VecDeque` 的哪个方法来按 FIFO 顺序返回响应？"
+answer.answer = "pop_front"
+prompt.distractors = [
+  "pop_back",
+  "front",
+  "swap_remove_front",
+]
+context = """
+`pop_front` 移除并返回第一个元素，实现 FIFO 顺序。`pop_back` 则是 LIFO。测试 `test_mock_steps_through_sequence` 会验证你选择了正确的一端。
+"""
+id = "568cce2b-60e7-40a3-9343-a8030a563b24"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "给 `MockProvider` 传入两个预设响应，然后调用三次 `chat()`，第三次调用会发生什么？"
+answer.answer = "返回 `Err`，因为队列已空。"
+prompt.distractors = [
+  "返回最后一个响应（队列循环使用）。",
+  "永远阻塞，等待新响应被推入。",
+  "返回一个文本为空、`StopReason::Stop` 的 `AssistantTurn`。",
+]
+context = """
+队列为空时 `pop_front` 返回 `None`；我们将其转换为 `anyhow::anyhow!("MockProvider: no more responses")`。测试 `test_mock_empty_responses_exhausted` 确保了这一行为。
+"""
+id = "4e79e40b-e38d-463a-b9c1-a5321c7776f7"

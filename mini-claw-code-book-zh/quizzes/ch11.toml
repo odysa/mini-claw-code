@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么本章将 Glob 和 Grep 保留为两个独立工具，而不将它们合并为带有 `mode: \"files\" | \"content\"` 参数的单个 `SearchTool`？"
+answer.answer = "两个描述清晰、目的明确的工具让 LLM 能将意图映射到正确工具，无需经过模式决策步骤；较小的模型在设置模式参数时容易出错。"
+prompt.distractors = [
+  "因为 `glob::Pattern` 和 `regex::Regex` 由于 trait 约束无法存在于同一 struct 中。",
+  "因为 OpenRouter API 拒绝派发参数 schema 中含有 `oneOf` 判别符的工具。",
+  "因为 `Tool` trait 要求每个工具恰好有一个必填参数。",
+]
+context = """
+两个目的明确的工具——"有哪些文件？"和"这个内容在哪里？"——清晰地映射到开发者在浏览陌生代码库时提出的两个问题。合并的工具增加了一个决策层，较小的模型经常弄错，并且迫使不相关的参数出现在每次调用中。Claude Code 出于同样的原因将它们分开。
+"""
+id = "a3cb921c-b4a6-4fce-b1bd-e01fda7c5d0d"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`search_file` 是 `async fn` 而 `collect_files` 是普通的同步 `fn`。这种拆分的设计理由是什么？"
+answer.answer = "`search_file` 进行阻塞 I/O（读取文件内容），从而受益于让步给运行时；`collect_files` 只读取目录元数据，速度很快，保持同步可以避免装箱递归 async 函数的复杂性。"
+prompt.distractors = [
+  "`tokio::fs::read_dir` 不可用，因此目录遍历必须是同步的。",
+  "Rust 编译器不允许递归 async 函数，但允许递归同步函数。",
+  "`collect_files` 必须是同步的，因为它接收 `&mut Vec<PathBuf>`，而该类型无法跨越 `await` 点。",
+]
+context = """
+本章的经验法则：对可能阻塞的 I/O 使用 async，对快速元数据操作使用同步。Rust 中的递归 async 函数需要 `Pin<Box<dyn Future>>` 或 `async_recursion` crate——这是真实的成本，只有当函数体有真正的 I/O 时才值得。通过 `std::fs::read_dir` 进行目录列表操作足够廉价，同步是正确的默认选择。
+"""
+id = "37e23d23-aaaf-4b37-ac03-129114374deb"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "在 `GrepTool::call` 中，include 模式通过 `args.get(\"include\").and_then(|v| v.as_str()).map(|p| glob::Pattern::new(p)).transpose()?` 编译。`.transpose()` 在这里做什么？"
+answer.answer = "它将 `Option<Result<Pattern, _>>` 转换为 `Result<Option<Pattern>, _>`，这样 `?` 就能传播错误模式，同时对缺失情况仍产生 `Option`。"
+prompt.distractors = [
+  "它颠倒元素的顺序，使 `?` 先看到错误变体。",
+  "它解包 `Option`，若没有提供 include 模式则 panic。",
+  "它将同步 `Option` 转换为可以被 `.await` 的 `Future<Option>`。",
+]
+context = """
+`Option::transpose` 将 `Option<Result<T, E>>` 翻转为 `Result<Option<T>, E>`。`x.map(fallible_fn).transpose()?` 的模式读作"若存在，则尝试操作；若失败，则传播；若缺失，则产生 `None`。"没有 `transpose`，你需要为 `Some(Ok)`、`Some(Err)` 和 `None` 分别写三个 `match` 分支。
+"""
+id = "8ec2bc0a-da9b-4457-9d81-99635d0a7aaa"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`collect_files` 跳过名称以哪个单个字符开头的目录，以避免遍历 `.git`、`.cargo` 及类似的目录树？"
+answer.answer = "."
+prompt.distractors = [
+  "_",
+  "~",
+  "#",
+]
+context = """
+守卫 `n.to_string_lossy().starts_with('.')` 完全跳过点前缀目录。没有它，对项目目录的 grep 会把大部分时间花在扫描 `.git/objects` 上——数千个二进制 blob 产生零个有用匹配。ripgrep 驱动的生产工具通过 `.gitignore` 集成实现了相同的效果。
+"""
+id = "7fecb1ee-a643-4fb6-bcf3-6cfb90b70b85"

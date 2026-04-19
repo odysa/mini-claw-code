@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::Path;
 use std::process::{Command, exit};
 
 /// Markdown authors can precede a `cargo test` code block with this HTML
@@ -14,6 +15,7 @@ fn main() {
         Some("check") => starter_check("mini-claw-code-starter"),
         Some("solution-check") => check("mini-claw-code"),
         Some("book") => book(),
+        Some("book-zh") => book_zh(),
         Some("book-build") => book_build(),
         Some("book-filter-check") => book_filter_check(),
         Some(cmd) => {
@@ -30,7 +32,7 @@ fn main() {
 
 fn usage() {
     eprintln!("Usage: cargo x <command>");
-    eprintln!("Commands: check, solution-check, book, book-build, book-filter-check");
+    eprintln!("Commands: check, solution-check, book, book-zh, book-build, book-filter-check");
 }
 
 fn check(package: &str) {
@@ -78,19 +80,96 @@ fn run(cmd: &str, args: &[&str], label: &str) {
     println!();
 }
 
+/// Build both books, combine them so Chinese lives under `/zh/`, and serve
+/// the combined site on :3000. Matches production layout so the EN / 中文
+/// switcher button works end-to-end. No live reload — re-run after edits.
+/// For live reload on a single language, run `mdbook serve <book-dir>` directly.
 fn book() {
-    println!("Building and serving mdbook (English)...");
+    for book_dir in ["mini-claw-code-book", "mini-claw-code-book-zh"] {
+        println!("--- building {book_dir} ---");
+        let status = Command::new("mdbook")
+            .args(["build", book_dir])
+            .status()
+            .unwrap_or_else(|e| {
+                eprintln!("Failed to run mdbook: {e}");
+                eprintln!("Install mdbook with: cargo install mdbook mdbook-mermaid");
+                exit(1);
+            });
+        if !status.success() {
+            eprintln!("Failed to build {book_dir}");
+            exit(1);
+        }
+    }
+
+    let preview = Path::new("target/book-preview");
+    let _ = std::fs::remove_dir_all(preview);
+    copy_dir_recursive(Path::new("mini-claw-code-book/book"), preview);
+    copy_dir_recursive(
+        Path::new("mini-claw-code-book-zh/book"),
+        &preview.join("zh"),
+    );
+
+    let port = "3000";
+    println!(
+        "\nServing at http://localhost:{port}/ (中文: http://localhost:{port}/zh/)\n\
+         Live reload is off — Ctrl+C, edit, then re-run `cargo x book`.\n\
+         Tip: for single-language hot reload, use `mdbook serve mini-claw-code-book[-zh]`.\n"
+    );
+
+    let status = Command::new("python3")
+        .args([
+            "-m",
+            "http.server",
+            "--directory",
+            preview.to_str().unwrap(),
+            port,
+        ])
+        .status()
+        .unwrap_or_else(|e| {
+            eprintln!("Failed to run python3 http.server: {e}");
+            eprintln!("Install python3, or run `mdbook serve mini-claw-code-book` for English-only live reload.");
+            exit(1);
+        });
+    if !status.success() {
+        exit(1);
+    }
+}
+
+fn book_zh() {
+    println!("Building and serving mdbook (Chinese, live reload)...");
     let status = Command::new("mdbook")
-        .args(["serve", "mini-claw-code-book"])
+        .args(["serve", "mini-claw-code-book-zh"])
         .status()
         .unwrap_or_else(|e| {
             eprintln!("Failed to run mdbook: {e}");
             eprintln!("Install mdbook with: cargo install mdbook");
             exit(1);
         });
-
     if !status.success() {
         exit(1);
+    }
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) {
+    std::fs::create_dir_all(dst).unwrap_or_else(|e| {
+        eprintln!("Failed to create {}: {e}", dst.display());
+        exit(1);
+    });
+    let entries = std::fs::read_dir(src).unwrap_or_else(|e| {
+        eprintln!("Failed to read {}: {e}", src.display());
+        exit(1);
+    });
+    for entry in entries.flatten() {
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path);
+        } else {
+            std::fs::copy(&src_path, &dst_path).unwrap_or_else(|e| {
+                eprintln!("Failed to copy {}: {e}", src_path.display());
+                exit(1);
+            });
+        }
     }
 }
 
@@ -231,21 +310,21 @@ fn list_tests(pkg: &str) -> Vec<String> {
 }
 
 fn book_build() {
-    println!("Building the book...\n");
+    println!("Building both books...\n");
 
-    let book_dir = "mini-claw-code-book";
-
-    let status = Command::new("mdbook")
-        .args(["build", book_dir])
-        .status()
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to run mdbook: {e}");
+    for book_dir in ["mini-claw-code-book", "mini-claw-code-book-zh"] {
+        println!("--- {book_dir} ---");
+        let status = Command::new("mdbook")
+            .args(["build", book_dir])
+            .status()
+            .unwrap_or_else(|e| {
+                eprintln!("Failed to run mdbook: {e}");
+                exit(1);
+            });
+        if !status.success() {
+            eprintln!("Book build failed for {book_dir}!");
             exit(1);
-        });
-    if !status.success() {
-        eprintln!("Book build failed!");
-        exit(1);
+        }
+        println!("Built to {book_dir}/book/\n");
     }
-
-    println!("\nBook built to {book_dir}/book/");
 }

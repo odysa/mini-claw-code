@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `BashTool` 使用 `bash -c <command>` 而不是解析命令字符串并直接调用 `Command::new(\"ls\").arg(\"-la\")`？"
+answer.answer = "这样管道、重定向、通配符、`&&` 以及环境变量展开等 shell 功能就无需重新实现 shell 解析器即可使用。"
+prompt.distractors = [
+  "因为 `Command::new` 在 macOS 上无法接受带空格的参数。",
+  "因为 `tokio::process` 需要 `bash -c` 才能异步运行。",
+  "因为生成 `bash` 避免了 fork，因此比 `Command::new` 更快。",
+]
+context = """
+将原始字符串传递给 `bash -c` 意味着 LLM 可以使用完整的 shell 语言——`echo hi | wc -c`、`cd /tmp && pwd`、`VAR=1 cmd`。自己解析则意味着重新实现 shell 引号、通配符和变量展开，这既复杂又没有必要，因为 bash 已经能正确处理。
+"""
+id = "f0bb8608-3f57-44de-8f7d-843f9236a71e"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "像 `mkdir -p /tmp/foo` 这样的命令成功执行但没有 stdout 和 stderr 输出，`BashTool` 在这种情况下会返回什么，为什么？"
+answer.answer = "字面字符串 `\"(no output)\"`，因为返回空结果会让 LLM 误以为工具失败或结果丢失。"
+prompt.distractors = [
+  "空字符串——LLM 应该从没有输出这一事实推断出成功。",
+  "命令字符串本身，回显给 LLM 以便确认执行了什么。",
+  "`\"exit 0\"`，让 LLM 可以读取数字退出码。",
+]
+context = """
+如果返回 `\"\"`，静默的成功与丢失的结果无法区分。`\"(no output)\"` 哨兵是一个小但重要的便利：它确认命令运行了且无需说明任何内容。测试 `test_bash_no_output` 通过运行 `true` 并检查哨兵是否出现来锁定这一行为。
+"""
+id = "5c16860d-d05f-48e2-a96e-0c9d8cca0e5c"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么本章坚持在 `async fn` 内部使用 `tokio::process::Command` 而非 `std::process::Command`？"
+answer.answer = "`std::process::Command` 在等待子进程时阻塞 OS 线程，使 Tokio 运行时上的其他任务停滞；`tokio::process` 在等待时会让步给运行时。"
+prompt.distractors = [
+  "`std::process::Command` 无法捕获 stderr，只能捕获 stdout。",
+  "`tokio::process::Command` 自动应用默认超时；`std` 版本不会。",
+  "`std::process::Command` 每次调用都生成一个新的 OS 进程，而 `tokio::process` 重用单个工作进程。",
+]
+context = """
+在异步运行时内阻塞线程意味着该线程上的其他 future 无法取得进展——没有其他工具调用、没有流式传输、没有 UI 更新。`tokio::process` 与运行时的反应器集成，因此 await 点会让步。在异步上下文中使用 `std::process` 是经典错误，在负载下表现为神秘的停滞。
+"""
+id = "3901b8e9-cca0-4d4f-acc2-42b649ee826d"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`std::process::Output`（或 `tokio::process::Output`）上的哪个方法可以获取进程标准错误流的原始字节？"
+answer.answer = "stderr"
+prompt.distractors = [
+  "stdout",
+  "status",
+  "err_bytes",
+]
+context = """
+`output.stderr` 和 `output.stdout` 都是 `Vec<u8>`。`BashTool` 在拼接之前通过 `String::from_utf8_lossy` 处理它们，因为命令输出不保证是有效的 UTF-8——`from_utf8_lossy` 会替换错误字节而不是失败。
+"""
+id = "fb6de73b-367c-4197-a184-a8655ac845dd"

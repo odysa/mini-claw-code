@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "本章为 `MockProvider::responses` 选择了 `std::sync::Mutex` 而非 `tokio::sync::Mutex`。决定性因素是什么？"
+answer.answer = "临界区只是一次 `pop_front`，其中没有 `.await`，因此更廉价的同步锁永远不会有阻塞运行时的风险。"
+prompt.distractors = [
+  "`tokio::sync::Mutex` 未实现 `Sync`，因此无法在 `&self` 背后共享。",
+  "`Provider::chat` 实际上不是 `async`，因此 `tokio` 锁会编译失败。",
+  "当被保护的类型是 `!Send` 时（`VecDeque` 就是这样），必须使用 `std::sync::Mutex`。",
+]
+context = """
+本章的经验法则：当守卫不跨越 `.await` 时使用 `std::sync::Mutex`，当守卫跨越 `.await` 时使用 `tokio::sync::Mutex`。在 `.await` 时持有同步锁可能会阻塞执行器，但 `pop_front` 只是一次指针操作——同步锁既正确又更廉价。`VecDeque<AssistantTurn>` 是 `Send`；tokio 锁是 `Sync`；真正的问题是代价与必要性的权衡。
+"""
+id = "c42c71a7-e3fa-485b-90ef-ff9738b38d1d"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `StreamEvent::ToolCallDelta` 包含一个 `index: usize` 字段？"
+answer.answer = "单次流式传输的轮次可以交错来自多个并发工具调用的片段，`index` 告诉累加器每个片段属于哪个调用。"
+prompt.distractors = [
+  "它是 SSE 流中的字节偏移量，用于检测丢包。",
+  "它是工具 JSON 参数字符串中 delta 的位置。",
+  "它映射到工具在 `ToolSet` 中注册的顺序。",
+]
+context = """
+OpenAI 风格的流式传输可以交错发出调用 0 和调用 1 的 `ToolCallDelta` 事件。`StreamAccumulator::feed` 使用 `index` 将每个参数片段路由到正确的 `PartialToolCall` 中，并在需要时用空槽填充 `Vec`（参见 `while self.tool_calls.len() <= *index` 循环）。
+"""
+id = "0786fed0-9a0b-4bfb-a7b7-f7e733032524"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`parse_sse_line` 在去掉 `data: ` 前缀后，看到哪个载荷时会返回 `Some(vec![StreamEvent::Done])`？"
+answer.answer = "[DONE]"
+prompt.distractors = [
+  "{\"done\": true}",
+  "END",
+  "\\n\\n",
+]
+context = """
+OpenAI SSE 的约定是字面量 `data: [DONE]` 行来终止流。`parse_sse_line` 去掉 `data: ` 前缀，将剩余部分与 `\"[DONE]\"` 比较，并发出 `StreamEvent::Done`。`test_streaming_parse_sse_done` 锁定了这一行为。
+"""
+id = "a47c866f-5ac4-4691-876e-72cb1d1b47db"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`StreamAccumulator::finish` 从累积状态中推导 `stop_reason`，而不是从流事件中读取它。它如何在 `Stop` 和 `ToolUse` 之间做出选择？"
+answer.answer = "如果过滤后的 `tool_calls` 向量非空，则返回 `ToolUse`；否则返回 `Stop`。"
+prompt.distractors = [
+  "它检查最后一个传入的 `StreamEvent`——`Done` 映射到 `Stop`，其他任何事件映射到 `ToolUse`。",
+  "它对底层 SSE 块调用 `finish_reason` 并原样复制该值。",
+  "无论是否有工具调用存活，只要 `text` 为 `None` 就返回 `ToolUse`。",
+]
+context = """
+`finish` 过滤掉占位符 `PartialToolCall` 条目（由索引填充循环创建的名称为空的条目），然后纯粹根据存活的调用推导原因。这使累加器对于从不发送 `finish_reason` 的流具有鲁棒性，并且语义上与非流式路径的处理方式一致。
+"""
+id = "175d0c02-f691-49db-9f5b-9885cb6262e0"

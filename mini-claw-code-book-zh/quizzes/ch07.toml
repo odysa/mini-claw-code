@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "在 `StopReason::ToolUse` 轮次之后，`SimpleAgent::chat` 必须按什么顺序推入消息？"
+answer.answer = "先推入 `Message::Assistant(turn)`，然后为每个工具结果推入一个 `Message::ToolResult { id, content }`，将每个结果的 `id` 与对应的 `ToolCall.id` 匹配。"
+prompt.distractors = [
+  "先推入所有 `Message::ToolResult` 条目，然后在最后推入 `Message::Assistant(turn)`，让模型能在最后一条响应下方获得上下文。",
+  "交替推入：`Assistant`、`ToolResult`、`Assistant`、`ToolResult`，每个工具调用一对。",
+  "顺序无关紧要——provider 在发送给 LLM 之前会按 `id` 字段对消息排序。",
+]
+context = """
+OpenAI / Claude API 合同要求 `tool_result` 消息紧跟在生成 `tool_use` 调用的 `assistant` 消息之后，每个结果的 `id` 必须与其调用匹配。弄错这一点会导致 provider 返回 400 错误。本章的"消息历史管理"一节追踪了精确的顺序：`[User] -> [Assistant with tool_calls] -> [ToolResult(s)] -> [Assistant with text]`。
+"""
+id = "5246c4f0-780d-40c5-a738-b08334930027"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `chat()` 从调用者处接收 `&mut Vec<Message>` 而不是在内部拥有历史记录？"
+answer.answer = "这让调用者可以驱动多轮对话、在每次调用后检查完整历史、并对其进行持久化——而无需 agent 暴露 getter 或来回转移所有权。"
+prompt.distractors = [
+  "`async fn` 体由于 `Send` 约束无法在 await 点跨越地拥有 `Vec`。",
+  "`Vec<Message>` 没有实现 `Clone`，因此 agent 无法存储副本。",
+  "`&mut` 是必需的，因为 `MockProvider` 会原地修改消息列表。",
+]
+context = """
+这是一个刻意的所有权选择，在"Rust 概念：所有权与 `&mut Vec<Message>`"框中有所介绍。可变借用在调用期间赋予 agent 完整的写访问权限，同时将所有权留给调用者。这对本章列举的三件事很重要：多轮对话（推入新的 `User` 消息并再次调用 `chat()`）、调用后的检查以及会话持久化。
+"""
+id = "3728bf52-d11e-4a08-8f67-0118bd989bbb"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "如果 `execute_tools` 收到一个 `ToolCall`，其 `name` 未在 `ToolSet` 中注册，结果字符串中会放什么？"
+answer.answer = "error: unknown tool `<name>`"
+prompt.distractors = [
+  "tool not found: <name>",
+  "空字符串——agent 静默跳过未知工具。",
+  "不产生结果字符串；`execute_tools` 返回 `Err(anyhow!(\"unknown tool\"))`，循环中止。",
+]
+context = """
+`match self.tools.get(&call.name)` 的 `None` 分支执行 `format!(\"error: unknown tool `{}`\", call.name)`。agent 永远不会因为幻觉工具名而 panic——它将错误反馈给 LLM，让 LLM 可以自行恢复。`test_simple_agent_unknown_tool` 锁定了这一行为。
+"""
+id = "46205a72-e503-478c-97d5-0b4c341140fe"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "为什么 `chat()` 对 provider 错误使用 `?` 传播，而 `execute_tools` 将工具错误吞入结果字符串？"
+answer.answer = "provider 错误（网络、认证、速率限制）需要人工或系统干预；工具错误是对话的一部分——LLM 可以读取它们并尝试不同的方法。"
+prompt.distractors = [
+  "`?` 在 `match` 分支内不起作用，因此即使我们想传播工具错误也做不到。",
+  "`anyhow::Error` 不是 `Send` 的，因此无法在 `execute_tools` 内部的 `await` 点跨越。",
+  "工具错误总是可恢复的，但 provider 错误总是瞬时的，因此 agent 会自动重试它们。",
+]
+context = """
+本章的"错误处理哲学"一节将此定义为两种截然不同的策略。工具失败是正常的——LLM 要求读取一个不存在的文件，bash 命令以非零退出。将错误作为工具结果反馈正是模型学会适应的方式。相比之下，provider 失败意味着 LLM 不可达；循环无法独立取得进展。这个边界是有意为之的，而非偶然。
+"""
+id = "7432232f-c0b2-481f-8942-04645ab8f8d5"

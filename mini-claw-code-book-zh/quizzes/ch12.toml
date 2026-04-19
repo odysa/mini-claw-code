@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`ToolSet` 将工具存储为 `HashMap<String, Box<dyn Tool>>`。使用 trait 对象（`Box<dyn Tool>`）而非每种工具对应一个变体的枚举，其实际原因是什么？"
+answer.answer = "这样就可以在不更改 `ToolSet` 类型或 agent 派发代码的情况下添加新工具——包括运行时动态注册的工具（如 MCP 工具）。"
+prompt.distractors = [
+  "因为 `HashMap` 值必须实现 `Copy`，而 trait 对象是满足该约束的唯一方式。",
+  "因为枚举只能用整数判别值作为键，而不能用字符串。",
+  "因为 trait 中的 `async fn` 需要枚举来擦除返回类型。",
+]
+context = """
+trait 对象提供了基于名称的派发，无需不断增长的枚举。agent 循环执行 `tools.get(name)` 并通过 vtable 调用 `.call()`——一次指针间接寻址，与调用的 I/O 或网络成本相比微不足道。生产级 agent（如 Claude Code）利用这一点来处理在会话期间出现和消失的 MCP 工具。
+"""
+id = "ff53a879-25ae-4bfc-8068-28738b5d74a3"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "在 `test_simple_agent_unknown_tool` 中，LLM 幻觉出了一个名为 `\"imaginary_tool\"` 的工具。agent 会怎么做，设计上的教训是什么？"
+answer.answer = "它将类似 `\"error: unknown tool `imaginary_tool`\"` 的错误字符串作为 `ToolResult` 推入对话，并让 LLM 在下一轮中自行恢复——未知工具是可恢复错误，而不是 panic。"
+prompt.distractors = [
+  "它从 `agent.run()` 返回 `Err`，终止会话，让用户重新配置工具集。",
+  "它静默重试本轮，希望 LLM 第二次选择有效的工具。",
+  "它即时注册一个 `imaginary_tool` 的 stub，让对话可以继续。",
+]
+context = """
+模型会产生工具名称幻觉，较小的模型在工具列表很长时尤为如此。将此视为可恢复错误——在对话中可见——让 LLM 能够自我纠正。崩溃或返回 `Err` 既脆弱又对用户不友好。测试验证了 agent 继续运行，最终文本承认了错误。
+"""
+id = "574e9112-6488-4875-bff3-fc592e88eee0"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "本章描述了未来的工具分类表：只读工具（Read、Glob、Grep）、写入工具（Write、Edit）和破坏性工具（Bash）。为什么 `EditTool` 即使修改了文件也不被归为破坏性？"
+answer.answer = "因为文件编辑是可恢复的——你可以用 git 撤销它们——而像 `rm -rf /` 或 `git push --force` 这样的破坏性操作则不能。"
+prompt.distractors = [
+  "因为 `EditTool` 只修改空白字符，这不被视为真正的更改。",
+  "因为编辑要求 `old_string` 恰好出现一次，这保证了它们不会造成危害。",
+  "因为 `Tool` trait 的 `is_destructive` 标志默认为 `false`，而 `EditTool` 没有覆盖它。",
+]
+context = """
+可恢复性是关键维度。只读工具没有副作用。写入/编辑不是并发安全的（对同一文件的两次写入会竞争），但可以撤销。Bash 是危险类别——它可以删除数据、推送错误代码或泄露秘密。第 13 章的权限引擎正是使用这种区分来决定哪些工具需要用户批准。
+"""
+id = "29dfee4f-b36b-4fed-9bc8-f3579efbec4c"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`SimpleAgent` 在每次循环迭代开始时调用 `ToolSet` 上的哪个方法来收集必须发送给 LLM 的 JSON schema？"
+answer.answer = "definitions"
+prompt.distractors = [
+  "schemas",
+  "tools",
+  "list",
+]
+context = """
+`definitions()` 返回 `Vec<&ToolDefinition>`——每个工具的名称、描述和参数 schema。LLM 使用这些 schema 来决定何时以及如何调用每个工具。`get(name)` 是在派发时用于反向查找的镜像方法。
+"""
+id = "a35ea065-8d7d-4a22-b421-d58d6c883fc3"

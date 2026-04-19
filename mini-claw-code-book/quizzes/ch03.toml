@@ -1,0 +1,50 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "In `single_turn`, the chapter warns: \"collect results before pushing `Message::Assistant(turn)`.\" Why does the order matter?"
+answer.answer = "`messages.push(Message::Assistant(turn))` moves `turn`, so after the push you can no longer borrow `turn.tool_calls` to iterate over it."
+prompt.distractors = [
+  "Rust requires assistant messages to come after tool results in the `Vec`, otherwise the LLM rejects the request.",
+  "`tool_calls` is a `Mutex`, and pushing the turn first would cause a deadlock when the loop tries to re-lock it.",
+  "The borrow checker disallows pushing into a `Vec` while any other value is in scope.",
+]
+context = """
+`Message::Assistant(turn)` takes `turn` by value, which is a move. After the move, the local `turn` binding is invalid, so you cannot read `turn.tool_calls` on a later line. The fix is to drain `tool_calls` into a local `results` vec first, then push the assistant message, then push the tool results.
+"""
+id = "b9eb3349-b70b-4780-8589-0b8a4af3ccc1"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "The LLM returns a tool call for a tool named `\"search\"` that you never registered. What does a correctly implemented `single_turn` do?"
+answer.answer = "It pushes a `ToolResult` whose content is something like `\"error: unknown tool `search`\"` and continues so the LLM can adapt."
+prompt.distractors = [
+  "It panics via `unwrap()` because an unknown tool is a programmer error.",
+  "It returns early with `Err(anyhow!(\"unknown tool\"))`, aborting the whole turn.",
+  "It silently drops the tool call and sends an empty `ToolResult` back to the LLM.",
+]
+context = """
+LLMs hallucinate tool names. The loop converts an unknown tool (and any `Err` from a known tool's `call()`) into a string result so the LLM reads it as feedback and tries something else. `test_single_turn_unknown_tool` verifies the agent recovers instead of crashing.
+"""
+id = "9bdcb422-94b9-492c-9cac-1f10b20a12a9"
+
+[[questions]]
+type = "ShortAnswer"
+prompt.prompt = "Inside `SimpleAgent::chat`, which `StopReason` variant causes the `loop { }` to `return` the final text?"
+answer.answer = "Stop"
+context = """
+`StopReason::Stop` is the termination condition — the LLM is done, `turn.text` holds the answer, and the loop returns. `StopReason::ToolUse` instead runs `execute_tools` / `push_results` and continues iterating. `test_simple_agent_three_turn_loop` exercises three rounds before the loop finally sees `Stop`.
+"""
+id = "c909b9cf-3887-4ebc-82a8-b3baacf0b358"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why is the Ch7 stub `SimpleAgent::run_with_history` left as `unimplemented!()` even though Chapter 3's tests call `run()` and `chat()`?"
+answer.answer = "No Ch3 test invokes `run_with_history`, so the `unimplemented!()` body never executes during `test_simple_agent_`."
+prompt.distractors = [
+  "`unimplemented!()` is a compile-time marker that the compiler silently replaces with an empty function body.",
+  "Cargo automatically skips tests that touch methods containing `unimplemented!()`.",
+  "The `run_with_history` signature is feature-gated and excluded from the Ch3 build entirely.",
+]
+context = """
+`unimplemented!()` is a runtime panic — it only fires if the function is actually called. Chapter 3 tests stick to `run()` and `chat()`, which route through `single_turn` / `execute_tools` / `push_results`. The events-based path is introduced in Chapter 7; leaving it stubbed keeps the Ch3 surface area small without breaking the build.
+"""
+id = "eea7c0e9-36da-400c-aaca-a4b60c754d00"

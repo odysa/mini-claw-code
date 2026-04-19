@@ -1,5 +1,6 @@
 /target
 .env
 mini-claw-code-book/book/
+mini-claw-code-book/src/quiz/
 .DS_Store
 *.tape

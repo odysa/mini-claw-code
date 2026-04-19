@@ -1,0 +1,50 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `Message::ToolResult` carry an `id: String` field in addition to `content`?"
+answer.answer = "So the model can correlate each result with the specific `ToolCall` it answers when a single turn requests multiple tools."
+prompt.distractors = [
+  "Because the `id` is the file path of the tool's output, used for caching on disk.",
+  "Because `serde_json` requires every enum variant to have an `id` field to round-trip correctly.",
+  "Because the agent uses the `id` as the key into the `ToolSet` `HashMap` when dispatching.",
+]
+context = """
+A single assistant turn can request multiple tool calls concurrently, and results may come back in any order. The `id` ties each `Message::ToolResult` back to a specific `ToolCall.id` so the LLM knows which result belongs to which request. Tool lookup in `ToolSet` uses `ToolCall.name`, not `id`.
+"""
+id = "c17fcea0-6ba1-4a44-9ce0-74518d0fdea4"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`AssistantTurn::text` is `Option<String>` rather than `String`. What situation does the `None` case represent?"
+answer.answer = "The model produced only tool calls and no human-readable text, so there is nothing to display yet."
+prompt.distractors = [
+  "The provider failed to parse the response — `None` is the error sentinel.",
+  "The model hit the context window limit and truncated its reply to nothing.",
+  "A `ToolResult` was appended before the assistant message, overwriting the text.",
+]
+context = """
+When `stop_reason == ToolUse` the model often emits only `ToolCall` entries with no accompanying prose. Modelling `text` as `Option<String>` captures that distinction without relying on the empty-string sentinel. Errors are surfaced via `anyhow::Result`, not `None`.
+"""
+id = "2af8f714-6df9-4615-afb9-d867b281763d"
+
+[[questions]]
+type = "ShortAnswer"
+prompt.prompt = "In `ToolSet::push`, the name used as the `HashMap` key comes from a single source of truth. Which method/field on the tool provides that name?"
+answer.answer = "definition().name"
+context = """
+`push` calls `tool.definition().name.to_string()` to derive the key, so the registry name and the schema name can never drift. `test_mock_toolset_empty` and the broader toolset tests rely on this single source of truth.
+"""
+id = "6d360425-bc59-410d-98ac-1fe45b5e42a1"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`ToolDefinition`'s builder methods (`param`, `param_raw`, constructor) all take `mut self` by value and return `Self`. What property of Rust makes this chaining zero-cost?"
+answer.answer = "Move semantics: each call consumes the struct and returns the modified value without cloning or reference counting."
+prompt.distractors = [
+  "`#[derive(Copy)]` on `ToolDefinition`, which lets the compiler cheaply duplicate the struct between calls.",
+  "Rust's garbage collector reuses the dropped builder frames to avoid allocation.",
+  "The `mut self` keyword automatically creates an `Rc<RefCell<Self>>` under the hood.",
+]
+context = """
+Builders that take `self` by value compile down to in-place mutation of a single stack slot. `ToolDefinition` is not `Copy` (it owns a `serde_json::Value`), and Rust has no GC; the chain is cheap because ownership simply threads through. The same pattern powers `ToolSet::new().with(...).with(...)` and `SimpleAgent::new(...).tool(...)`.
+"""
+id = "ac54909e-4e24-4aef-8013-96820e250101"

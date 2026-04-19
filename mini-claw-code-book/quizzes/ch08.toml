@@ -1,0 +1,50 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `discover()` reverse the list of found CLAUDE.md files before returning?"
+answer.answer = "To produce root-first order so global instructions appear before more specific ones — the LLM sees the most specific instructions last, closest to the user prompt."
+prompt.distractors = [
+  "`Path::parent()` returns directories in reverse order, so `reverse()` undoes an off-by-one traversal bug.",
+  "Reversing is required because `Vec::push` is faster than `Vec::insert(0, ...)`, and the order is then corrected for the caller.",
+  "It ensures the most recently modified file is read first, which improves cache locality.",
+]
+context = """
+The walk starts at the working directory and climbs to the filesystem root, so files are collected specific-first. Reversing produces root-first order, which matches the convention that general rules come before narrow overrides. As the chapter notes: "the LLM sees the most specific instructions last (closest to the user prompt)." The earlier reasoning is organizational, not performance-related.
+"""
+id = "8d648638-3aa9-45ba-a77b-8259f4aa64ac"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "What is the core motivation for Claude Code's `SYSTEM_PROMPT_DYNAMIC_BOUNDARY` — the split between static and dynamic sections?"
+answer.answer = "Prompt caching works only on a stable prefix; putting all static content above the boundary lets the API reuse its cached internal state on every request."
+prompt.distractors = [
+  "The LLM refuses to process system prompts longer than a fixed length unless they are split into two halves.",
+  "Dynamic sections contain user-specific data that must be encrypted separately for privacy reasons.",
+  "Splitting the prompt enables parallel uploading of the two halves, halving request latency.",
+]
+context = """
+Cache hits require a byte-identical prefix. If any character in the cached region changes, the cache is invalidated and the whole prompt has to be reprocessed. The chapter's "Static vs. dynamic" section quantifies the win: up to 85% latency reduction and up to 90% cost reduction on long prompts. That is why stable sections (identity, safety rules, tool schemas) go above the boundary and volatile ones (cwd, git status, CLAUDE.md contents) go below.
+"""
+id = "612bcca7-4f5e-4816-9478-d383e0225dcd"
+
+[[questions]]
+type = "ShortAnswer"
+prompt.prompt = "What does `InstructionLoader::load()` return when no CLAUDE.md files are found anywhere on the walk?"
+answer.answer = "None"
+context = """
+`load()` returns `Option<String>` precisely so the caller can distinguish "no instructions at all" from "instructions were found." The test `test_instructions_instruction_loader_no_files` pins this down. The caller then skips appending an instructions section to the system prompt rather than inserting an empty block.
+"""
+id = "7a6172d0-4a5c-44de-ba26-4977be23cbcf"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `InstructionLoader::new` take `&[&str]` but store `Vec<String>` internally?"
+answer.answer = "To accept borrowed data at the API boundary (flexible for callers) while owning the data internally (so the struct has no lifetime parameter and outlives its creator)."
+prompt.distractors = [
+  "`&str` cannot be serialized with `serde`, and the loader must serialize its configuration.",
+  "Converting to `String` normalizes the path separators to be cross-platform.",
+  "`Vec<&str>` would require a lifetime parameter on every async method, which conflicts with `#[async_trait]`.",
+]
+context = """
+The chapter's "Rust concept: borrowed slices to owned collections" box describes this pattern directly. Accepting `&[&str]` lets callers pass string literals, `&String`, or anything that derefs to `&str` — minimal friction. Owning `Vec<String>` inside avoids tying the struct's lifetime to the caller's buffer, which would make it awkward to pass the loader across tasks or store it in a long-lived agent.
+"""
+id = "7c0690e2-4c91-46b7-8a96-e23b25a6c7b6"

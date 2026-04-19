@@ -419,6 +419,10 @@ The permission engine decides *whether* a tool call should run based on who the 
 
 Chapter 14 adds safety checks -- static analysis of tool arguments that catches dangerous patterns before the permission prompt even appears. It validates paths against allowed directories, matches filenames against protected patterns (`.env`, `.git/config`), and filters bash commands for blocked patterns (`rm -rf /`, `sudo`, fork bombs). Safety checks wrap tools so that dangerous calls are blocked before they execute.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch13.toml}}
+
 ---
 
 [← Chapter 12: Tool Registry](./ch12-tool-registry.md) · [Contents](./ch00-overview.md) · [Chapter 14: Safety Checks →](./ch14-safety.md)

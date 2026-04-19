@@ -456,6 +456,10 @@ The entire agent -- tools, providers, the loop itself -- is built on the vocabul
 
 None of these types do anything on their own -- they are the nouns of the system. In the next chapter, we will implement the `MockProvider` and `OpenRouterProvider`, giving these types their first verbs.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch04.toml}}
+
 ---
 
 [← Chapter 3: The Agentic Loop](./ch03-agentic-loop.md) · [Contents](./ch00-overview.md) · [Chapter 5a: Provider & Streaming Foundations →](./ch05a-provider-foundations.md)

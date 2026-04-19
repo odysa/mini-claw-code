@@ -303,6 +303,10 @@ The pattern — "split a complex stream into two concurrent sides, bridged by a 
 
 In [Chapter 6](./ch06-tool-interface.md) we turn from providers to tools — the other half of the agent's interface with the outside world.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch05b.toml}}
+
 ---
 
 [← Chapter 5a: Provider & Streaming Foundations](./ch05a-provider-foundations.md) · [Contents](./ch00-overview.md) · [Chapter 6: Tool Interface →](./ch06-tool-interface.md)

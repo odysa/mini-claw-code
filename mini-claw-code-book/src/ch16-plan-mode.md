@@ -599,6 +599,10 @@ builds the systems that make your agent project-aware:
 The safety infrastructure you built in Part III protects the agent from doing
 harm. The configuration infrastructure in Part IV teaches it to do good.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch16.toml}}
+
 ---
 
 [← Chapter 15: Hooks](./ch15-hooks.md) · [Contents](./ch00-overview.md) · [Chapter 17: Settings Hierarchy →](./ch17-settings.md)

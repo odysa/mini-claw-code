@@ -1,0 +1,50 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does the `Tool` trait use `#[async_trait]` while the `Provider` trait uses RPITIT (`impl Future` in the return position)?"
+answer.answer = "Tools are stored as `Box<dyn Tool>` in a heterogeneous collection, which requires object safety; providers are used as generic parameters, where RPITIT's zero-cost monomorphization fits."
+prompt.distractors = [
+  "`async_trait` is faster at runtime, and tool calls are on the hot path while provider calls are not.",
+  "Providers return non-`Send` futures, so they cannot use `async_trait`.",
+  "RPITIT was stabilized too late for the `Tool` trait but in time for `Provider`.",
+]
+context = """
+RPITIT generates a unique future type per impl — great for zero cost, but the trait is no longer object-safe, so `Box<dyn Provider>` will not compile. `ToolSet` needs a `HashMap` of mixed tool types (`BashTool`, `ReadTool`, `WriteTool`...), which forces `Box<dyn Tool>` and therefore object safety. `#[async_trait]` rewrites `async fn` into `Pin<Box<dyn Future + Send>>`, accepting one heap allocation per call in exchange for that object safety. The chapter's "Why two async trait styles?" section is the canonical reference for this split.
+"""
+id = "4e639fce-b1c9-46d0-a80a-f572584e3f8e"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "A tool implementation encounters a missing file. What should `call()` return?"
+answer.answer = "`Ok(format!(\"error: file not found: {path}\"))` — the error is a *value*, not a failure."
+prompt.distractors = [
+  "`Err(anyhow!(\"file not found\"))` — propagating errors is always the Rust way.",
+  "`panic!(\"file not found\")` — the agent loop catches panics.",
+  "`Ok(String::new())` — an empty string signals failure to the LLM.",
+]
+context = """
+The chapter's "Why errors are values, not `Err`" section is explicit: tool failures are part of the conversation. If `call()` returns `Err`, the agent's `unwrap_or_else` still rescues it, but the stronger convention is to return `Ok(\"error: ...\")` so the model reads a deliberate, descriptive message. `Err` is reserved for genuinely unrecoverable situations like a serialization bug — not for everyday "the file you asked about doesn't exist." An empty string is worst of all: the LLM cannot distinguish it from a successful read of an empty file.
+"""
+id = "9a729660-a6fd-4fdd-8c18-6b4a14451ebb"
+
+[[questions]]
+type = "ShortAnswer"
+prompt.prompt = "Inside `EchoTool::call`, the chapter uses `args[\"text\"].as_str().unwrap_or(\"(no text)\")`. What would be the downside of writing `args[\"text\"].as_str().unwrap()` instead?"
+answer.answer = "It would panic on malformed LLM input, crashing the agent."
+context = """
+LLM-provided arguments are not trusted input. A model can hallucinate a missing field or pass the wrong type. `unwrap()` would panic and take down the agent task; `unwrap_or(\"(no text)\")` degrades gracefully. The chapter's EchoTool walk-through specifically calls this out: "Always be defensive with LLM-provided arguments."
+"""
+id = "a792e061-95b8-457d-8940-10b6d5c9b738"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `EchoTool` store its `ToolDefinition` as a struct field instead of constructing it inside `definition()` on every call?"
+answer.answer = "`definition()` returns `&ToolDefinition`, so the value must outlive the call — it needs to live somewhere the tool owns."
+prompt.distractors = [
+  "Building a `ToolDefinition` is expensive, so caching it avoids recomputation.",
+  "`ToolDefinition` is not `Clone`, so it cannot be returned by value.",
+  "The `#[async_trait]` macro does not support non-async methods that construct values.",
+]
+context = """
+The trait signature is `fn definition(&self) -> &ToolDefinition`. A reference must point at something that outlives the borrow — returning `&local_var` from a function does not compile. Storing the definition in `self.def` and returning `&self.def` is the straightforward fix. Tool definitions are also fixed for the lifetime of the tool, so building once in the constructor fits the shape of the data naturally.
+"""
+id = "02c6c22a-823d-4dc8-a56e-f97f847eed19"

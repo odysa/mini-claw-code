@@ -1,0 +1,50 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "In `StreamingAgent::chat`, why is a *fresh* `mpsc::unbounded_channel` created at the top of every loop iteration instead of once before the loop?"
+answer.answer = "Dropping `stream_tx` when `stream_chat` returns is the signal that ends the forwarder task; a reused channel would keep the forwarder alive forever."
+prompt.distractors = [
+  "`tokio::sync::mpsc` channels can only deliver a single message per instance, so a new one is required each turn.",
+  "Reusing the channel would leak memory because old events would never be garbage-collected.",
+  "Each turn uses a different event type, so the channel's generic parameter has to be re-specialized.",
+]
+context = """
+The forwarder task loops on `stream_rx.recv().await`; that call only returns `None` when every sender has been dropped. When `stream_chat` returns it drops its local copy of `stream_tx`, which closes the channel and lets the forwarder exit. If you hoisted the channel out of the loop, the outer `stream_tx` would still be alive after the first turn and the forwarder would wait forever. The dedicated note in the chapter pins this down: "A new `mpsc::unbounded_channel()` every turn... dropping `stream_tx` is how the forwarder knows the turn is over."
+"""
+id = "c81c5c3a-57cd-4921-9b58-d543d009d518"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "What goes wrong if you skip `forwarder.await` after `stream_chat` returns?"
+answer.answer = "The last few `TextDelta`s may not reach the UI before the agent emits `Done`, and any panic inside the forwarder is silently lost."
+prompt.distractors = [
+  "The `stream_tx` channel is not closed, so the next turn deadlocks.",
+  "`tokio` refuses to spawn another task until the previous one is awaited, so the loop hangs.",
+  "The provider's HTTP connection stays open and leaks a file descriptor.",
+]
+context = """
+`stream_chat` returning closes the channel, which makes the forwarder's loop exit — but that exit happens asynchronously. Without awaiting the `JoinHandle`, the main task races ahead and can emit `AgentEvent::Done` before the forwarder has flushed its final `TextDelta`s. The chapter calls this "the classic 'last few tokens go missing' bug." Awaiting also surfaces panics from inside the forwarder.
+"""
+id = "5c70a56e-e73c-4bf9-8656-5529fe48bc63"
+
+[[questions]]
+type = "ShortAnswer"
+prompt.prompt = "In the SSE parsing loop, what role does the `buffer: String` play — in one short phrase?"
+answer.answer = "It reassembles SSE lines across arbitrary HTTP chunk boundaries."
+context = """
+`resp.chunk()` hands you bytes in whatever pieces TCP delivered — a single SSE line can be split across two chunks, or one chunk can contain several lines. The `buffer` accumulates raw text and the inner `while let Some(pos) = buffer.find('\\n')` loop pulls complete lines off the front. This is the classic line-oriented protocol pattern the chapter highlights in step 3.
+"""
+id = "9fd1f856-feec-49d6-8f2b-e3b5145eb02e"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `StreamingAgent::chat` filter only `StreamEvent::TextDelta` into the UI channel and drop `ToolCallStart`, `ToolCallDelta`, and `Done`?"
+answer.answer = "Those events describe low-level stream grammar; the UI wants agent-level `AgentEvent`s, and the agent emits its own `ToolCall`/`Done` after the turn is assembled."
+prompt.distractors = [
+  "`ToolCallStart` and `ToolCallDelta` are internal to the provider and cannot be sent across an `mpsc` channel.",
+  "Forwarding them would cause the accumulator to double-count tokens.",
+  "The UI channel is typed as `mpsc::UnboundedSender<String>`, so non-text events will not compile.",
+]
+context = """
+The two channels speak different vocabularies (the chapter's "two channels, and the problem they solve" section). `StreamEvent` is raw stream grammar; `AgentEvent` is what the UI cares about. The agent waits until it has the assembled `AssistantTurn`, then emits a single `AgentEvent::ToolCall` per tool invocation — which carries the `tool_summary` the UI actually renders. Forwarding raw tool deltas would duplicate information and leak provider-level details into the UI.
+"""
+id = "64dc2fcf-829f-425c-828f-c6631750115e"

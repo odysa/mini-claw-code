@@ -470,6 +470,10 @@ Search tools are what turn a coding agent from a tool that edits known files int
 
 With search tools in place, the agent can now explore an unfamiliar codebase on its own. Given a prompt like "find and fix the bug in the parser," it can glob for source files, grep for the parser code, read the relevant files, and then use the write and edit tools from Chapter 9 to make changes. The tool suite is becoming complete.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch11.toml}}
+
 ---
 
 [← Chapter 10: Bash Tool](./ch10-bash-tool.md) · [Contents](./ch00-overview.md) · [Chapter 12: Tool Registry →](./ch12-tool-registry.md)

@@ -367,6 +367,10 @@ that let your agent interact with the filesystem -- reading, writing, and
 editing files. These are the tools whose schemas will eventually appear in the
 static portion of your system prompt.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch08.toml}}
+
 ---
 
 [← Chapter 7: The Agentic Loop (Deep Dive)](./ch07-query-engine.md) · [Contents](./ch00-overview.md) · [Chapter 9: File Tools →](./ch09-file-tools.md)

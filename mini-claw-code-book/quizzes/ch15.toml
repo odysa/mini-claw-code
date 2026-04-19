@@ -1,0 +1,50 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`HookRegistry::dispatch` iterates hooks in registration order. A `LoggingHook` is registered first, then a `BlockingHook` that returns `Block(\"bash disabled\")` for a `PreToolCall { tool_name: \"bash\" }`. What does `dispatch` return, and what did the logging hook see?"
+answer.answer = "Returns `Block(\"bash disabled\")`; the logging hook ran first and recorded the event before the block short-circuited."
+prompt.distractors = [
+  "Returns `Continue`, because the logging hook's `Continue` overrides the later `Block`.",
+  "Returns `Block(\"bash disabled\")`; the logging hook was skipped because blocks short-circuit backward as well as forward.",
+  "Returns `ModifyArgs(...)`, because dispatch merges the results of all hooks into a single action.",
+]
+context = """
+Dispatch runs hooks in order. The logging hook runs and returns `Continue` (and records the event), then the blocking hook runs and returns `Block`, which short-circuits — later hooks never see the event. `test_hooks_registry_block_short_circuits` verifies this, and registration order is how you choose priority.
+"""
+id = "f22247be-48fb-4c99-8c28-837052bc2bc6"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why can `PostToolCall` hooks not meaningfully return `Block`?"
+answer.answer = "Because the tool has already executed by the time `PostToolCall` fires — there is nothing left to stop."
+prompt.distractors = [
+  "Because `HookAction::Block` is only defined for `PreToolCall` events in the enum.",
+  "Because `PostToolCall` hooks run on a background thread that cannot affect the agent loop.",
+  "Because the registry silently downgrades any `Block` from a post-hook into `Continue`.",
+]
+context = """
+The asymmetry is semantic, not enforced by the type system — a post-hook *can* return `Block`, but the tool already ran so it is meaningless. `BlockingHook` encodes this by pattern-matching only `PreToolCall`; on post events it falls through to `Continue`.
+"""
+id = "5d7d873e-00cd-4c16-9c37-49a7dacc3408"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`LoggingHook` stores its log in `std::sync::Mutex<Vec<String>>`. Why `std::sync::Mutex` rather than `tokio::sync::Mutex`?"
+answer.answer = "Because the lock is only held for a synchronous `push` with no `.await` inside the critical section, and `std::sync::Mutex` is faster for that case."
+prompt.distractors = [
+  "Because `tokio::sync::Mutex` cannot be used inside an `async_trait` method.",
+  "Because the `Hook` trait requires `Send + Sync`, which `tokio::sync::Mutex` does not implement.",
+  "Because `Vec<String>` does not implement `Send`, so only `std::sync::Mutex` will compile.",
+]
+context = """
+Rule of thumb: reach for `tokio::sync::Mutex` only when you must hold the lock across an `.await`. Here the critical section is a one-line `push`, so the cheaper std Mutex is correct. Both mutex types satisfy `Send + Sync` when `T: Send`.
+"""
+id = "a07c6de4-8304-49b6-8aa5-28cceb473f32"
+
+[[questions]]
+type = "ShortAnswer"
+prompt.prompt = "`ShellHook` runs an external command and interprets its exit code. What exit code causes the hook to return `HookAction::Block`?"
+answer.answer = "non-zero"
+context = """
+Exit code 0 means "all good, continue." Any non-zero exit causes `ShellHook` to return `Block`, capturing stderr as the reason. This mirrors Claude Code's JSON-configured hooks: the shell signals its decision through its exit status, so any existing script (`cargo fmt --check`, a linter, an audit command) plugs in without modification.
+"""
+id = "e7e8508b-3860-4c6d-8cf9-e6ab9fa8819c"

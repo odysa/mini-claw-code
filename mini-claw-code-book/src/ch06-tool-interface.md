@@ -211,6 +211,10 @@ This chapter focused on the *why* behind the tool types you defined in Chapter 4
 
 In the next chapter we build the `SimpleAgent` -- the loop that ties providers and tools together into a functioning agent.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch06.toml}}
+
 ---
 
 [← Chapter 5b: OpenRouter & StreamingAgent](./ch05b-openrouter-streaming.md) · [Contents](./ch00-overview.md) · [Chapter 7: The Agentic Loop (Deep Dive) →](./ch07-query-engine.md)

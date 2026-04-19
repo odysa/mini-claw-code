@@ -141,6 +141,10 @@ You'll repeat this for `WriteTool`, `EditTool`, and `BashTool` in later chapters
 
 A tool is the bridge between "the LLM wants to read a file" and "the file is actually read." The LLM describes its intent as structured JSON. Your code does the work.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch02.toml}}
+
 ---
 
 [← Chapter 1: Your First LLM Call](./ch01-first-llm-call.md) · [Contents](./ch00-overview.md) · [Chapter 3: The Agentic Loop →](./ch03-agentic-loop.md)

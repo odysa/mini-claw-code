@@ -378,6 +378,10 @@ The architecture -- composable checks that inspect arguments and wrap tools -- d
 
 In [Chapter 15: Hook System](./ch15-hooks.md) you will build pre-tool and post-tool hooks -- shell commands that run before and after tool execution. Hooks let users enforce custom policies beyond what the built-in safety checker covers: run a linter after every edit, block writes to specific directories, log every bash command. Where the safety checker is a built-in guard, hooks are user-defined guards.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch14.toml}}
+
 ---
 
 [← Chapter 13: Permission Engine](./ch13-permissions.md) · [Contents](./ch00-overview.md) · [Chapter 15: Hooks →](./ch15-hooks.md)

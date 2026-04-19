@@ -432,6 +432,10 @@ After this chapter, you have a working coding agent. Not a complete one -- it ha
 
 This is the skeleton that everything else hangs on. Every feature you add later -- real tools like Bash and Read, permissions, streaming -- plugs into the loop you just built.
 
+## Check yourself
+
+{{#quiz ../quizzes/ch07.toml}}
+
 ---
 
 [← Chapter 6: Tool Interface](./ch06-tool-interface.md) · [Contents](./ch00-overview.md) · [Chapter 8: System Prompt →](./ch08-system-prompt.md)

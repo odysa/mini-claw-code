@@ -1,0 +1,50 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does the loader parse TOML into `ConfigOverlay` (fields are `Option<T>`) instead of into `Config` directly and comparing against `Config::default()`?"
+answer.answer = "Because comparing against the default cannot distinguish \"user did not set this field\" from \"user explicitly set it to the same value as the default,\" breaking last-write-wins."
+prompt.distractors = [
+  "Because `Config` does not implement `Deserialize`, so serde can only produce a `ConfigOverlay`.",
+  "Because `toml::from_str` requires every field on the target type to be `Option<T>`.",
+  "Because `Option<T>` is cheaper to deserialize than `T`, making config loading faster.",
+]
+context = """
+Encoding "set vs unset" in the type system is the whole trick of this chapter. If your user config says `model = \"anthropic/claude-sonnet-4-20250514\"` (the default), a value-comparison heuristic would treat it as "unset" and silently let a lower-priority layer win. `Option<T>` removes the ambiguity: `None` means the TOML key was absent, `Some(v)` means it was present regardless of what `v` is.
+"""
+id = "a4517681-9ca8-48d8-bcba-54a630014308"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "The loader walks layers in this order: `Config::default()`, project config, user config, environment. Given `protected_patterns = [\".env\"]` in the project config and `protected_patterns = [\".credentials\"]` in the user config, what ends up in the final `Config.protected_patterns`?"
+answer.answer = "`[\".credentials\"]` — the user config overlay replaces the project config's list entirely."
+prompt.distractors = [
+  "`[\".env\", \".credentials\"]` — collections are appended across layers by default.",
+  "`[\".env\"]` — lower-priority layers win when they define a list.",
+  "`[]` — conflicting list definitions cancel each other out.",
+]
+context = """
+The merge rule for collections is replace, not append. Each layer that mentions a field takes full control of its value. This keeps the merge logic uniform (one rule for every field) and lets a higher layer truly override a lower one — including clearing a list with an empty `[]`. If you wanted append, you would write a different merge.
+"""
+id = "6630aa93-64b6-4c6d-ae68-3fd11096057f"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Environment variable support is deliberately limited to `model`, `base_url`, and `max_context_tokens`. Why are `blocked_commands` and `protected_patterns` excluded?"
+answer.answer = "Because safety rules should come from audited config files, not from environment variables that a compromised process could manipulate."
+prompt.distractors = [
+  "Because serde cannot deserialize `Vec<String>` from a single environment variable string.",
+  "Because environment variables are shadowed by the project config in the merge order.",
+  "Because `std::env::var` is asynchronous and would block the safety check pipeline.",
+]
+context = """
+This is a deliberate attack-surface reduction. A CI pipeline setting `MINI_CLAW_MODEL` for a cheaper model is fine; a compromised environment silently clearing `blocked_commands` is a disaster. Safety-critical settings come from files that can be version-controlled and reviewed.
+"""
+id = "466c9af9-5b12-4384-8c04-d0d7c3f045c4"
+
+[[questions]]
+type = "ShortAnswer"
+prompt.prompt = "`ConfigLoader::load_file` returns `Option<ConfigOverlay>` and silently returns `None` when the file is missing. Why is \"file not found\" treated as the normal case rather than as an error?"
+answer.answer = "Because most users and projects will not have a config file, so a missing file should fall through to defaults, not stop the agent."
+context = """
+`.ok()?` on both `read_to_string` and `toml::from_str` converts any failure into `None`, so the layer is skipped and the merge continues. `test_config_load_nonexistent_path` pins this: loading a bogus path does not panic, it just yields `None`. A production tool might log a warning on parse failures, but missing files are absolutely not errors.
+"""
+id = "e65c953b-5f2c-42fb-a436-79312a46f43b"

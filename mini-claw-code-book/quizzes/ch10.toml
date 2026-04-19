@@ -1,0 +1,50 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `BashTool` spawn `bash -c <command>` instead of parsing the command string and calling `Command::new(\"ls\").arg(\"-la\")` directly?"
+answer.answer = "So that shell features like pipes, redirects, globs, `&&`, and environment variable expansion work without reimplementing a shell parser."
+prompt.distractors = [
+  "Because `Command::new` cannot accept arguments with spaces on macOS.",
+  "Because `bash -c` is required for `tokio::process` to run asynchronously.",
+  "Because spawning `bash` avoids a fork and is therefore faster than `Command::new`.",
+]
+context = """
+Passing the raw string to `bash -c` means the LLM can use the full shell language — `echo hi | wc -c`, `cd /tmp && pwd`, `VAR=1 cmd`. Parsing it ourselves would mean reimplementing shell quoting, globbing, and variable expansion, which is both complex and unnecessary when bash already does it correctly.
+"""
+id = "f0bb8608-3f57-44de-8f7d-843f9236a71e"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "A command like `mkdir -p /tmp/foo` succeeds but produces no stdout and no stderr. What does `BashTool` return in that case, and why?"
+answer.answer = "The literal string `\"(no output)\"`, because an empty result would confuse the LLM into thinking the tool failed or the result was lost."
+prompt.distractors = [
+  "An empty string — the LLM is expected to infer success from the absence of output.",
+  "The command string itself, echoed back so the LLM can confirm what ran.",
+  "`\"exit 0\"`, so the LLM can read the numeric exit code.",
+]
+context = """
+Silent success is indistinguishable from a dropped result if we return `""`. The `"(no output)"` sentinel is a small but important affordance: it confirms the command ran and had nothing to say. The test `test_bash_no_output` pins this behavior by running `true` and checking the sentinel appears.
+"""
+id = "5c16860d-d05f-48e2-a96e-0c9d8cca0e5c"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does the chapter insist on `tokio::process::Command` instead of `std::process::Command` inside an `async fn`?"
+answer.answer = "`std::process::Command` blocks the OS thread while waiting for the subprocess, which stalls other tasks on the Tokio runtime; `tokio::process` yields to the runtime while waiting."
+prompt.distractors = [
+  "`std::process::Command` cannot capture stderr, only stdout.",
+  "`tokio::process::Command` automatically applies a default timeout; the `std` version does not.",
+  "`std::process::Command` spawns a new OS process per call, while `tokio::process` reuses a single worker process.",
+]
+context = """
+Blocking a thread inside an async runtime means other futures on that thread cannot make progress — no other tool calls, no streaming, no UI updates. `tokio::process` integrates with the runtime's reactor so the await point yields. Using `std::process` in an async context is a classic mistake that shows up as mysterious stalls under load.
+"""
+id = "3901b8e9-cca0-4d4f-acc2-42b649ee826d"
+
+[[questions]]
+type = "ShortAnswer"
+prompt.prompt = "Which method on a `std::process::Output` (or `tokio::process::Output`) gives you the raw bytes of the process's standard error stream?"
+answer.answer = "stderr"
+context = """
+`output.stderr` and `output.stdout` are both `Vec<u8>`. `BashTool` passes them through `String::from_utf8_lossy` before concatenating because command output is not guaranteed to be valid UTF-8 — `from_utf8_lossy` replaces bad bytes rather than failing.
+"""
+id = "fb6de73b-367c-4197-a184-a8655ac845dd"

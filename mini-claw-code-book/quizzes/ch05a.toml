@@ -1,0 +1,50 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "The chapter picks `std::sync::Mutex` over `tokio::sync::Mutex` for `MockProvider::responses`. What is the deciding factor?"
+answer.answer = "The critical section is a single `pop_front` with no `.await` inside, so the cheaper synchronous lock never risks blocking the runtime."
+prompt.distractors = [
+  "`tokio::sync::Mutex` doesn't implement `Sync`, so it can't be shared behind `&self`.",
+  "`Provider::chat` is not actually `async`, so a `tokio` lock would fail to compile.",
+  "`std::sync::Mutex` is required whenever the protected type is `!Send`, which `VecDeque` is.",
+]
+context = """
+Rule of thumb from the chapter: use `std::sync::Mutex` when the guard never crosses an `.await`, and `tokio::sync::Mutex` when it does. Holding a sync lock across `.await` can stall the executor, but `pop_front` is a single pointer op — the sync lock is both correct and cheaper. `VecDeque<AssistantTurn>` is `Send`; the tokio lock is `Sync`; the real issue is cost vs. necessity.
+"""
+id = "c42c71a7-e3fa-485b-90ef-ff9738b38d1d"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `StreamEvent::ToolCallDelta` include an `index: usize` field?"
+answer.answer = "A single streamed turn can interleave fragments from multiple concurrent tool calls, and the index tells the accumulator which call each fragment belongs to."
+prompt.distractors = [
+  "It's the byte offset into the SSE stream, used to detect dropped chunks.",
+  "It's the position of the delta within the tool's JSON arguments string.",
+  "It maps to the order in which tools were registered in the `ToolSet`.",
+]
+context = """
+OpenAI-style streaming can emit `ToolCallDelta` events for call 0 and call 1 interleaved. `StreamAccumulator::feed` uses `index` to route each argument fragment into the right `PartialToolCall`, padding the `Vec` with empty slots as needed (see the `while self.tool_calls.len() <= *index` loop).
+"""
+id = "0786fed0-9a0b-4bfb-a7b7-f7e733032524"
+
+[[questions]]
+type = "ShortAnswer"
+prompt.prompt = "`parse_sse_line` returns `Some(vec![StreamEvent::Done])` when it sees exactly which payload after stripping `data: `?"
+answer.answer = "[DONE]"
+context = """
+The OpenAI SSE convention is a literal `data: [DONE]` line terminating the stream. `parse_sse_line` strips the `data: ` prefix, compares the remainder to `\"[DONE]\"`, and emits `StreamEvent::Done`. `test_streaming_parse_sse_done` locks this in.
+"""
+id = "a47c866f-5ac4-4691-876e-72cb1d1b47db"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`StreamAccumulator::finish` derives `stop_reason` from the accumulated state rather than reading it off a stream event. How does it choose between `Stop` and `ToolUse`?"
+answer.answer = "If the filtered `tool_calls` vector is non-empty it returns `ToolUse`; otherwise `Stop`."
+prompt.distractors = [
+  "It inspects the last `StreamEvent` fed in — `Done` maps to `Stop`, anything else to `ToolUse`.",
+  "It calls `finish_reason` on the underlying SSE chunk and copies the value verbatim.",
+  "It returns `ToolUse` whenever `text` is `None`, regardless of whether any tool calls survived.",
+]
+context = """
+`finish` filters out placeholder `PartialToolCall` entries (ones with empty names created by the index-padding loop), then derives the reason purely from the surviving calls. This keeps the accumulator robust against streams that never send a `finish_reason`, and it mirrors what the non-streaming path does semantically.
+"""
+id = "175d0c02-f691-49db-9f5b-9885cb6262e0"

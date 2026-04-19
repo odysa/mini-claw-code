@@ -1,0 +1,50 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does the `Tool` trait use `#[async_trait]` instead of the RPITIT style (`async fn` with return-position `impl Trait`) that `Provider` uses?"
+answer.answer = "Because tools are stored as `Box<dyn Tool>` in a `HashMap`, and object safety requires the boxed, erased future that `#[async_trait]` produces."
+prompt.distractors = [
+  "Because `#[async_trait]` is faster than RPITIT for I/O-bound code like file reads.",
+  "Because RPITIT does not support `&self` receivers on async trait methods.",
+  "Because `anyhow::Result` can only be returned from functions rewritten by `#[async_trait]`.",
+]
+context = """
+`ReadTool` and `BashTool` coexist in a single `HashMap<String, Box<dyn Tool>>`, so the trait must be object-safe. A plain `async fn` in a trait returns an anonymous future that can't be erased behind `dyn`; `#[async_trait]` rewrites it to `Pin<Box<dyn Future + Send + '_>>`, which can. `Provider` goes the RPITIT route because it's only ever held as a generic `P: Provider`, not behind `dyn`.
+"""
+id = "bc83bacb-b3b2-475a-851a-1817114fb886"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Inside `ReadTool::call`, the path is extracted with `args[\"path\"].as_str().context(\"missing 'path' argument\")?`. What happens when the LLM calls the tool with `{}` (no `path` field)?"
+answer.answer = "`as_str()` returns `None`, `context` converts it into an error, and `?` returns `Err` with the message \"missing 'path' argument\"."
+prompt.distractors = [
+  "`args[\"path\"]` panics because indexing a missing key is undefined behavior on `serde_json::Value`.",
+  "`as_str()` returns an empty string, and `tokio::fs::read_to_string(\"\")` is called with an empty path.",
+  "The `?` operator short-circuits before `context` runs, so the error has no message attached.",
+]
+context = """
+Indexing a `serde_json::Value` with a missing key returns `Value::Null` (not a panic). `Null.as_str()` is `None`. `Option::context` from `anyhow` turns the `None` into an `Err` with the given message, which `?` then propagates. The `test_read_read_missing_arg` test pins this behavior.
+"""
+id = "b0ebf485-6303-43e7-b0e0-7bb24471b9c4"
+
+[[questions]]
+type = "ShortAnswer"
+prompt.prompt = "When you build a `ToolDefinition` with `.param(\"path\", \"string\", \"...\", true)`, which JSON Schema key receives the parameter name because `required` is `true`?"
+answer.answer = "required"
+context = """
+The builder pushes `\"path\"` onto the `required` array in the parameters schema (`{\"type\": \"object\", \"properties\": {...}, \"required\": [...]}`). Passing `false` would add the property but skip the `required` push. `test_read_read_definition` inspects this JSON.
+"""
+id = "7e357fc2-61c2-4d5d-9a61-2de2776f9326"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "The chapter calls out a three-step pattern every tool follows: **Define**, **Extract**, **Execute**. Which line in `ReadTool::call` corresponds to the *Extract* step?"
+answer.answer = "`args[\"path\"].as_str().context(\"missing 'path' argument\")?`"
+prompt.distractors = [
+  "`ToolDefinition::new(\"read\", \"Read the contents of a file.\")`",
+  "`tokio::fs::read_to_string(path).await`",
+  "`.with_context(|| format!(\"failed to read '{path}'\"))`",
+]
+context = """
+Extract means pulling typed arguments out of the untyped `serde_json::Value` the LLM handed you. The `ToolDefinition::new(...)` call is Define, and `read_to_string(...).await` is Execute. Every tool in later chapters (`WriteTool`, `EditTool`, `BashTool`) repeats this same three-step shape.
+"""
+id = "70e593f9-91df-4542-a1b4-b9bdecf6fab5"

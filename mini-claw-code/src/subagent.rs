@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
+use crate::agent::chat_loop;
 use crate::types::*;
 
 /// A tool that spawns a child agent to handle a subtask independently.
@@ -21,7 +22,7 @@ pub struct SubagentTool<P: Provider> {
     provider: Arc<P>,
     tools_factory: Box<dyn Fn() -> ToolSet + Send + Sync>,
     system_prompt: Option<String>,
-    max_turns: usize,
+    config: QueryConfig,
     definition: ToolDefinition,
 }
 
@@ -36,7 +37,12 @@ impl<P: Provider> SubagentTool<P> {
             provider,
             tools_factory: Box::new(tools_factory),
             system_prompt: None,
-            max_turns: 10,
+            // Subagents default to a tighter turn limit than the top-level agent
+            // — a child that spins 50 times is almost certainly stuck.
+            config: QueryConfig {
+                max_turns: 10,
+                ..QueryConfig::default()
+            },
             definition: ToolDefinition::new(
                 "subagent",
                 "Spawn a child agent to handle a subtask independently. \
@@ -60,7 +66,13 @@ impl<P: Provider> SubagentTool<P> {
     /// Set the maximum number of agent loop turns before the child is stopped.
     /// Defaults to 10.
     pub fn max_turns(mut self, max: usize) -> Self {
-        self.max_turns = max;
+        self.config.max_turns = max;
+        self
+    }
+
+    /// Override the full config (max_turns, max_result_chars).
+    pub fn config(mut self, config: QueryConfig) -> Self {
+        self.config = config;
         self
     }
 }
@@ -71,14 +83,13 @@ impl<P: Provider + 'static> Tool for SubagentTool<P> {
         &self.definition
     }
 
-    async fn call(&self, args: Value) -> anyhow::Result<String> {
+    async fn call(&self, args: Value) -> anyhow::Result<ToolResult> {
         let task = args
             .get("task")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("missing required parameter: task"))?;
 
         let tools = (self.tools_factory)();
-        let defs = tools.definitions();
 
         let mut messages = Vec::new();
         if let Some(ref prompt) = self.system_prompt {
@@ -86,33 +97,9 @@ impl<P: Provider + 'static> Tool for SubagentTool<P> {
         }
         messages.push(Message::User(task.to_string()));
 
-        for _ in 0..self.max_turns {
-            let turn = self.provider.chat(&messages, &defs).await?;
-
-            match turn.stop_reason {
-                StopReason::Stop => {
-                    return Ok(turn.text.unwrap_or_default());
-                }
-                StopReason::ToolUse => {
-                    let mut results = Vec::with_capacity(turn.tool_calls.len());
-                    for call in &turn.tool_calls {
-                        let content = match tools.get(&call.name) {
-                            Some(t) => t
-                                .call(call.arguments.clone())
-                                .await
-                                .unwrap_or_else(|e| format!("error: {e}")),
-                            None => format!("error: unknown tool `{}`", call.name),
-                        };
-                        results.push((call.id.clone(), content));
-                    }
-                    messages.push(Message::Assistant(turn));
-                    for (id, content) in results {
-                        messages.push(Message::ToolResult { id, content });
-                    }
-                }
-            }
+        match chat_loop(&*self.provider, &tools, &self.config, &mut messages, None).await {
+            Ok(text) => Ok(ToolResult::text(text)),
+            Err(e) => Ok(ToolResult::error(e.to_string())),
         }
-
-        Ok("error: max turns exceeded".to_string())
     }
 }

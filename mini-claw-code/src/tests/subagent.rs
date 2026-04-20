@@ -25,7 +25,7 @@ async fn test_subagent_subagent_text_response() {
     let tool = SubagentTool::new(provider, || ToolSet::new());
     let result = tool.call(json!({"task": "Do something"})).await.unwrap();
 
-    assert_eq!(result, "Child result");
+    assert_eq!(result.content, "Child result");
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ async fn test_subagent_subagent_with_tool() {
     let tool = SubagentTool::new(provider, || ToolSet::new().with(ReadTool::new()));
     let result = tool.call(json!({"task": "Read the file"})).await.unwrap();
 
-    assert_eq!(result, "The file says: secret data");
+    assert_eq!(result.content, "The file says: secret data");
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ async fn test_subagent_subagent_multi_step() {
     let tool = SubagentTool::new(provider, || ToolSet::new().with(ReadTool::new()));
     let result = tool.call(json!({"task": "Read both files"})).await.unwrap();
 
-    assert_eq!(result, "alpha and beta");
+    assert_eq!(result.content, "alpha and beta");
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ async fn test_subagent_max_turns_exceeded() {
     let tool = SubagentTool::new(provider, || ToolSet::new().with(ReadTool::new())).max_turns(2);
     let result = tool.call(json!({"task": "Loop forever"})).await.unwrap();
 
-    assert_eq!(result, "error: max turns exceeded");
+    assert_eq!(result.content, "error: exceeded max turns (2)");
 }
 
 // ---------------------------------------------------------------------------
@@ -189,12 +189,15 @@ async fn test_subagent_subagent_missing_task() {
 
 #[tokio::test]
 async fn test_subagent_subagent_child_provider_error() {
-    // Empty mock → error on first call
+    // Empty mock → provider errors on first call. The child's error surfaces
+    // to the parent as a ToolResult::error, not as a bubbled anyhow::Err —
+    // this way the parent agent can react to the failure instead of crashing.
     let provider = Arc::new(MockProvider::new(VecDeque::new()));
     let tool = SubagentTool::new(provider, || ToolSet::new());
-    let result = tool.call(json!({"task": "Do something"})).await;
+    let result = tool.call(json!({"task": "Do something"})).await.unwrap();
 
-    assert!(result.is_err());
+    assert!(result.content.starts_with("error: "));
+    assert!(result.content.contains("no more responses"));
 }
 
 // ---------------------------------------------------------------------------
@@ -227,7 +230,7 @@ async fn test_subagent_subagent_unknown_tool_in_child() {
     let tool = SubagentTool::new(provider, || ToolSet::new());
     let result = tool.call(json!({"task": "Try unknown"})).await.unwrap();
 
-    assert_eq!(result, "Tool not found, but I can still answer.");
+    assert_eq!(result.content, "Tool not found, but I can still answer.");
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +265,7 @@ async fn test_subagent_system_prompt_in_child() {
         SubagentTool::new(provider, || ToolSet::new()).system_prompt("You are a security auditor.");
     let result = tool.call(json!({"task": "Audit this code"})).await.unwrap();
 
-    assert_eq!(result, "Audited.");
+    assert_eq!(result.content, "Audited.");
 }
 
 // ---------------------------------------------------------------------------

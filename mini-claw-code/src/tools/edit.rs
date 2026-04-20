@@ -38,7 +38,7 @@ impl Tool for EditTool {
         &self.definition
     }
 
-    async fn call(&self, args: Value) -> anyhow::Result<String> {
+    async fn call(&self, args: Value) -> anyhow::Result<ToolResult> {
         let path = args["path"].as_str().context("missing 'path' argument")?;
         let old = args["old_string"]
             .as_str()
@@ -64,6 +64,6 @@ impl Tool for EditTool {
             .await
             .with_context(|| format!("failed to write '{path}'"))?;
 
-        Ok(format!("edited {path}"))
+        Ok(ToolResult::text(format!("edited {path}")))
     }
 }

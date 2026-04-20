@@ -28,7 +28,7 @@ impl Tool for BashTool {
         &self.definition
     }
 
-    async fn call(&self, args: Value) -> anyhow::Result<String> {
+    async fn call(&self, args: Value) -> anyhow::Result<ToolResult> {
         let command = args["command"]
             .as_str()
             .context("missing 'command' argument")?;
@@ -58,6 +58,10 @@ impl Tool for BashTool {
             result.push_str("(no output)");
         }
 
-        Ok(result)
+        Ok(ToolResult::text(result))
+    }
+
+    fn is_destructive(&self) -> bool {
+        true
     }
 }

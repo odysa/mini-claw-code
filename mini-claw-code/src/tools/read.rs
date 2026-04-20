@@ -32,11 +32,19 @@ impl Tool for ReadTool {
         &self.definition
     }
 
-    async fn call(&self, args: Value) -> anyhow::Result<String> {
+    async fn call(&self, args: Value) -> anyhow::Result<ToolResult> {
         let path = args["path"].as_str().context("missing 'path' argument")?;
         let content = tokio::fs::read_to_string(path)
             .await
             .with_context(|| format!("failed to read '{path}'"))?;
-        Ok(content)
+        Ok(ToolResult::text(content))
+    }
+
+    fn is_read_only(&self) -> bool {
+        true
+    }
+
+    fn is_concurrent_safe(&self) -> bool {
+        true
     }
 }

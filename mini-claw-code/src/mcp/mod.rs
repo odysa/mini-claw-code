@@ -7,7 +7,7 @@ pub use types::McpToolDef;
 use async_trait::async_trait;
 use serde_json::Value;
 
-use crate::types::{Tool, ToolDefinition};
+use crate::types::{Tool, ToolDefinition, ToolResult};
 
 /// Wraps a remote MCP tool as a local `Tool` implementation.
 ///
@@ -40,7 +40,8 @@ impl Tool for McpTool {
         &self.definition
     }
 
-    async fn call(&self, args: Value) -> anyhow::Result<String> {
-        self.client.call_tool(&self.remote_name, args).await
+    async fn call(&self, args: Value) -> anyhow::Result<ToolResult> {
+        let content = self.client.call_tool(&self.remote_name, args).await?;
+        Ok(ToolResult::text(content))
     }
 }

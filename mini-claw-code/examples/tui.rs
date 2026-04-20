@@ -146,6 +146,9 @@ async fn ui_event_loop(
         tokio::select! {
             event = rx.recv() => {
                 match event {
+                    Some(AgentEvent::ToolEnd { .. }) => {
+                        // UI doesn't render tool results (yet); summary is enough.
+                    }
                     Some(AgentEvent::TextDelta(text)) => {
                         if !streaming_text {
                             // First delta: clear the spinner line
@@ -156,7 +159,7 @@ async fn ui_event_loop(
                         let _ = io::stdout().flush();
                         text_buf.push_str(&text);
                     }
-                    Some(AgentEvent::ToolCall { summary, .. }) => {
+                    Some(AgentEvent::ToolStart { summary, .. }) => {
                         tool_count += 1;
                         streaming_text = false;
                         text_buf.clear();

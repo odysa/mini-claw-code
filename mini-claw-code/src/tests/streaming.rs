@@ -499,11 +499,16 @@ async fn test_streaming_streaming_agent_tool_loop() {
     while let Ok(e) = rx.try_recv() {
         events.push(e);
     }
-    // Should see ToolCall event, then TextDeltas, then Done
+    // Should see ToolStart/ToolEnd events, then TextDeltas, then Done
     assert!(
         events
             .iter()
-            .any(|e| matches!(e, crate::AgentEvent::ToolCall { .. }))
+            .any(|e| matches!(e, crate::AgentEvent::ToolStart { .. }))
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, crate::AgentEvent::ToolEnd { .. }))
     );
     assert!(
         events

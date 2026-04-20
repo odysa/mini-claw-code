@@ -102,8 +102,8 @@ async fn test_write_returns_confirmation() {
         .await
         .unwrap();
 
-    assert!(result.contains("wrote"));
-    assert!(result.contains(path.to_str().unwrap()));
+    assert!(result.content.contains("wrote"));
+    assert!(result.content.contains(path.to_str().unwrap()));
 }
 
 #[tokio::test]

@@ -51,7 +51,7 @@ async fn test_ask_ask_question_only() {
         .await
         .unwrap();
 
-    assert_eq!(result, "Yes");
+    assert_eq!(result.content, "Yes");
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ async fn test_ask_ask_with_options() {
         .await
         .unwrap();
 
-    assert_eq!(result, "Option B");
+    assert_eq!(result.content, "Option B");
 }
 
 // ---------------------------------------------------------------------------

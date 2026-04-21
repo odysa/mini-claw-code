@@ -20,14 +20,14 @@ fn test_bash_definition() {
 async fn test_bash_runs_command() {
     let tool = BashTool::new();
     let result = tool.call(json!({"command": "echo hello"})).await.unwrap();
-    assert!(result.contains("hello"));
+    assert!(result.content.contains("hello"));
 }
 
 #[tokio::test]
 async fn test_bash_captures_stderr() {
     let tool = BashTool::new();
     let result = tool.call(json!({"command": "echo err >&2"})).await.unwrap();
-    assert!(result.contains("err"));
+    assert!(result.content.contains("err"));
 }
 
 #[tokio::test]
@@ -52,16 +52,16 @@ async fn test_bash_stdout_and_stderr() {
         .call(json!({"command": "echo out && echo err >&2"}))
         .await
         .unwrap();
-    assert!(result.contains("out"));
-    assert!(result.contains("stderr:"));
-    assert!(result.contains("err"));
+    assert!(result.content.contains("out"));
+    assert!(result.content.contains("stderr:"));
+    assert!(result.content.contains("err"));
 }
 
 #[tokio::test]
 async fn test_bash_no_output() {
     let tool = BashTool::new();
     let result = tool.call(json!({"command": "true"})).await.unwrap();
-    assert_eq!(result, "(no output)");
+    assert_eq!(result.content, "(no output)");
 }
 
 #[tokio::test]
@@ -72,7 +72,7 @@ async fn test_bash_exit_code_nonzero() {
         .call(json!({"command": "echo fail && exit 1"}))
         .await
         .unwrap();
-    assert!(result.contains("fail"));
+    assert!(result.content.contains("fail"));
 }
 
 #[tokio::test]
@@ -82,9 +82,9 @@ async fn test_bash_multiline_output() {
         .call(json!({"command": "echo line1 && echo line2 && echo line3"}))
         .await
         .unwrap();
-    assert!(result.contains("line1"));
-    assert!(result.contains("line2"));
-    assert!(result.contains("line3"));
+    assert!(result.content.contains("line1"));
+    assert!(result.content.contains("line2"));
+    assert!(result.content.contains("line3"));
 }
 
 #[tokio::test]

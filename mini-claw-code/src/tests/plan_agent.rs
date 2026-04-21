@@ -358,7 +358,7 @@ async fn test_plan_agent_read_only_override() {
     let agent = PlanAgent::new(provider)
         .tool(ReadTool::new())
         .tool(BashTool::new())
-        .read_only(&["read"]); // bash excluded
+        .plan_tool_names(["read"]); // bash excluded
 
     let (tx, _rx) = mpsc::unbounded_channel();
     let mut messages = vec![Message::User("Plan".into())];
@@ -434,7 +434,7 @@ fn test_plan_agent_builder_pattern() {
         .tool(WriteTool::new())
         .tool(EditTool::new())
         .tool(BashTool::new())
-        .read_only(&["read", "bash"])
+        .plan_tool_names(["read", "bash"])
         .plan_prompt("Custom planning instructions.");
     // If this compiles and runs, the builder pattern works.
 }

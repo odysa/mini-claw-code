@@ -140,7 +140,7 @@ async fn test_safety_wrapper_blocks_on_check_failure() {
     let result = Tool::call(&wrapped, json!({"path": "/etc/passwd"}))
         .await
         .unwrap();
-    assert!(result.contains("safety check failed"));
+    assert!(result.content.contains("safety check failed"));
 }
 
 #[tokio::test]
@@ -158,7 +158,7 @@ async fn test_safety_wrapper_allows_valid_call() {
     let result = Tool::call(&wrapped, json!({"path": file.to_str().unwrap()}))
         .await
         .unwrap();
-    assert_eq!(result, "content");
+    assert_eq!(result.content, "content");
 }
 
 #[test]

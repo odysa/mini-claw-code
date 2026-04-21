@@ -5,8 +5,9 @@ use serde::Deserialize;
 use serde_json::Value;
 use tokio::sync::mpsc;
 
-use crate::agent::{AgentEvent, tool_summary};
+use crate::agent::AgentEvent;
 use crate::mock::MockProvider;
+use crate::planning::stream_chat_loop;
 use crate::types::*;
 
 // ---------------------------------------------------------------------------
@@ -281,6 +282,7 @@ impl StreamProvider for MockStreamProvider {
 pub struct StreamingAgent<P: StreamProvider> {
     provider: P,
     tools: ToolSet,
+    config: QueryConfig,
 }
 
 impl<P: StreamProvider> StreamingAgent<P> {
@@ -288,11 +290,18 @@ impl<P: StreamProvider> StreamingAgent<P> {
         Self {
             provider,
             tools: ToolSet::new(),
+            config: QueryConfig::default(),
         }
     }
 
     pub fn tool(mut self, t: impl Tool + 'static) -> Self {
         self.tools.push(t);
+        self
+    }
+
+    /// Override the loop limits (max turns, max tool result size).
+    pub fn config(mut self, config: QueryConfig) -> Self {
+        self.config = config;
         self
     }
 
@@ -318,59 +327,13 @@ impl<P: StreamProvider> StreamingAgent<P> {
         messages: &mut Vec<Message>,
         events: mpsc::UnboundedSender<AgentEvent>,
     ) -> anyhow::Result<String> {
-        let defs = self.tools.definitions();
-
-        loop {
-            // Set up stream channel and forward text deltas to the UI
-            let (stream_tx, mut stream_rx) = mpsc::unbounded_channel();
-            let events_clone = events.clone();
-            let forwarder = tokio::spawn(async move {
-                while let Some(event) = stream_rx.recv().await {
-                    if let StreamEvent::TextDelta(text) = event {
-                        let _ = events_clone.send(AgentEvent::TextDelta(text));
-                    }
-                }
-            });
-
-            let turn = match self.provider.stream_chat(messages, &defs, stream_tx).await {
-                Ok(t) => t,
-                Err(e) => {
-                    let _ = events.send(AgentEvent::Error(e.to_string()));
-                    return Err(e);
-                }
-            };
-            let _ = forwarder.await;
-
-            match turn.stop_reason {
-                StopReason::Stop => {
-                    let text = turn.text.clone().unwrap_or_default();
-                    let _ = events.send(AgentEvent::Done(text.clone()));
-                    messages.push(Message::Assistant(turn));
-                    return Ok(text);
-                }
-                StopReason::ToolUse => {
-                    let mut results = Vec::with_capacity(turn.tool_calls.len());
-                    for call in &turn.tool_calls {
-                        let _ = events.send(AgentEvent::ToolCall {
-                            name: call.name.clone(),
-                            summary: tool_summary(call),
-                        });
-                        let content = match self.tools.get(&call.name) {
-                            Some(t) => t
-                                .call(call.arguments.clone())
-                                .await
-                                .unwrap_or_else(|e| format!("error: {e}")),
-                            None => format!("error: unknown tool `{}`", call.name),
-                        };
-                        results.push((call.id.clone(), content));
-                    }
-
-                    messages.push(Message::Assistant(turn));
-                    for (id, content) in results {
-                        messages.push(Message::ToolResult { id, content });
-                    }
-                }
-            }
-        }
+        stream_chat_loop(
+            &self.provider,
+            &self.tools,
+            &self.config,
+            messages,
+            Some(&events),
+        )
+        .await
     }
 }

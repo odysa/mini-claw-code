@@ -4,7 +4,7 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 use tokio::sync::{Mutex, oneshot};
 
-use crate::types::{Tool, ToolDefinition};
+use crate::types::{Tool, ToolDefinition, ToolResult};
 
 // ---------------------------------------------------------------------------
 // Trait
@@ -58,7 +58,7 @@ impl Tool for AskTool {
         &self.definition
     }
 
-    async fn call(&self, args: Value) -> anyhow::Result<String> {
+    async fn call(&self, args: Value) -> anyhow::Result<ToolResult> {
         let question = args
             .get("question")
             .and_then(|v| v.as_str())
@@ -66,7 +66,12 @@ impl Tool for AskTool {
 
         let options = parse_options(&args);
 
-        self.handler.ask(question, &options).await
+        let answer = self.handler.ask(question, &options).await?;
+        Ok(ToolResult::text(answer))
+    }
+
+    fn is_read_only(&self) -> bool {
+        true
     }
 }
 

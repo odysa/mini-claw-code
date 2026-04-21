@@ -24,7 +24,7 @@ async fn test_read_read_file() {
         .await
         .unwrap();
 
-    assert_eq!(result, "hello world");
+    assert_eq!(result.content, "hello world");
 }
 
 #[tokio::test]
@@ -75,7 +75,7 @@ async fn test_read_read_empty_file() {
         .await
         .unwrap();
 
-    assert_eq!(result, "");
+    assert_eq!(result.content, "");
 }
 
 #[tokio::test]
@@ -90,7 +90,7 @@ async fn test_read_read_multiline_file() {
         .await
         .unwrap();
 
-    assert_eq!(result, "line1\nline2\nline3");
+    assert_eq!(result.content, "line1\nline2\nline3");
 }
 
 #[tokio::test]
@@ -105,8 +105,8 @@ async fn test_read_read_unicode_content() {
         .await
         .unwrap();
 
-    assert!(result.contains("hello"));
-    assert!(result.contains("world"));
+    assert!(result.content.contains("hello"));
+    assert!(result.content.contains("world"));
 }
 
 #[tokio::test]
@@ -122,7 +122,7 @@ async fn test_read_read_large_file() {
         .await
         .unwrap();
 
-    assert_eq!(result.len(), 100_000);
+    assert_eq!(result.content.len(), 100_000);
 }
 
 #[tokio::test]
@@ -152,7 +152,7 @@ async fn test_read_read_extra_args_ignored() {
         .await
         .unwrap();
 
-    assert_eq!(result, "content");
+    assert_eq!(result.content, "content");
 }
 
 #[tokio::test]
@@ -167,7 +167,7 @@ async fn test_read_read_preserves_whitespace() {
         .await
         .unwrap();
 
-    assert_eq!(result, "  leading\n\ttab\ntrailing  \n");
+    assert_eq!(result.content, "  leading\n\ttab\ntrailing  \n");
 }
 
 #[tokio::test]

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use async_trait::async_trait;
 use serde_json::Value;
 
-use crate::types::{Tool, ToolDefinition};
+use crate::types::{Tool, ToolDefinition, ToolResult};
 
 /// A check that runs before a tool call is executed.
 ///
@@ -222,13 +222,29 @@ impl Tool for SafeToolWrapper {
         self.inner.definition()
     }
 
-    async fn call(&self, args: Value) -> anyhow::Result<String> {
+    async fn call(&self, args: Value) -> anyhow::Result<ToolResult> {
         let tool_name = self.inner.definition().name;
         for check in &self.checks {
             if let Err(reason) = check.check(tool_name, &args) {
-                return Ok(format!("error: safety check failed: {reason}"));
+                return Ok(ToolResult::error(format!("safety check failed: {reason}")));
             }
         }
         self.inner.call(args).await
+    }
+
+    fn is_read_only(&self) -> bool {
+        self.inner.is_read_only()
+    }
+
+    fn is_concurrent_safe(&self) -> bool {
+        self.inner.is_concurrent_safe()
+    }
+
+    fn is_destructive(&self) -> bool {
+        self.inner.is_destructive()
+    }
+
+    fn summary(&self, args: &Value) -> String {
+        self.inner.summary(args)
     }
 }

@@ -102,8 +102,8 @@ async fn test_edit_returns_confirmation() {
         .await
         .unwrap();
 
-    assert!(result.contains("edited"));
-    assert!(result.contains(path.to_str().unwrap()));
+    assert!(result.content.contains("edited"));
+    assert!(result.content.contains(path.to_str().unwrap()));
 }
 
 #[tokio::test]

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use tokio::sync::mpsc;
 
-use crate::agent::{AgentEvent, tool_summary};
+use crate::agent::{AgentEvent, emit_tool_events, push_tool_results};
 use crate::streaming::{StreamEvent, StreamProvider};
 use crate::types::*;
 
@@ -15,26 +15,32 @@ When your plan is ready, call the `exit_plan` tool to submit it for review.";
 /// A two-phase agent that separates planning (read-only) from execution (all tools).
 ///
 /// During the **plan** phase a system prompt is injected telling the LLM it is
-/// in planning mode, and only read-only tools (plus `exit_plan`) are visible.
-/// The LLM calls `exit_plan` when its plan is ready, or stops naturally.
-/// During the **execute** phase all registered tools are available.
-/// The caller drives the approval flow between the two phases.
+/// in planning mode, and only tools whose [`Tool::is_read_only`] returns `true`
+/// (plus `exit_plan`) are visible. The LLM calls `exit_plan` when its plan is
+/// ready, or stops naturally. During the **execute** phase all registered tools
+/// are available. The caller drives the approval flow between the two phases.
+///
+/// An explicit `plan_tool_names` override is available for the occasional tool
+/// whose read-only-ness depends on arguments.
 pub struct PlanAgent<P: StreamProvider> {
     provider: P,
     tools: ToolSet,
-    read_only: HashSet<&'static str>,
+    plan_tool_override: Option<HashSet<String>>,
     plan_system_prompt: String,
+    config: QueryConfig,
     exit_plan_def: ToolDefinition,
 }
 
 impl<P: StreamProvider> PlanAgent<P> {
-    /// Create a new `PlanAgent` with default read-only tools: `bash`, `read`, and `ask_user`.
+    /// Create a new `PlanAgent` that uses `Tool::is_read_only()` to decide
+    /// which tools are available during planning.
     pub fn new(provider: P) -> Self {
         Self {
             provider,
             tools: ToolSet::new(),
-            read_only: HashSet::from(["bash", "read", "ask_user"]),
+            plan_tool_override: None,
             plan_system_prompt: DEFAULT_PLAN_PROMPT.to_string(),
+            config: QueryConfig::default(),
             exit_plan_def: ToolDefinition::new(
                 "exit_plan",
                 "Signal that your plan is complete and ready for user review. \
@@ -49,9 +55,15 @@ impl<P: StreamProvider> PlanAgent<P> {
         self
     }
 
-    /// Override the set of tool names allowed during the planning phase.
-    pub fn read_only(mut self, names: &[&'static str]) -> Self {
-        self.read_only = names.iter().copied().collect();
+    /// Override which tools are allowed during planning by name. When unset,
+    /// planning uses `Tool::is_read_only()`; when set, only names in the
+    /// override are visible (plus `exit_plan`).
+    pub fn plan_tool_names<I>(mut self, names: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Into<String>,
+    {
+        self.plan_tool_override = Some(names.into_iter().map(Into::into).collect());
         self
     }
 
@@ -59,6 +71,67 @@ impl<P: StreamProvider> PlanAgent<P> {
     pub fn plan_prompt(mut self, prompt: impl Into<String>) -> Self {
         self.plan_system_prompt = prompt.into();
         self
+    }
+
+    /// Override the loop limits (max turns, max tool result size).
+    pub fn config(mut self, config: QueryConfig) -> Self {
+        self.config = config;
+        self
+    }
+
+    /// Is `tool_name` allowed during the planning phase?
+    fn is_plan_allowed(&self, tool_name: &str) -> bool {
+        if let Some(names) = &self.plan_tool_override {
+            return names.contains(tool_name);
+        }
+        self.tools.get(tool_name).is_some_and(|t| t.is_read_only())
+    }
+
+    /// Definitions visible to the LLM during planning: read-only tools + `exit_plan`.
+    fn plan_definitions(&self) -> Vec<&ToolDefinition> {
+        let mut defs: Vec<&ToolDefinition> = self
+            .tools
+            .definitions()
+            .into_iter()
+            .filter(|d| self.is_plan_allowed(d.name))
+            .collect();
+        defs.push(&self.exit_plan_def);
+        defs
+    }
+
+    /// Execute only the plan-allowed tools; blocked calls yield an error result
+    /// so the model learns it can't use them here.
+    async fn execute_plan_calls(&self, calls: &[ToolCall]) -> Vec<(String, ToolResult)> {
+        let mut allowed: Vec<ToolCall> = Vec::new();
+        let mut blocked: Vec<(String, ToolResult)> = Vec::new();
+
+        for call in calls {
+            if call.name == "exit_plan" {
+                continue; // handled by the caller
+            }
+            if self.is_plan_allowed(&call.name) {
+                allowed.push(ToolCall {
+                    id: call.id.clone(),
+                    name: call.name.clone(),
+                    arguments: call.arguments.clone(),
+                });
+            } else {
+                blocked.push((
+                    call.id.clone(),
+                    ToolResult::error(format!(
+                        "tool '{}' is not available in planning mode",
+                        call.name
+                    )),
+                ));
+            }
+        }
+
+        let mut results = self
+            .tools
+            .execute_calls(&allowed, self.config.max_result_chars)
+            .await;
+        results.extend(blocked);
+        results
     }
 
     /// Run the **planning** phase: only read-only tools (plus `exit_plan`) are visible.
@@ -77,59 +150,11 @@ impl<P: StreamProvider> PlanAgent<P> {
         {
             messages.insert(0, Message::System(self.plan_system_prompt.clone()));
         }
-        self.run_loop(messages, Some(&self.read_only), events).await
-    }
 
-    /// Run the **execution** phase: all registered tools are available.
-    pub async fn execute(
-        &self,
-        messages: &mut Vec<Message>,
-        events: mpsc::UnboundedSender<AgentEvent>,
-    ) -> anyhow::Result<String> {
-        self.run_loop(messages, None, events).await
-    }
+        let defs = self.plan_definitions();
 
-    /// Shared agent loop. When `allowed` is `Some`, only those tool names
-    /// (plus `exit_plan`) are sent to the LLM and permitted for execution.
-    async fn run_loop(
-        &self,
-        messages: &mut Vec<Message>,
-        allowed: Option<&HashSet<&'static str>>,
-        events: mpsc::UnboundedSender<AgentEvent>,
-    ) -> anyhow::Result<String> {
-        let all_defs = self.tools.definitions();
-        let defs: Vec<&ToolDefinition> = match allowed {
-            Some(names) => {
-                let mut filtered: Vec<&ToolDefinition> = all_defs
-                    .into_iter()
-                    .filter(|d| names.contains(d.name))
-                    .collect();
-                filtered.push(&self.exit_plan_def);
-                filtered
-            }
-            None => all_defs,
-        };
-
-        loop {
-            // Set up stream channel and forward text deltas to the UI
-            let (stream_tx, mut stream_rx) = mpsc::unbounded_channel();
-            let events_clone = events.clone();
-            let forwarder = tokio::spawn(async move {
-                while let Some(event) = stream_rx.recv().await {
-                    if let StreamEvent::TextDelta(text) = event {
-                        let _ = events_clone.send(AgentEvent::TextDelta(text));
-                    }
-                }
-            });
-
-            let turn = match self.provider.stream_chat(messages, &defs, stream_tx).await {
-                Ok(t) => t,
-                Err(e) => {
-                    let _ = events.send(AgentEvent::Error(e.to_string()));
-                    return Err(e);
-                }
-            };
-            let _ = forwarder.await;
+        for _ in 0..self.config.max_turns {
+            let turn = run_streaming_turn(&self.provider, messages, &defs, &events).await?;
 
             match turn.stop_reason {
                 StopReason::Stop => {
@@ -139,58 +164,134 @@ impl<P: StreamProvider> PlanAgent<P> {
                     return Ok(text);
                 }
                 StopReason::ToolUse => {
-                    let mut results = Vec::with_capacity(turn.tool_calls.len());
-                    let mut exit_plan = false;
-
-                    for call in &turn.tool_calls {
-                        // Handle exit_plan: signal plan completion
-                        if allowed.is_some() && call.name == "exit_plan" {
-                            results.push((call.id.clone(), "Plan submitted for review.".into()));
-                            exit_plan = true;
-                            continue;
-                        }
-
-                        // Execution guard: block tools not in the allowed set
-                        if let Some(names) = allowed
-                            && !names.contains(call.name.as_str())
-                        {
-                            results.push((
-                                call.id.clone(),
-                                format!(
-                                    "error: tool '{}' is not available in planning mode",
-                                    call.name
-                                ),
-                            ));
-                            continue;
-                        }
-
-                        let _ = events.send(AgentEvent::ToolCall {
-                            name: call.name.clone(),
-                            summary: tool_summary(call),
+                    // Detect exit_plan: finish the phase, signal completion.
+                    if let Some(exit_id) = turn
+                        .tool_calls
+                        .iter()
+                        .find(|c| c.name == "exit_plan")
+                        .map(|c| c.id.clone())
+                    {
+                        let text = turn.text.clone().unwrap_or_default();
+                        messages.push(Message::Assistant(turn));
+                        messages.push(Message::ToolResult {
+                            id: exit_id,
+                            content: "Plan submitted for review.".into(),
                         });
-                        let content = match self.tools.get(&call.name) {
-                            Some(t) => t
-                                .call(call.arguments.clone())
-                                .await
-                                .unwrap_or_else(|e| format!("error: {e}")),
-                            None => format!("error: unknown tool `{}`", call.name),
-                        };
-                        results.push((call.id.clone(), content));
+                        let _ = events.send(AgentEvent::Done(text.clone()));
+                        return Ok(text);
                     }
 
-                    let plan_text = turn.text.clone().unwrap_or_default();
-                    messages.push(Message::Assistant(turn));
-                    for (id, content) in results {
-                        messages.push(Message::ToolResult { id, content });
-                    }
-
-                    // If exit_plan was called, return the plan text to the caller
-                    if exit_plan {
-                        let _ = events.send(AgentEvent::Done(plan_text.clone()));
-                        return Ok(plan_text);
-                    }
+                    let results = self.execute_plan_calls(&turn.tool_calls).await;
+                    emit_tool_events(&events, &turn.tool_calls, &results, &self.tools);
+                    push_tool_results(messages, turn, results);
                 }
             }
         }
+
+        let err = format!(
+            "exceeded max turns ({}) during planning",
+            self.config.max_turns
+        );
+        let _ = events.send(AgentEvent::Error(err.clone()));
+        anyhow::bail!(err)
     }
+
+    /// Run the **execution** phase: all registered tools are available.
+    pub async fn execute(
+        &self,
+        messages: &mut Vec<Message>,
+        events: mpsc::UnboundedSender<AgentEvent>,
+    ) -> anyhow::Result<String> {
+        stream_chat_loop(
+            &self.provider,
+            &self.tools,
+            &self.config,
+            messages,
+            Some(&events),
+        )
+        .await
+    }
+}
+
+/// Run one streaming turn, forwarding text deltas to `events` and returning
+/// the assembled [`AssistantTurn`].
+pub(crate) async fn run_streaming_turn<P: StreamProvider>(
+    provider: &P,
+    messages: &[Message],
+    defs: &[&ToolDefinition],
+    events: &mpsc::UnboundedSender<AgentEvent>,
+) -> anyhow::Result<AssistantTurn> {
+    let (stream_tx, mut stream_rx) = mpsc::unbounded_channel();
+    let events_clone = events.clone();
+    let forwarder = tokio::spawn(async move {
+        while let Some(event) = stream_rx.recv().await {
+            if let StreamEvent::TextDelta(text) = event {
+                let _ = events_clone.send(AgentEvent::TextDelta(text));
+            }
+        }
+    });
+
+    let result = provider.stream_chat(messages, defs, stream_tx).await;
+    let _ = forwarder.await;
+
+    match result {
+        Ok(turn) => Ok(turn),
+        Err(e) => {
+            let _ = events.send(AgentEvent::Error(e.to_string()));
+            Err(e)
+        }
+    }
+}
+
+/// The streaming counterpart to [`chat_loop`](crate::agent::chat_loop).
+///
+/// Shared by [`PlanAgent::execute`] and [`StreamingAgent`](crate::streaming::StreamingAgent).
+/// `events` is optional in signature for symmetry with `chat_loop`, but in
+/// practice streaming agents always pass `Some` because the UI needs the
+/// text deltas.
+pub(crate) async fn stream_chat_loop<P: StreamProvider>(
+    provider: &P,
+    tools: &ToolSet,
+    config: &QueryConfig,
+    messages: &mut Vec<Message>,
+    events: Option<&mpsc::UnboundedSender<AgentEvent>>,
+) -> anyhow::Result<String> {
+    let defs = tools.definitions();
+
+    for _ in 0..config.max_turns {
+        let turn = match events {
+            Some(tx) => run_streaming_turn(provider, messages, &defs, tx).await?,
+            None => {
+                // Silent path: still need a channel for the provider, just discard.
+                let (noop_tx, _noop_rx) = mpsc::unbounded_channel();
+                provider.stream_chat(messages, &defs, noop_tx).await?
+            }
+        };
+
+        match turn.stop_reason {
+            StopReason::Stop => {
+                let text = turn.text.clone().unwrap_or_default();
+                if let Some(tx) = events {
+                    let _ = tx.send(AgentEvent::Done(text.clone()));
+                }
+                messages.push(Message::Assistant(turn));
+                return Ok(text);
+            }
+            StopReason::ToolUse => {
+                let results = tools
+                    .execute_calls(&turn.tool_calls, config.max_result_chars)
+                    .await;
+                if let Some(tx) = events {
+                    emit_tool_events(tx, &turn.tool_calls, &results, tools);
+                }
+                push_tool_results(messages, turn, results);
+            }
+        }
+    }
+
+    let err = format!("exceeded max turns ({})", config.max_turns);
+    if let Some(tx) = events {
+        let _ = tx.send(AgentEvent::Error(err.clone()));
+    }
+    anyhow::bail!(err)
 }

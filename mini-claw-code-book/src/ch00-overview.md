@@ -111,12 +111,21 @@ cargo test -p mini-claw-code-starter
 | 17 | Settings Hierarchy | `src/config.rs`, `src/usage.rs` | `config`, `cost_tracker` |
 | 18 | Project Instructions | `src/instructions.rs`, `src/context.rs` | `instructions`, `context_manager` |
 
+### Part V: Extensions
+
+These chapters build opt-in capabilities on top of the core agent. Their tests
+are marked `#[ignore]` in the starter because they depend on the rest of the
+book being implemented first; run them with `--ignored`.
+
+| Chapter | Topic | File(s) to edit | Test command |
+|---------|-------|-----------------|--------------|
+| 19 | AskTool (user input) | `src/tools/ask.rs` | `test_ask_` (run with `--ignored`) |
+| 20 | Subagents | `src/subagent.rs` | `test_subagent_` (run with `--ignored`) |
+
 ### Bonus (no chapter yet -- stubs + tests available)
 
 | Topic | File to edit | Test command |
 |-------|-------------|--------------|
-| AskTool (user input) | `src/tools/ask.rs` | `ask` (run with `--ignored`) |
-| SubagentTool (child agents) | `src/subagent.rs` | `subagent` (run with `--ignored`) |
 | Interactive CLI | `examples/chat.rs` | `cargo run --example chat` (after stub is filled in) |
 
 Let's start building.

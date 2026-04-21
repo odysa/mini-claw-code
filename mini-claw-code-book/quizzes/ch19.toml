@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Why does `AskTool` declare the `options` parameter with `param_raw(...)` instead of `param(\"options\", \"array\", ..., false)`?"
+answer.answer = "`.param()` only builds scalar JSON schemas; an array of strings requires `{\"type\": \"array\", \"items\": {\"type\": \"string\"}}`, which `.param()` cannot express."
+prompt.distractors = [
+  "`.param()` always marks parameters as required, so optional array parameters must go through `param_raw`.",
+  "`.param_raw()` is faster at runtime because it skips JSON Schema validation.",
+  "The LLM only accepts array parameters if they are registered with `.param_raw()`.",
+]
+context = """
+`.param(name, type, description, required)` writes `{"type": type, "description": ...}` into the schema — fine for scalars like `string` or `number`, but it has nowhere to put the nested `items` key that JSON Schema requires for arrays. `.param_raw(name, schema, required)` takes a raw `serde_json::Value` and stores it verbatim, which is what the `options: array of strings` parameter needs. The test `test_ask_param_raw` exercises this builder directly, independent of `AskTool`.
+"""
+id = "d6c22653-6eae-470a-bf52-5c3f097d70f9"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "The `AskTool` struct stores its input handler as `Arc<dyn InputHandler>`. Why `Arc<dyn ...>` rather than `Box<dyn ...>` or a generic `H: InputHandler`?"
+answer.answer = "The handler can have multiple owners (e.g. a TUI event loop and the tool itself), and the type is erased so one `AskTool` works with any handler flavor without propagating a generic parameter."
+prompt.distractors = [
+  "`Box<dyn InputHandler>` is not `Send + Sync` and cannot be held across `.await`.",
+  "`Arc` is required because `async fn` methods in traits can only be called through reference-counted pointers.",
+  "Generic parameters on tools are forbidden by the `Tool` trait's object-safety rules.",
+]
+context = """
+`Box<dyn ...>` would work for a handler with a single owner, but `ChannelInputHandler` is paired with a consumer on the other end of an mpsc channel that typically also needs a reference — sharing means `Arc`. A generic `H: InputHandler` parameter would monomorphise per handler type and propagate that parameter to every user of `AskTool`, bloating call sites. `Arc<dyn InputHandler>` gives you sharing, type erasure, and `Send + Sync` in one type.
+"""
+id = "cbba4c21-6122-44ff-b6ad-1906e1a65e3d"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "Inside `CliInputHandler::ask`, why is the body of the closure wrapped in `tokio::task::spawn_blocking(move || { ... }).await?` instead of being called directly?"
+answer.answer = "`io::stdin().read_line` blocks the current OS thread; running it directly inside an `async fn` would stall the Tokio runtime. `spawn_blocking` moves the blocking call to Tokio's blocking pool so the async runtime can keep making progress."
+prompt.distractors = [
+  "`async fn` cannot own captured `String` values; `spawn_blocking` is the only way to move them into a closure.",
+  "`stdin` reads are async on macOS but blocking on Linux, so `spawn_blocking` provides portability.",
+  "The `#[async_trait]` macro requires every trait implementation to spawn its work on a dedicated thread pool.",
+]
+context = """
+Tokio's main executor threads are for work that yields — futures awaiting I/O, timers, etc. A call that blocks (like `read_line`) holds a thread indefinitely, which can starve the whole runtime if you exhaust the limited worker pool. `spawn_blocking` hands the work to a separate pool sized for blocking operations. The closure takes owned copies (`question.to_string()`, `options.to_vec()`) because it moves to a different thread with no borrow on the original references.
+"""
+id = "8b973bf8-4035-4620-9f03-617e9a7d92a8"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "The `ChannelInputHandler` uses an `mpsc::UnboundedSender<UserInputRequest>` to send questions *and* each request carries its own `oneshot::Sender<String>` for the answer. Why two channel types instead of one?"
+answer.answer = "An `mpsc` carries many questions to a single event loop; a `oneshot` pairs each answer with its specific question without having to tag responses with request IDs."
+prompt.distractors = [
+  "`oneshot` is faster than `mpsc` for string payloads; using it for the question would be wasteful.",
+  "`mpsc` receivers cannot send replies, so a second channel is mandatory by the Tokio API.",
+  "`mpsc` channels drop messages under load; the `oneshot` reply is needed to confirm delivery.",
+]
+context = """
+If both directions used an `mpsc`, you would need to tag each reply with a request ID so the agent knows which question it answers — effectively reinventing a small RPC protocol. The `oneshot::Sender` embedded in the request means the event loop replies to *that specific question*, and the agent awaits exactly one reply. The test `test_ask_channel_handler_roundtrip` exercises this wiring end to end.
+"""
+id = "b4372e26-14d3-410a-9e73-4ba41aa31fc8"

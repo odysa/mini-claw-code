@@ -81,7 +81,8 @@ cargo test -p mini-claw-code-starter
 | Chapter | Topic | File(s) to edit | Test command |
 |---------|-------|-----------------|--------------|
 | 4 | Messages & Types | `src/types.rs` (pre-filled) | `test_mock_` |
-| 5 | Provider & Streaming | `src/mock.rs`, `src/streaming.rs`, `src/providers/openrouter.rs` | `test_mock_`, `test_openrouter_`, `streaming` |
+| 5a | Provider & Streaming Foundations | `src/mock.rs`, `src/streaming.rs` | `test_mock_`, `test_streaming_parse_`, `test_streaming_accumulator_` |
+| 5b | OpenRouter & StreamingAgent | `src/providers/openrouter.rs`, `src/streaming.rs` | `test_openrouter_`, `test_streaming_stream_chat_`, `test_streaming_streaming_agent_` |
 | 6 | Tool Interface | `src/tools/read.rs` (already done in Ch2 — re-read) | `test_read_` |
 | 7 | The Agentic Loop (Deep Dive) | `src/agent.rs` (already done in Ch3 — re-read) | `test_single_turn_`, `test_simple_agent_` |
 

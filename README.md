@@ -85,7 +85,8 @@ Match on `StopReason`. Follow instructions. That's the architecture.
 | Ch | Topic | What it adds |
 |----|-------|--------------|
 | 4 | Messages & Types | The shared protocol behind every provider and tool |
-| 5 | Provider & Streaming | `OpenRouterProvider`, SSE parsing, `StreamingAgent` |
+| 5a | Provider & Streaming Foundations | `Provider` trait, SSE parsing, `StreamAccumulator` |
+| 5b | OpenRouter & StreamingAgent | `OpenRouterProvider`, event channels, `StreamingAgent` |
 | 6 | Tool Interface | Why `Tool` and `Provider` pick different async styles |
 | 7 | The Agentic Loop (Deep Dive) | `execute_tools`, event plumbing, ownership |
 
@@ -158,7 +159,7 @@ Every hands-on chapter follows the same rhythm:
 
 Green tests = you got it.
 
-> **Heads up:** chapter numbers don't match the starter's test file numbers (the chapters were reorganized by topic). Each chapter tells you exactly which `test_chN_` prefix to run. The full mapping is also in the [overview](https://odysa.github.io/mini-claw-code/ch00-overview.html).
+> **Heads up:** starter tests are organized by feature, not chapter number — each chapter tells you exactly which test prefix to run (e.g. `test_read_`, `test_bash_`, `test_edit_`). The full mapping lives in the [overview](https://odysa.github.io/mini-claw-code/ch00-overview.html).
 
 ## Project structure
 

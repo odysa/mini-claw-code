@@ -36,8 +36,26 @@ impl AskTool {
     /// Hint: Use `ToolDefinition::new("ask_user", ...)`,
     /// `.param("question", "string", ..., true)`,
     /// then `.param_raw("options", json!({"type": "array", ...}), false)`.
-    pub fn new(_handler: Arc<dyn InputHandler>) -> Self {
-        unimplemented!("TODO bonus: build ask_user ToolDefinition + store the handler")
+    pub fn new(handler: Arc<dyn InputHandler>) -> Self {
+        Self {
+            definition: ToolDefinition::new(
+                "ask_user",
+                "Ask the user a clarifying question. Use this when you need more information \
+                 before proceeding. The user will see your question and can provide a free-text \
+                 answer or choose from the options you provide.",
+            )
+            .param("question", "string", "The question to ask the user", true)
+            .param_raw(
+                "options",
+                json!({
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Optional list of choices to present to the user"
+                }),
+                false,
+            ),
+            handler,
+        }
     }
 }
 
@@ -48,10 +66,14 @@ impl Tool for AskTool {
     }
 
     /// Extract question and options, call handler.ask().
-    async fn call(&self, _args: Value) -> anyhow::Result<String> {
-        unimplemented!(
-            "TODO bonus: pull question+options from args and delegate to self.handler.ask"
-        )
+    async fn call(&self, args: Value) -> anyhow::Result<String> {
+        let question = args
+            .get("question")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("missing required parameter: question"))?;
+
+        let options = parse_options(&args);
+        self.handler.ask(question, &options).await
     }
 }
 
@@ -156,6 +178,10 @@ impl MockInputHandler {
 impl InputHandler for MockInputHandler {
     /// Return the next canned answer, or error if the queue is empty.
     async fn ask(&self, _question: &str, _options: &[String]) -> anyhow::Result<String> {
-        unimplemented!("TODO bonus: pop the next pre-configured answer from self.answers")
+        self.answers
+            .lock()
+            .await
+            .pop_front()
+            .ok_or_else(|| anyhow::anyhow!("MockInputHandler: no more answers"))
     }
 }

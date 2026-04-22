@@ -25,3 +25,5 @@
 - [Chapter 16: Plan Mode](./ch16-plan-mode.md)
 - [Chapter 17: Settings Hierarchy](./ch17-settings.md)
 - [Chapter 18: Project Instructions & Context Management](./ch18-instructions.md)
+- [Chapter 19: AskTool (User Input)](./ch19-ask-tool.md)
+- [Chapter 20: Subagents](./ch20-subagent.md)

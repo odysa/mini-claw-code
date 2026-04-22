@@ -590,4 +590,4 @@ Natural extensions to explore on your own:
 
 ---
 
-[← Chapter 17: Settings Hierarchy](./ch17-settings.md) · [Contents](./ch00-overview.md)
+[← Chapter 17: Settings Hierarchy](./ch17-settings.md) · [Contents](./ch00-overview.md) · [Chapter 19: AskTool →](./ch19-ask-tool.md)

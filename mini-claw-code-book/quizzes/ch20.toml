@@ -1,0 +1,55 @@
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "`SubagentTool` stores its provider as `Arc<P>` but stores its tools as a `Box<dyn Fn() -> ToolSet + Send + Sync>` closure factory. Why the asymmetry?"
+answer.answer = "`Arc<P>` can be shared with the parent because the blanket `impl<P: Provider> Provider for Arc<P>` makes it a valid provider, but `Box<dyn Tool>` is not `Clone`, so tools are rebuilt per call through a closure."
+prompt.distractors = [
+  "`Arc<ToolSet>` would deadlock because tools hold internal mutexes.",
+  "Providers are immutable at runtime while tools mutate per call, so only tools need a fresh instance.",
+  "Rust forbids sharing heterogeneous collections across async tasks; the factory is a workaround.",
+]
+context = """
+Providers have one implementation per backend, are stateless in the sense that matters (the HTTP client is internally shareable), and the blanket `Provider` impl for `Arc<P>` lets parent and child share one concrete provider. Tools, by contrast, live inside a `HashMap<String, Box<dyn Tool>>`, and `Box<dyn Tool>` cannot be cloned — the concrete type is erased. So instead of sharing the same `ToolSet`, the subagent gets a closure that builds a new one on each spawn, which also lets the child have a different tool set from the parent.
+"""
+id = "c3fdca43-c8b8-4860-b1b9-5c5aaaed141c"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "When the child loop exhausts `max_turns`, `SubagentTool::call` returns `Ok(\"error: max turns exceeded\".to_string())`. Why not `Err(anyhow!(\"max turns exceeded\"))`?"
+answer.answer = "Returning `Ok(error_string)` surfaces the child's specific failure to the parent LLM as a tool result it can read and recover from; returning `Err` would be treated as a generic tool failure, losing context."
+prompt.distractors = [
+  "`async_trait` methods cannot return `Err` from inside a loop body.",
+  "The parent's agent loop panics on any `Err` return from a tool call.",
+  "Returning `Err` would cause `Arc::drop` to execute on the still-running child.",
+]
+context = """
+The agent loop converts any `Err` from a tool call into `"error: ..."` text before handing it to the model. Returning `Ok("error: max turns exceeded")` delivers the exact same message directly, phrased from the child's perspective. The test `test_subagent_max_turns_exceeded` pins this behavior with `.await.unwrap()` and `assert_eq!(result, "error: max turns exceeded")`. Compare with `test_subagent_subagent_child_provider_error`, where a provider failure *is* propagated as `Err` — that is a genuine infrastructure error the child cannot recover from.
+"""
+id = "d874953d-e402-4d37-96ba-b8807232dd24"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "After the parent agent calls `SubagentTool` with `{\"task\": \"...\"}`, the child runs through four internal messages (User, Assistant, ToolResult, Assistant). How many of those messages end up in the parent's `Vec<Message>`?"
+answer.answer = "Zero — only the child's final text, wrapped in a single `Message::ToolResult`, crosses the boundary into the parent's history."
+prompt.distractors = [
+  "All four, in the same order the child produced them.",
+  "Two — the child's final `Assistant` turn and its preceding `ToolResult`.",
+  "One — the child's full history is flattened into a single `System` message in the parent."
+]
+context = """
+The child's message vector is local to `SubagentTool::call`. Only the final string returned from the call becomes a tool result in the parent's history. This is the isolation contract verified by `test_subagent_isolated_message_history`: after the call, the parent's vector is exactly `[User, Assistant(ToolUse), ToolResult, Assistant(Stop)]` — four messages, one of which is the subagent's condensed answer. This isolation is what makes subagents pay off: the parent's prompt stays small regardless of how chatty the child was.
+"""
+id = "1dcd824a-4f94-4c9a-b893-130690d0ff5a"
+
+[[questions]]
+type = "MultipleChoice"
+prompt.prompt = "In the child's tool-dispatch loop, a call to a tool that does not exist is handled with `format!(\"error: unknown tool `{}`\", call.name)` and pushed as a `ToolResult`. What behavior does this enable on the next turn?"
+answer.answer = "The LLM receives the error as a tool result, realizes its call was rejected, and can retry with a different tool or answer without the child loop crashing."
+prompt.distractors = [
+  "The LLM automatically retries the same tool name on the next turn until it succeeds.",
+  "The agent loop rewrites the next `provider.chat` call to exclude the unknown tool from the schema.",
+  "The child immediately exits with `StopReason::Stop` and returns the error string as its answer.",
+]
+context = """
+Tool errors — including unknown tools — are feedback, not failures. The child loop keeps running; the next `provider.chat` call sees the error string as the most recent tool result, and the model decides what to do next. The test `test_subagent_subagent_unknown_tool_in_child` confirms this: the child calls a nonexistent tool, gets the error string back, and produces a sensible final answer on the next turn. Returning `Err` here would short-circuit the loop and lose the chance for the model to adjust.
+"""
+id = "aa496393-6d5a-458c-9d33-ec823ffd3fe7"

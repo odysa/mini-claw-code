@@ -15,6 +15,7 @@ command = "mdbook-mermaid"
 
 [output.html]
 additional-js = ["mermaid.min.js", "mermaid-init.js", "language-switcher.js"]
+additional-css = ["custom.css"]
 site-url = "/mini-claw-code/zh/"
 git-repository-url = "https://github.com/odysa/mini-claw-code"
-git-repository-icon = "fab-github"
+git-repository-icon = "fa-github"

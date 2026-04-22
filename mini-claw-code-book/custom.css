@@ -1,0 +1,13 @@
+#menu-bar .right-buttons {
+    display: flex;
+    align-items: center;
+}
+
+#menu-bar .right-buttons > a:has(#git-repository-button) {
+    order: -1;
+}
+
+#menu-bar .icon-button i,
+#menu-bar .right-buttons a i {
+    font-size: 1.4em;
+}

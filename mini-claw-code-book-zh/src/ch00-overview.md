@@ -81,7 +81,8 @@ cargo test -p mini-claw-code-starter
 | 第 N 章 | 主题 | 需编辑的文件 | 测试命令 |
 |---------|------|------------|---------|
 | 4 | 消息与类型 | `src/types.rs`（已预填）| `test_mock_` |
-| 5 | Provider 与流式 | `src/mock.rs`、`src/streaming.rs`、`src/providers/openrouter.rs` | `test_mock_`、`test_openrouter_`、`streaming` |
+| 5a | Provider 与流式基础 | `src/mock.rs`、`src/streaming.rs` | `test_mock_`、`test_streaming_parse_`、`test_streaming_accumulator_` |
+| 5b | OpenRouter 与 StreamingAgent | `src/providers/openrouter.rs`、`src/streaming.rs` | `test_openrouter_`、`test_streaming_stream_chat_`、`test_streaming_streaming_agent_` |
 | 6 | 工具接口 | `src/tools/read.rs`（第 2 章已完成，重新阅读）| `test_read_` |
 | 7 | Agentic 循环（深度解析）| `src/agent.rs`（第 3 章已完成，重新阅读）| `test_single_turn_`、`test_simple_agent_` |
 
